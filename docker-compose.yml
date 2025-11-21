@@ -96,12 +96,10 @@ services:
     ports:
       - "5050:80"
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@alloartisan.local
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
       PGADMIN_DEFAULT_PASSWORD: admin123
       PGADMIN_CONFIG_SERVER_MODE: 'False'
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
-      # Thème sombre par défaut
-      PGADMIN_CONFIG_THEME: 'dark'
     volumes:
       - pgadmin-data:/var/lib/pgadmin
       # Configuration pré-configurée des serveurs (optionnel)
