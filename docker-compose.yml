@@ -1,0 +1,181 @@
+services:
+  # ========================================
+  # BASE DE DONNÉES DÉVELOPPEMENT
+  # PostgreSQL 16 avec PostGIS 3.4
+  # ========================================
+  dev-db:
+    image: postgis/postgis:16-3.4
+    container_name: alloartisan-dev-db
+    restart: unless-stopped
+    ports:
+      - "5438:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+      POSTGRES_DB: alloartisan_dev
+      # Optimisations pour développement
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 1GB
+      POSTGRES_MAX_CONNECTIONS: 100
+    volumes:
+      # Persistence des données
+      - dev-db-data:/var/lib/postgresql/data
+      # Scripts d'initialisation (si besoin)
+      - ./docker/init-scripts:/docker-entrypoint-initdb.d:ro
+    networks:
+      - alloartisan-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d alloartisan_dev" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command: >
+      postgres -c shared_preload_libraries=pg_stat_statements -c pg_stat_statements.track=all -c max_connections=100 -c shared_buffers=256MB -c effective_cache_size=1GB -c maintenance_work_mem=64MB -c checkpoint_completion_target=0.9 -c wal_buffers=16MB -c default_statistics_target=100 -c random_page_cost=1.1 -c effective_io_concurrency=200 -c work_mem=2621kB -c min_wal_size=1GB -c max_wal_size=4GB -c log_statement=all -c log_duration=on
+
+  # ========================================
+  # BASE DE DONNÉES TEST
+  # PostgreSQL 16 avec PostGIS 3.4
+  # ========================================
+  test-db:
+    image: postgis/postgis:16-3.4
+    container_name: alloartisan-test-db
+    restart: unless-stopped
+    ports:
+      - "5436:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+      POSTGRES_DB: alloartisan_test
+      POSTGRES_SHARED_BUFFERS: 128MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 512MB
+      POSTGRES_MAX_CONNECTIONS: 50
+    volumes:
+      - test-db-data:/var/lib/postgresql/data
+    networks:
+      - alloartisan-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d alloartisan_test" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    command: >
+      postgres -c shared_preload_libraries=pg_stat_statements -c max_connections=50 -c shared_buffers=128MB -c fsync=off -c synchronous_commit=off -c full_page_writes=off
+
+  # ========================================
+  # REDIS - Cache et Sessions
+  # ========================================
+  redis:
+    image: redis:7.2-alpine
+    container_name: alloartisan-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save 60 1000 --appendonly yes --appendfsync everysec --requirepass redis123
+    volumes:
+      - redis-data:/data
+    networks:
+      - alloartisan-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  # ========================================
+  # PGADMIN - Interface de gestion PostgreSQL (DEV uniquement)
+  # Interface moderne et complète pour PostgreSQL/PostGIS
+  # ========================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: alloartisan-pgadmin
+    restart: unless-stopped
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@alloartisan.local
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+      # Thème sombre par défaut
+      PGADMIN_CONFIG_THEME: 'dark'
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+      # Configuration pré-configurée des serveurs (optionnel)
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
+    networks:
+      - alloartisan-network
+    depends_on:
+      dev-db:
+        condition: service_healthy
+    profiles:
+      - dev
+      - admin
+
+  # ========================================
+  # REDIS COMMANDER - Interface Redis (DEV uniquement)
+  # ========================================
+  redis-commander:
+    image: ghcr.io/joeferner/redis-commander:latest
+    container_name: alloartisan-redis-commander
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      REDIS_HOSTS: local:redis:6379:0:redis123
+      HTTP_USER: admin
+      HTTP_PASSWORD: admin123
+    networks:
+      - alloartisan-network
+    depends_on:
+      redis:
+        condition: service_healthy
+    profiles:
+      - dev
+      - admin
+  # ========================================
+  # MAILHOG - Serveur SMTP de test (DEV uniquement)
+  # Capture tous les emails envoyés en développement
+  # ========================================
+  # mailhog:
+  #   image: mailhog/mailhog:latest
+  #   container_name: alloartisan-mailhog
+  #   restart: unless-stopped
+  #   ports:
+  #     - "1025:1025" # SMTP
+  #     - "8025:8025" # Interface Web
+  #   networks:
+  #     - alloartisan-network
+  #   profiles:
+  #     - dev
+
+  # ========================================
+  # VOLUMES PERSISTANTS
+  # ========================================
+volumes:
+  dev-db-data:
+    name: alloartisan-dev-db-data
+    driver: local
+  test-db-data:
+    name: alloartisan-test-db-data
+    driver: local
+  redis-data:
+    name: alloartisan-redis-data
+    driver: local
+  pgadmin-data:
+    name: alloartisan-pgadmin-data
+    driver: local
+
+# ========================================
+# RÉSEAU
+# ========================================
+networks:
+  alloartisan-network:
+    name: alloartisan-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

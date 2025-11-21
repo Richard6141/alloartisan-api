@@ -1,0 +1,24 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "AlloArtisan DEV",
+      "Group": "Servers",
+      "Host": "dev-db",
+      "Port": 5432,
+      "MaintenanceDB": "alloartisan_dev",
+      "Username": "postgres",
+      "SSLMode": "prefer",
+      "Comment": "Base de données de développement"
+    },
+    "2": {
+      "Name": "AlloArtisan TEST",
+      "Group": "Servers",
+      "Host": "test-db",
+      "Port": 5432,
+      "MaintenanceDB": "alloartisan_test",
+      "Username": "postgres",
+      "SSLMode": "prefer",
+      "Comment": "Base de données de test"
+    }
+  }
+}

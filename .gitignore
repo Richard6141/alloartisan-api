@@ -19,6 +19,13 @@ lerna-debug.log*
 /coverage
 /.nyc_output
 
+
+# ========================================
+# Documentation générée
+# ========================================
+docs/api/
+docs/coverage/
+
 # IDEs and editors
 /.idea
 .project
@@ -51,6 +58,27 @@ pids
 *.pid
 *.seed
 *.pid.lock
+
+# ========================================
+# NestJS
+# ========================================
+dist/
+build/
+.nest/
+
+# ========================================
+# Base de données
+# ========================================
+*.db
+*.sqlite
+*.sqlite3
+backups/
+*.sql
+*.dump
+
+# Prisma
+prisma/migrations/**/migration.sql
+.prisma/
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json

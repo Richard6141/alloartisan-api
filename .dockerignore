@@ -1,0 +1,74 @@
+# ========================================
+# ALLOARTISAN - .dockerignore
+# Fichiers à exclure des builds Docker
+# ========================================
+
+# Dépendances
+node_modules
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# Tests
+coverage
+*.test.ts
+*.spec.ts
+test/
+tests/
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Documentation
+*.md
+docs/
+README.md
+
+# Environnement
+.env
+.env.*
+!.env.example
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Fichiers temporaires
+tmp
+temp
+dist
+build
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backups
+backups/
+*.sql
+*.dump
+
+# Uploads (dev)
+uploads/
+public/uploads/
