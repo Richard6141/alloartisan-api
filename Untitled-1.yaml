@@ -1,0 +1,28 @@
+services:
+    dev-db:
+        image: postgres:15
+        container_name: dev-db
+        ports:
+            - '5438:5432'
+        environment:
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: 123
+            POSTGRES_DB: alloartisan
+        networks:
+            - app-network
+
+    test-db:
+        image: postgres:15
+        container_name: test-db
+        ports:
+            - '5436:5432'
+        environment:
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: 123
+            POSTGRES_DB: nest
+        networks:
+            - app-network
+
+networks:
+    app-network:
+        driver: bridge
