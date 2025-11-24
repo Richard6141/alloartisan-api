@@ -12,12 +12,67 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum Role {
+  CLIENT
+  ARTISAN
+  ADMIN
+}
+
+enum Statut {
+  EN_ATTENTE
+  ACTIF
+  SUSPENDU
+  BANNI
+}
+
 model User {
-  id        Int      @id @default(autoincrement())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  email     String   @unique
-  password  String
-  firstName String?
-  lastName  String?
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  email       String   @unique(map: "idx_users_email")
+  telephone   String?  @unique @db.VarChar(20)
+  nom         String?  @db.VarChar(100)
+  prenom      String?  @db.VarChar(100)
+  dateNaissance DateTime? @db.Date @map("date_naissance")
+  sexe        String?  @db.Char(1)
+  photoUrl    String?  @db.Text @map("photo_url")
+
+  adressePrincipale String? @map("adresse_principale")
+  latitude    Decimal? @db.Decimal(10, 8)
+  longitude   Decimal? @db.Decimal(11, 8)
+  ville       String?  @db.VarChar(50)
+  quartier    String?  @db.VarChar(100)
+
+  // Authentification
+  passwordHash String   @db.VarChar(255) @map("password_hash")
+  emailVerified Boolean @default(false) @map("email_verified")
+  telephoneVerified Boolean @default(false) @map("telephone_verified")
+  profilComplet Boolean @default(false) @map("profil_complet")
+
+  emailVerificationToken      String?   @unique @db.VarChar(64) @map("email_verification_token")
+  emailVerificationExpiresAt  DateTime? @db.Timestamptz @map("email_verification_expires_at")
+
+  telephoneVerificationToken     String?   @unique @db.VarChar(64) @map("telephone_verification_token")
+  telephoneVerificationExpiresAt DateTime? @db.Timestamptz @map("telephone_verification_expires_at")
+  role      Role   @default(CLIENT)
+  statut    Statut @default(EN_ATTENTE)
+  langue     String  @default("fr") @db.VarChar(5)
+  timezone   String  @default("Africa/Porto-Novo") @db.VarChar(50)
+  notificationEmail Boolean @default(true)  @map("notification_email")
+  notificationSms   Boolean @default(false) @map("notification_sms")
+  notificationPush  Boolean @default(true)  @map("notification_push")
+
+  // Métadonnées
+  derniereConnexion DateTime? @db.Timestamptz @map("derniere_connexion")
+  createdAt DateTime @default(now()) @db.Timestamptz @map("created_at")
+  updatedAt DateTime @updatedAt @db.Timestamptz @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz @map("deleted_at")
+
+  @@index([telephone], name: "idx_users_telephone")
+  @@index([ville, quartier], name: "idx_users_location")
+  @@index([role], name: "idx_users_role")
+  @@index([createdAt], name: "idx_users_created")
+  @@index([emailVerificationToken], name: "idx_users_token")
+  @@index([statut, role], name: "idx_users_statut_role")
+  @@index([deletedAt, statut], name: "idx_users_active")
+  
+  @@map("users")
 }
