@@ -4,6 +4,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { ArtisansModule } from './artisans/artisans.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { AtGuard } from './common/guards';
 
 @Module({
     imports: [
@@ -12,6 +13,12 @@ import { PrismaModule } from './prisma/prisma.module';
         UsersModule,
         ArtisansModule,
         PrismaModule,
+    ],
+    providers: [
+        {
+            provide: 'APP_GUARD',
+            useClass: AtGuard,
+        },
     ],
 })
 export class AppModule {}
