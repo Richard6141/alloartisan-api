@@ -43,6 +43,8 @@ model User {
 
   // Authentification
   passwordHash String   @db.VarChar(255) @map("password_hash")
+  //Refresh tocken
+  hasheRt String?  @db.VarChar(255) @map("hashed_rt")
   emailVerified Boolean @default(false) @map("email_verified")
   telephoneVerified Boolean @default(false) @map("telephone_verified")
   profilComplet Boolean @default(false) @map("profil_complet")

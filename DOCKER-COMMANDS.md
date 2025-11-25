@@ -236,4 +236,26 @@ DATABASE_URL_TEST="postgresql://postgres:postgres123@localhost:5436/alloartisan_
 
 # Redis
 REDIS_URL="redis://:redis123@localhost:6379"
+
+Gestion Docker :
+  - pnpm docker:up - Démarrer PostgreSQL (dev + test) et Redis
+  - pnpm docker:up:admin - Démarrer avec pgAdmin et Redis Commander
+  - pnpm docker:down - Arrêter tous les services
+  - pnpm docker:down:volumes - Arrêter et supprimer les données
+  - pnpm docker:logs - Voir les logs en temps réel
+
+  Base de données développement :
+  - pnpm db:dev:rm - Supprimer le conteneur dev-db
+  - pnpm db:dev:up - Démarrer dev-db
+  - pnpm db:dev:restart - Reset complet dev-db + migrations
+
+  Base de données test :
+  - pnpm db:test:rm - Supprimer le conteneur test-db
+  - pnpm db:test:up - Démarrer test-db
+  - pnpm db:test:restart - Reset complet test-db + migrations
+  - pnpm db:restart - Reset dev + test ensemble
+
+  Prisma :
+  - pnpm prisma:dev:deploy - Appliquer les migrations en dev
+  - pnpm prisma:test:deploy - Appliquer les migrations en test
 ```

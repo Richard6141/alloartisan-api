@@ -31,7 +31,26 @@ export class AuthService {
         }
     }
 
-    login() {
+    async login(dto: AuthDto) {
+        // Trouver l'utilisateur par email
+        const user = await this.prisma.user.findUnique({
+            where: {
+                email: dto.email,
+            },
+        });
+        // Si non trouvé en renvoie erreur
+        if (!user) {
+            throw new ForbiddenException('Email or password incorrect');
+        }
+        // Si trouvé, on compare mot de passe
+        const passwordMatch = await argon.verify(user.passwordHash, dto.password);
+        //Si mot de passe incorrect, on renvoit erreur
+        if (!passwordMatch) {
+            throw new ForbiddenException('Email or password incorrect');
+        }
+        // Si trouvé, on renvoit, l'utilisateur
+        const { passwordHash: _, ...userWithoutpasswordHash } = user;
+        return userWithoutpasswordHash;
         return 'Hola Mundo';
     }
 
