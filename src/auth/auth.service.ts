@@ -5,12 +5,16 @@ import * as argon from 'argon2';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import { Tokens } from './types';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { OtpService } from 'src/common/services';
 
 @Injectable()
 export class AuthService {
     constructor(
         private prisma: PrismaService,
         private jwtService: JwtService,
+        private config: ConfigService,
+        private otpService: OtpService,
     ) {}
 
     async register(dto: AuthDto): Promise<Tokens> {
@@ -103,7 +107,7 @@ export class AuthService {
                     role,
                 },
                 {
-                    secret: 'at-secret',
+                    secret: this.config.getOrThrow('JWT_ACCESS_SECRET'),
                     expiresIn: 60 * 15,
                 },
             ),
@@ -114,7 +118,7 @@ export class AuthService {
                     role,
                 },
                 {
-                    secret: 'rt-secret',
+                    secret: this.config.getOrThrow('JWT_REFRESH_SECRET'),
                     expiresIn: 60 * 60 * 24 * 7,
                 },
             ),

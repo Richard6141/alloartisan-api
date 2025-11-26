@@ -75,6 +75,6 @@ model User {
   @@index([emailVerificationToken], name: "idx_users_token")
   @@index([statut, role], name: "idx_users_statut_role")
   @@index([deletedAt, statut], name: "idx_users_active")
-  
+
   @@map("users")
 }
