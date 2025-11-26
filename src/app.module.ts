@@ -7,6 +7,7 @@ import { UsersModule } from './users/users.module';
 import { ArtisansModule } from './artisans/artisans.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AtGuard } from './common/guards';
+import { MailerModule } from '@nestjs-modules/mailer';
 
 @Module({
     imports: [
@@ -25,6 +26,20 @@ import { AtGuard } from './common/guards';
                 }),
             }),
         }),
+        MailerModule.forRoot({
+            transport: {
+                host: process.env.MAIL_HOST,
+                port: Number(process.env.MAIL_PORT),
+                secure: false,
+                auth: {
+                    user: process.env.MAIL_USER,
+                    pass: process.env.MAIL_PASS,
+                },
+            },
+            defaults: {
+                from: '"NoReply | AlloArtisan" <vlavonou@e-bd.de>',
+            },
+        }),
         AuthModule,
         UsersModule,
         ArtisansModule,
@@ -37,4 +52,4 @@ import { AtGuard } from './common/guards';
         },
     ],
 })
-export class AppModule {}
+export class AppModule { }

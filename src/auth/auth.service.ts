@@ -7,6 +7,10 @@ import { Tokens } from './types';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { OtpService } from 'src/common/services';
+import { OtpType } from 'src/common/types';
+import { MailerService } from '@nestjs-modules/mailer';
+import { EmailVerificationDto } from 'src/common/services/dto';
+import { NewOtpCodeDTO } from 'src/common/services/dto/new-otp-code.dto';
 
 @Injectable()
 export class AuthService {
@@ -15,7 +19,8 @@ export class AuthService {
         private jwtService: JwtService,
         private config: ConfigService,
         private otpService: OtpService,
-    ) {}
+        private readonly mailerService: MailerService,
+    ) { }
 
     async register(dto: AuthDto): Promise<Tokens> {
         //Générer le mot de passe haché
@@ -32,6 +37,65 @@ export class AuthService {
             //return userWithoutpasswordHash;
             const tokens = await this.getTokens(user.id, user.email, user.role);
             await this.updateRtHash(user.id, tokens.refresh_token);
+            const otp = await this.otpService.create(user.id, OtpType.EMAIL_VERIFICATION);
+            await this.mailerService.sendMail({
+                to: user.email,
+                subject: 'Vérification de votre email - Allo Artisan',
+                html: `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="utf-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    </head>
+                    <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
+                        <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td align="center" style="padding: 40px 0;">
+                                    <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                        <!-- Header -->
+                                        <tr>
+                                            <td style="padding: 40px 40px 20px; text-align: center; background-color: #2563eb; border-radius: 8px 8px 0 0;">
+                                                <h1 style="margin: 0; color: #ffffff; font-size: 28px;">Allo Artisan</h1>
+                                            </td>
+                                        </tr>
+                                        <!-- Content -->
+                                        <tr>
+                                            <td style="padding: 40px;">
+                                                <h2 style="margin: 0 0 20px; color: #333333; font-size: 24px;">Vérification de votre email</h2>
+                                                <p style="margin: 0 0 20px; color: #666666; font-size: 16px; line-height: 1.5;">
+                                                    Bienvenue sur Allo Artisan ! Pour finaliser votre inscription, veuillez utiliser le code de vérification ci-dessous :
+                                                </p>
+                                                <div style="text-align: center; margin: 30px 0;">
+                                                    <div style="display: inline-block; padding: 20px 40px; background-color: #f0f7ff; border: 2px dashed #2563eb; border-radius: 8px;">
+                                                        <span style="font-size: 32px; font-weight: bold; color: #2563eb; letter-spacing: 8px;">${otp}</span>
+                                                    </div>
+                                                </div>
+                                                <p style="margin: 0 0 10px; color: #666666; font-size: 14px; line-height: 1.5;">
+                                                    Ce code expire dans <strong>10 minutes</strong>.
+                                                </p>
+                                                <p style="margin: 0; color: #999999; font-size: 14px; line-height: 1.5;">
+                                                    Si vous n'avez pas créé de compte sur Allo Artisan, vous pouvez ignorer cet email.
+                                                </p>
+                                            </td>
+                                        </tr>
+                                        <!-- Footer -->
+                                        <tr>
+                                            <td style="padding: 20px 40px; text-align: center; background-color: #f9fafb; border-radius: 0 0 8px 8px; border-top: 1px solid #e5e7eb;">
+                                                <p style="margin: 0; color: #999999; font-size: 12px;">
+                                                    © 2025 Allo Artisan. Tous droits réservés.
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </body>
+                    </html>
+                `,
+            });
+            console.log(otp);
             return tokens;
         } catch (error) {
             if (error instanceof PrismaClientKnownRequestError) {
@@ -50,8 +114,8 @@ export class AuthService {
                 email: dto.email,
             },
         });
-        // Si non trouvé en renvoie erreur
-        if (!user) {
+        // Si non trouvé en renvoie erreur ou non actif
+        if (!user || user.statut === 'BANNI' || user.statut === 'SUSPENDU') {
             throw new ForbiddenException('Email or password incorrect');
         }
         // Si trouvé, on compare mot de passe
@@ -59,6 +123,15 @@ export class AuthService {
         //Si mot de passe incorrect, on renvoit erreur
         if (!passwordMatch) {
             throw new ForbiddenException('Email or password incorrect');
+        }
+        if (!user.emailVerified) {
+            throw new ForbiddenException('Veuillez vérifier votre email avant de vous connecter');
+        }
+
+        if (user.statut != 'ACTIF') {
+            throw new ForbiddenException(
+                'Veuillez consulter les administrateur pour activer votre compte',
+            );
         }
         // Si trouvé, on renvoit, l'utilisateur
         const tokens = await this.getTokens(user.id, user.email, user.role);
@@ -138,5 +211,53 @@ export class AuthService {
                 hasheRt: hash,
             },
         });
+    }
+
+    async verifyOtp(dto: EmailVerificationDto): Promise<void> {
+        //Vérifier si l'utilisateur existe
+        const typeotp = OtpType.EMAIL_VERIFICATION;
+        const user = await this.prisma.user.findUnique({
+            where: {
+                email: dto.email,
+            },
+        });
+        if (!user) {
+            throw new ForbiddenException('User not found');
+        }
+        //Vérifier si l'OTP
+        const otp = await this.otpService.verify(user.id, typeotp, String(dto.code));
+        if (otp && user.role === 'CLIENT') {
+            await this.prisma.user.update({
+                where: {
+                    id: user.id,
+                },
+                data: {
+                    emailVerified: true,
+                    statut: 'ACTIF',
+                },
+            });
+        } else {
+            throw new ForbiddenException('Invalid OTP');
+        }
+    }
+
+    async newOtpCode(dto: NewOtpCodeDTO): Promise<string> {
+        const user = await this.prisma.user.findUnique({
+            where: {
+                email: dto.email,
+            },
+        });
+        if (!user) {
+            throw new ForbiddenException('User not found');
+        }
+        if (user.emailVerified) {
+            throw new ForbiddenException('Email already verified');
+        }
+        const otpExists = await this.otpService.exists(user.id, OtpType.EMAIL_VERIFICATION);
+        if (otpExists) {
+            return 'Un code existe déjà. Veuillez vérifier votre boite mail ou patientez quelques minutes pour demander un nouveau';
+        }
+        await this.otpService.create(user.id, OtpType.EMAIL_VERIFICATION);
+        return 'Veuillez consulter votre boite mail pour recevoir un nouveau code';
     }
 }

@@ -6,7 +6,7 @@ import { OtpType, StoredOtpData } from '../types';
 
 @Injectable()
 export class OtpService {
-    constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
+    constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) { }
 
     /**
      * Génère un code OTP aléatoire (6 chiffres par défaut)
@@ -53,7 +53,6 @@ export class OtpService {
 
         const key = this.getRedisKey(userId, type);
 
-        // Stocke dans Redis avec TTL (expiration automatique)
         await this.cacheManager.set(key, JSON.stringify(otpData), ttl * 1000);
 
         return code; // Retourne le code en clair pour l'envoyer
@@ -86,7 +85,13 @@ export class OtpService {
 
         // Incrémenter les tentatives
         otpData.attempts += 1;
-        await this.cacheManager.set(key, JSON.stringify(otpData), 0); // Garde le TTL existant
+
+        // Calculer le TTL restant (10 minutes depuis la création)
+        const ttlMs = 600 * 1000; // 10 minutes en millisecondes
+        const elapsed = Date.now() - otpData.createdAt;
+        const remainingTtl = Math.max(ttlMs - elapsed, 1000); // Au moins 1 seconde
+
+        await this.cacheManager.set(key, JSON.stringify(otpData), remainingTtl);
 
         // Vérifier le code
         const isValid = await argon.verify(otpData.codeHash, code);

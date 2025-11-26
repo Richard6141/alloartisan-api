@@ -1,0 +1,80 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+enum Role {
+  CLIENT
+  ARTISAN
+  ADMIN
+}
+
+enum Statut {
+  EN_ATTENTE
+  ACTIF
+  SUSPENDU
+  BANNI
+}
+
+model User {
+  id            String    @id @default(uuid()) @db.VarChar(36)
+  email         String    @unique(map: "idx_users_email")
+  telephone     String?   @unique @db.VarChar(20)
+  nom           String?   @db.VarChar(100)
+  prenom        String?   @db.VarChar(100)
+  dateNaissance DateTime? @map("date_naissance") @db.Date
+  sexe          String?   @db.Char(1)
+  photoUrl      String?   @map("photo_url") @db.Text
+
+  adressePrincipale String?  @map("adresse_principale")
+  latitude          Decimal? @db.Decimal(10, 8)
+  longitude         Decimal? @db.Decimal(11, 8)
+  ville             String?  @db.VarChar(50)
+  quartier          String?  @db.VarChar(100)
+
+  // Authentification
+  passwordHash      String  @map("password_hash") @db.VarChar(255)
+  //Refresh tocken
+  hasheRt           String? @map("hashed_rt") @db.VarChar(255)
+  emailVerified     Boolean @default(false) @map("email_verified")
+  telephoneVerified Boolean @default(false) @map("telephone_verified")
+  profilComplet     Boolean @default(false) @map("profil_complet")
+
+  emailVerificationToken     String?   @unique @map("email_verification_token") @db.VarChar(64)
+  emailVerificationExpiresAt DateTime? @map("email_verification_expires_at") @db.Timestamptz
+
+  telephoneVerificationToken     String?   @unique @map("telephone_verification_token") @db.VarChar(64)
+  telephoneVerificationExpiresAt DateTime? @map("telephone_verification_expires_at") @db.Timestamptz
+  role                           Role      @default(CLIENT)
+  statut                         Statut    @default(EN_ATTENTE)
+  langue                         String    @default("fr") @db.VarChar(5)
+  timezone                       String    @default("Africa/Porto-Novo") @db.VarChar(50)
+  notificationEmail              Boolean   @default(true) @map("notification_email")
+  notificationSms                Boolean   @default(false) @map("notification_sms")
+  notificationPush               Boolean   @default(true) @map("notification_push")
+
+  // Métadonnées
+  derniereConnexion DateTime? @map("derniere_connexion") @db.Timestamptz
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@index([telephone], name: "idx_users_telephone")
+  @@index([ville, quartier], name: "idx_users_location")
+  @@index([role], name: "idx_users_role")
+  @@index([createdAt], name: "idx_users_created")
+  @@index([emailVerificationToken], name: "idx_users_token")
+  @@index([statut, role], name: "idx_users_statut_role")
+  @@index([deletedAt, statut], name: "idx_users_active")
+  @@map("users")
+}

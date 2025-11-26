@@ -4,10 +4,12 @@ import { AuthService } from './auth.service';
 import { AuthDto } from './dto';
 import { RtGuard } from 'src/common/guards';
 import { GetCurrentUser, GetCurrentUserId, Public } from 'src/common/decorators';
+import { EmailVerificationDto } from 'src/common/services/dto';
+import { NewOtpCodeDTO } from 'src/common/services/dto/new-otp-code.dto';
 
 @Controller('auth')
 export class AuthController {
-    constructor(private authService: AuthService) {}
+    constructor(private authService: AuthService) { }
 
     @Public()
     @Post('register')
@@ -38,5 +40,18 @@ export class AuthController {
         @GetCurrentUser('refreshToken') refreshToken: string,
     ) {
         return this.authService.refreshTokens(userId, refreshToken);
+    }
+    @Public()
+    @Post('verify-otp')
+    @HttpCode(HttpStatus.OK)
+    verifyOtp(@Body() dto: EmailVerificationDto) {
+        return this.authService.verifyOtp(dto);
+    }
+
+    @Public()
+    @Post('new-otp-code')
+    @HttpCode(HttpStatus.OK)
+    newotpcode(@Body() dto: NewOtpCodeDTO) {
+        return this.authService.newOtpCode(dto);
     }
 }
