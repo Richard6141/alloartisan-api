@@ -6,7 +6,7 @@ import { OtpType, StoredOtpData } from '../types';
 
 @Injectable()
 export class OtpService {
-    constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) { }
+    constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
 
     /**
      * Génère un code OTP aléatoire (6 chiffres par défaut)

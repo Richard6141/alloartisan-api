@@ -95,7 +95,6 @@ export class AuthService {
                     </html>
                 `,
             });
-            console.log(otp);
             return tokens;
         } catch (error) {
             if (error instanceof PrismaClientKnownRequestError) {

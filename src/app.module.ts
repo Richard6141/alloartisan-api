@@ -8,6 +8,8 @@ import { ArtisansModule } from './artisans/artisans.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AtGuard } from './common/guards';
 import { MailerModule } from '@nestjs-modules/mailer';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
     imports: [
@@ -26,19 +28,49 @@ import { MailerModule } from '@nestjs-modules/mailer';
                 }),
             }),
         }),
-        MailerModule.forRoot({
-            transport: {
-                host: process.env.MAIL_HOST,
-                port: Number(process.env.MAIL_PORT),
-                secure: false,
-                auth: {
-                    user: process.env.MAIL_USER,
-                    pass: process.env.MAIL_PASS,
+        MailerModule.forRootAsync({
+            imports: [ConfigModule],
+            inject: [ConfigService],
+            useFactory: (config: ConfigService) => ({
+                transport: {
+                    host: config.get('MAIL_HOST'),
+                    port: config.get<number>('MAIL_PORT'),
+                    secure: false,
+                    auth: {
+                        user: config.get('MAIL_USER'),
+                        pass: config.get('MAIL_PASS'),
+                    },
                 },
-            },
-            defaults: {
-                from: '"NoReply | AlloArtisan" <vlavonou@e-bd.de>',
-            },
+                defaults: {
+                    from: config.get(
+                        'MAIL_FROM',
+                        '"NoReply | AlloArtisan" <noreply@alloartisan.com>',
+                    ),
+                },
+            }),
+        }),
+        ThrottlerModule.forRootAsync({
+            imports: [ConfigModule],
+            inject: [ConfigService],
+            useFactory: (config: ConfigService) => ({
+                throttlers: [
+                    {
+                        name: 'short',
+                        ttl: config.get<number>('THROTTLE_SHORT_TTL', 1000),
+                        limit: config.get<number>('THROTTLE_SHORT_LIMIT', 3),
+                    },
+                    {
+                        name: 'medium',
+                        ttl: config.get<number>('THROTTLE_MEDIUM_TTL', 10000),
+                        limit: config.get<number>('THROTTLE_MEDIUM_LIMIT', 20),
+                    },
+                    {
+                        name: 'long',
+                        ttl: config.get<number>('THROTTLE_LONG_TTL', 60000),
+                        limit: config.get<number>('THROTTLE_LONG_LIMIT', 100),
+                    },
+                ],
+            }),
         }),
         AuthModule,
         UsersModule,
@@ -47,8 +79,12 @@ import { MailerModule } from '@nestjs-modules/mailer';
     ],
     providers: [
         {
-            provide: 'APP_GUARD',
+            provide: APP_GUARD,
             useClass: AtGuard,
+        },
+        {
+            provide: APP_GUARD,
+            useClass: ThrottlerGuard,
         },
     ],
 })
