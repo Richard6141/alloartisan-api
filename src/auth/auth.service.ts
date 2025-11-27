@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, BadRequestException, Inject } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AuthDto, ForgotPasswordDto, ResetPasswordDto, EnableMfaDto, VerifyMfaDto } from './dto';
 import * as argon from 'argon2';
@@ -11,9 +11,12 @@ import { OtpType, SessionInfo } from 'src/common/types';
 import { EmailVerificationDto } from 'src/common/services/dto';
 import { NewOtpCodeDTO } from 'src/common/services/dto/new-otp-code.dto';
 import { LoginAttemptService } from './services/login-attempt.service';
+import { MfaAttemptService } from './services/mfa-attempt.service';
 import { Role, Statut } from 'src/generated/prisma';
 import { authenticator } from 'otplib';
 import * as QRCode from 'qrcode';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 
 interface DeviceInfo {
     deviceName?: string;
@@ -25,6 +28,7 @@ interface DeviceInfo {
 @Injectable()
 export class AuthService {
     private readonly logger = new Logger(AuthService.name);
+    private readonly MFA_SECRET_TTL = 10 * 60 * 1000; // 10 minutes pour activer le MFA
 
     constructor(
         private prisma: PrismaService,
@@ -34,7 +38,9 @@ export class AuthService {
         private emailService: EmailService,
         private sessionService: SessionService,
         private loginAttemptService: LoginAttemptService,
-    ) { }
+        private mfaAttemptService: MfaAttemptService,
+        @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    ) {}
 
     // ==================== REGISTER ====================
     async register(dto: AuthDto, deviceInfo?: DeviceInfo): Promise<Tokens> {
@@ -131,6 +137,8 @@ export class AuthService {
 
     // ==================== VERIFY MFA LOGIN ====================
     async verifyMfaLogin(mfaToken: string, code: string, deviceInfo?: DeviceInfo): Promise<Tokens> {
+        let userId: string;
+
         try {
             const payload = await this.jwtService.verifyAsync<{ sub: string; type: string }>(
                 mfaToken,
@@ -141,28 +149,48 @@ export class AuthService {
                 throw new ForbiddenException('Invalid MFA token');
             }
 
-            const user = await this.prisma.user.findUnique({
-                where: { id: payload.sub },
-            });
-
-            if (!user || !user.mfaSecret) {
-                throw new ForbiddenException('Invalid MFA token');
-            }
-
-            const isValid = authenticator.verify({ token: code, secret: user.mfaSecret });
-            if (!isValid) {
-                throw new ForbiddenException('Invalid MFA code');
-            }
-
-            await this.prisma.user.update({
-                where: { id: user.id },
-                data: { derniereConnexion: new Date() },
-            });
-
-            return this.createSession(user.id, deviceInfo);
+            userId = payload.sub;
         } catch {
             throw new ForbiddenException('Invalid or expired MFA token');
         }
+
+        // Vérifier si l'utilisateur est verrouillé pour MFA
+        const isLocked = await this.mfaAttemptService.isLocked(userId);
+        if (isLocked) {
+            const remainingTime = await this.mfaAttemptService.getRemainingLockTime(userId);
+            throw new ForbiddenException(
+                `Trop de tentatives MFA échouées. Réessayez dans ${remainingTime} secondes.`,
+            );
+        }
+
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+        });
+
+        if (!user || !user.mfaSecret) {
+            throw new ForbiddenException('Invalid MFA token');
+        }
+
+        const isValid = authenticator.verify({ token: code, secret: user.mfaSecret });
+        if (!isValid) {
+            const remainingAttempts = await this.mfaAttemptService.recordFailedAttempt(userId);
+            if (remainingAttempts === 0) {
+                throw new ForbiddenException(
+                    'Compte MFA verrouillé pendant 15 minutes suite à trop de tentatives échouées.',
+                );
+            }
+            throw new ForbiddenException('Invalid MFA code');
+        }
+
+        // Reset des tentatives après succès
+        await this.mfaAttemptService.resetAttempts(userId);
+
+        await this.prisma.user.update({
+            where: { id: user.id },
+            data: { derniereConnexion: new Date() },
+        });
+
+        return this.createSession(user.id, deviceInfo);
     }
 
     // ==================== LOGOUT ====================
@@ -252,13 +280,17 @@ export class AuthService {
     }
 
     // ==================== MFA (TOTP) ====================
+    private getMfaPendingKey(userId: string): string {
+        return `mfa:pending:${userId}`;
+    }
+
     async generateMfaSecret(userId: string): Promise<{ secret: string; qrCode: string }> {
         const user = await this.prisma.user.findUnique({
             where: { id: userId },
         });
 
         if (!user) {
-            throw new ForbiddenException('User not found');
+            throw new ForbiddenException('Access Denied');
         }
 
         if (user.mfaEnabled) {
@@ -269,11 +301,12 @@ export class AuthService {
         const otpAuthUrl = authenticator.keyuri(user.email, 'AlloArtisan', secret);
         const qrCode = await QRCode.toDataURL(otpAuthUrl);
 
-        // Stocker temporairement le secret (non activé)
-        await this.prisma.user.update({
-            where: { id: userId },
-            data: { mfaSecret: secret },
-        });
+        // Stocker temporairement le secret dans Redis (pas en DB)
+        await this.cacheManager.set(
+            this.getMfaPendingKey(userId),
+            secret,
+            this.MFA_SECRET_TTL,
+        );
 
         return { secret, qrCode };
     }
@@ -283,23 +316,33 @@ export class AuthService {
             where: { id: userId },
         });
 
-        if (!user || !user.mfaSecret) {
-            throw new ForbiddenException('Please generate MFA secret first');
+        if (!user) {
+            throw new ForbiddenException('Access Denied');
         }
 
         if (user.mfaEnabled) {
             throw new BadRequestException('MFA is already enabled');
         }
 
-        const isValid = authenticator.verify({ token: dto.code, secret: user.mfaSecret });
+        // Récupérer le secret temporaire depuis Redis
+        const pendingSecret = await this.cacheManager.get<string>(this.getMfaPendingKey(userId));
+        if (!pendingSecret) {
+            throw new ForbiddenException('Please generate MFA secret first');
+        }
+
+        const isValid = authenticator.verify({ token: dto.code, secret: pendingSecret });
         if (!isValid) {
             throw new ForbiddenException('Invalid MFA code');
         }
 
+        // Stocker le secret définitivement en DB et activer MFA
         await this.prisma.user.update({
             where: { id: userId },
-            data: { mfaEnabled: true },
+            data: { mfaEnabled: true, mfaSecret: pendingSecret },
         });
+
+        // Supprimer le secret temporaire de Redis
+        await this.cacheManager.del(this.getMfaPendingKey(userId));
 
         return 'MFA activé avec succès';
     }
@@ -328,12 +371,14 @@ export class AuthService {
 
     // ==================== EMAIL VERIFICATION ====================
     async verifyOtp(dto: EmailVerificationDto): Promise<void> {
+        const genericError = 'Code invalide ou expiré';
+
         const user = await this.prisma.user.findUnique({
             where: { email: dto.email },
         });
 
         if (!user) {
-            throw new ForbiddenException('User not found');
+            throw new ForbiddenException(genericError);
         }
 
         const isValid = await this.otpService.verify(
@@ -351,33 +396,32 @@ export class AuthService {
                 },
             });
         } else {
-            throw new ForbiddenException('Invalid OTP');
+            throw new ForbiddenException(genericError);
         }
     }
 
     async newOtpCode(dto: NewOtpCodeDTO): Promise<string> {
+        const successMessage = 'Si cet email existe et nécessite une vérification, un code a été envoyé.';
+
         const user = await this.prisma.user.findUnique({
             where: { email: dto.email },
         });
 
-        if (!user) {
-            throw new ForbiddenException('User not found');
-        }
-
-        if (user.emailVerified) {
-            throw new ForbiddenException('Email already verified');
+        // Toujours retourner le même message pour éviter l'énumération
+        if (!user || user.emailVerified) {
+            return successMessage;
         }
 
         const otpExists = await this.otpService.exists(user.id, OtpType.EMAIL_VERIFICATION);
         if (otpExists) {
-            return 'Un code existe déjà. Veuillez vérifier votre boite mail ou patientez quelques minutes.';
+            return successMessage;
         }
 
         this.sendVerificationEmail(user.id, user.email).catch((error) => {
             this.logger.error(`Failed to send OTP email to ${user.email}`, error);
         });
 
-        return 'Veuillez consulter votre boite mail pour recevoir un nouveau code';
+        return successMessage;
     }
 
     // ==================== PRIVATE HELPERS ====================

@@ -2,6 +2,7 @@ import { Injectable, Inject, BadRequestException } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import * as argon from 'argon2';
+import { randomInt } from 'crypto';
 import { OtpType, StoredOtpData } from '../types';
 
 @Injectable()
@@ -9,13 +10,13 @@ export class OtpService {
     constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
 
     /**
-     * Génère un code OTP aléatoire (6 chiffres par défaut)
+     * Génère un code OTP aléatoire cryptographiquement sécurisé (6 chiffres par défaut)
      */
     private generateCode(length: number = 6): string {
         const digits = '0123456789';
         let code = '';
         for (let i = 0; i < length; i++) {
-            code += digits[Math.floor(Math.random() * digits.length)];
+            code += digits[randomInt(digits.length)];
         }
         return code;
     }
