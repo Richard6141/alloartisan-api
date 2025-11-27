@@ -44,11 +44,13 @@ model User {
 
   // Authentification
   passwordHash String   @db.VarChar(255) @map("password_hash")
-  //Refresh tocken
-  hasheRt String?  @db.VarChar(255) @map("hashed_rt")
   emailVerified Boolean @default(false) @map("email_verified")
   telephoneVerified Boolean @default(false) @map("telephone_verified")
   profilComplet Boolean @default(false) @map("profil_complet")
+
+  // MFA (TOTP)
+  mfaEnabled Boolean @default(false) @map("mfa_enabled")
+  mfaSecret  String? @db.VarChar(255) @map("mfa_secret")
 
   emailVerificationToken      String?   @unique @db.VarChar(64) @map("email_verification_token")
   emailVerificationExpiresAt  DateTime? @db.Timestamptz @map("email_verification_expires_at")

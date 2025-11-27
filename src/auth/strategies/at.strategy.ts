@@ -7,6 +7,7 @@ import { Statut } from 'src/generated/prisma';
 
 type JwtPayload = {
     sub: string;
+    sid: string;
 };
 
 @Injectable()
@@ -40,6 +41,7 @@ export class AtStrategy extends PassportStrategy(Strategy, 'jwt') {
             sub: user.id,
             email: user.email,
             role: user.role,
+            sessionId: payload.sid,
         };
     }
 }

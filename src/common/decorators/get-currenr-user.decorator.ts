@@ -4,6 +4,7 @@ type JwtPayloadWithRt = {
     sub: string;
     email: string;
     role: string;
+    sessionId?: string;
     refreshToken?: string;
 };
 
