@@ -141,7 +141,11 @@ export class SessionService {
 
         // Mettre à jour la liste pour ne garder que la session courante
         const userSessionsKey = this.getUserSessionsKey(userId);
-        await this.cacheManager.set(userSessionsKey, JSON.stringify([currentSessionId]), this.SESSION_TTL);
+        await this.cacheManager.set(
+            userSessionsKey,
+            JSON.stringify([currentSessionId]),
+            this.SESSION_TTL,
+        );
     }
 
     /**
@@ -175,7 +179,7 @@ export class SessionService {
     private async getUserSessionIds(userId: string): Promise<string[]> {
         const userSessionsKey = this.getUserSessionsKey(userId);
         const data = await this.cacheManager.get<string>(userSessionsKey);
-        return data ? JSON.parse(data) : [];
+        return data ? (JSON.parse(data) as string[]) : [];
     }
 
     private async addSessionToUserList(userId: string, sessionId: string): Promise<void> {
@@ -216,7 +220,10 @@ export class SessionService {
         sessionsWithTime.sort((a, b) => a.lastUsedAt - b.lastUsedAt);
 
         // Supprimer les sessions les plus anciennes
-        const toRemove = sessionsWithTime.slice(0, sessionsWithTime.length - this.MAX_SESSIONS_PER_USER);
+        const toRemove = sessionsWithTime.slice(
+            0,
+            sessionsWithTime.length - this.MAX_SESSIONS_PER_USER,
+        );
 
         for (const session of toRemove) {
             await this.revoke(userId, session.sessionId);

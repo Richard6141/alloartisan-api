@@ -54,7 +54,11 @@ export class AuthController {
     @Post('login/mfa')
     @HttpCode(HttpStatus.OK)
     verifyMfaLogin(@Body() dto: VerifyMfaLoginDto, @Req() req: Request): Promise<Tokens> {
-        return this.authService.verifyMfaLogin(dto.mfa_token, dto.code, this.extractDeviceInfo(req));
+        return this.authService.verifyMfaLogin(
+            dto.mfa_token,
+            dto.code,
+            this.extractDeviceInfo(req),
+        );
     }
 
     @SkipThrottle()

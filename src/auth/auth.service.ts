@@ -100,7 +100,9 @@ export class AuthService {
         }
 
         if (!user.emailVerified || user.statut !== Statut.ACTIF) {
-            this.sendAccountStatusEmail(user).catch(() => { });
+            this.sendAccountStatusEmail(user).catch((error) =>
+                this.logger.error(`Failed to send account status email to ${user.email}`, error),
+            );
             throw new ForbiddenException(genericError);
         }
 
@@ -130,9 +132,10 @@ export class AuthService {
     // ==================== VERIFY MFA LOGIN ====================
     async verifyMfaLogin(mfaToken: string, code: string, deviceInfo?: DeviceInfo): Promise<Tokens> {
         try {
-            const payload = await this.jwtService.verifyAsync(mfaToken, {
-                secret: this.config.getOrThrow('JWT_ACCESS_SECRET'),
-            });
+            const payload = await this.jwtService.verifyAsync<{ sub: string; type: string }>(
+                mfaToken,
+                { secret: this.config.getOrThrow('JWT_ACCESS_SECRET') },
+            );
 
             if (payload.type !== 'mfa_pending') {
                 throw new ForbiddenException('Invalid MFA token');
