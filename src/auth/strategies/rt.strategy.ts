@@ -6,8 +6,6 @@ import { ConfigService } from '@nestjs/config';
 
 type JwtPayload = {
     sub: string;
-    email: string;
-    role: string;
 };
 
 @Injectable()
@@ -19,10 +17,11 @@ export class RtStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
             passReqToCallback: true,
         });
     }
+
     validate(req: Request, payload: JwtPayload) {
         const refreshToken = req.get('authorization')?.replace('Bearer', '').trim();
         return {
-            ...payload,
+            sub: payload.sub,
             refreshToken,
         };
     }

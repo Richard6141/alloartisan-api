@@ -7,9 +7,9 @@ import { UsersModule } from './users/users.module';
 import { ArtisansModule } from './artisans/artisans.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AtGuard } from './common/guards';
-import { MailerModule } from '@nestjs-modules/mailer';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { CommonModule } from './common/common.module';
 
 @Module({
     imports: [
@@ -26,24 +26,6 @@ import { APP_GUARD } from '@nestjs/core';
                     },
                     password: config.get('REDIS_PASSWORD'),
                 }),
-            }),
-        }),
-        MailerModule.forRootAsync({
-            imports: [ConfigModule],
-            inject: [ConfigService],
-            useFactory: (config: ConfigService) => ({
-                transport: {
-                    host: config.get('MAIL_HOST'),
-                    port: config.get<number>('MAIL_PORT'),
-                    secure: false,
-                    auth: {
-                        user: config.get('MAIL_USER'),
-                        pass: config.get('MAIL_PASS'),
-                    },
-                },
-                defaults: {
-                    from: config.get('MAIL_FROM', '"NoReply | AlloArtisan" <vlavonou@e-bd.de>'),
-                },
             }),
         }),
         ThrottlerModule.forRootAsync({
@@ -69,6 +51,7 @@ import { APP_GUARD } from '@nestjs/core';
                 ],
             }),
         }),
+        CommonModule,
         AuthModule,
         UsersModule,
         ArtisansModule,
