@@ -11,6 +11,7 @@ import { OtpType } from 'src/common/types';
 import { MailerService } from '@nestjs-modules/mailer';
 import { EmailVerificationDto } from 'src/common/services/dto';
 import { NewOtpCodeDTO } from 'src/common/services/dto/new-otp-code.dto';
+import { LoginAttemptService } from './services/login-attempt.service';
 
 @Injectable()
 export class AuthService {
@@ -20,7 +21,8 @@ export class AuthService {
         private config: ConfigService,
         private otpService: OtpService,
         private readonly mailerService: MailerService,
-    ) { }
+        private loginAttemptService: LoginAttemptService,
+    ) {}
 
     async register(dto: AuthDto): Promise<Tokens> {
         //Générer le mot de passe haché
@@ -107,32 +109,60 @@ export class AuthService {
     }
 
     async login(dto: AuthDto): Promise<Tokens> {
-        // Trouver l'utilisateur par email
+        // 1. Vérifier si le compte est verrouillé
+        const isLocked = await this.loginAttemptService.isLocked(dto.email);
+        if (isLocked) {
+            const remainingTime = await this.loginAttemptService.getRemainingLockTime(dto.email);
+            throw new ForbiddenException(
+                `Compte temporairement verrouillé. Réessayez dans ${remainingTime} secondes.`,
+            );
+        }
+
+        // 2. Trouver l'utilisateur par email
         const user = await this.prisma.user.findUnique({
             where: {
                 email: dto.email,
             },
         });
-        // Si non trouvé en renvoie erreur ou non actif
+
+        // 3. Si non trouvé ou banni/suspendu, enregistrer l'échec
         if (!user || user.statut === 'BANNI' || user.statut === 'SUSPENDU') {
+            await this.loginAttemptService.recordFailedAttempt(dto.email);
             throw new ForbiddenException('Email or password incorrect');
         }
-        // Si trouvé, on compare mot de passe
+
+        // 4. Vérifier le mot de passe
         const passwordMatch = await argon.verify(user.passwordHash, dto.password);
-        //Si mot de passe incorrect, on renvoit erreur
         if (!passwordMatch) {
-            throw new ForbiddenException('Email or password incorrect');
+            const remainingAttempts = await this.loginAttemptService.recordFailedAttempt(dto.email);
+
+            if (remainingAttempts === 0) {
+                throw new ForbiddenException(
+                    'Compte verrouillé pendant 15 minutes suite à trop de tentatives échouées.',
+                );
+            }
+
+            throw new ForbiddenException(
+                `Email or password incorrect. ${remainingAttempts} tentative(s) restante(s).`,
+            );
         }
+
+        // 5. Vérifier si email vérifié
         if (!user.emailVerified) {
             throw new ForbiddenException('Veuillez vérifier votre email avant de vous connecter');
         }
 
-        if (user.statut != 'ACTIF') {
+        // 6. Vérifier le statut
+        if (user.statut !== 'ACTIF') {
             throw new ForbiddenException(
                 'Veuillez consulter les administrateur pour activer votre compte',
             );
         }
-        // Si trouvé, on renvoit, l'utilisateur
+
+        // 7. Login réussi → Reset le compteur de tentatives
+        await this.loginAttemptService.resetAttempts(dto.email);
+
+        // 8. Générer et retourner les tokens
         const tokens = await this.getTokens(user.id, user.email, user.role);
         await this.updateRtHash(user.id, tokens.refresh_token);
         return tokens;
