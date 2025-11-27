@@ -42,10 +42,7 @@ import { APP_GUARD } from '@nestjs/core';
                     },
                 },
                 defaults: {
-                    from: config.get(
-                        'MAIL_FROM',
-                        '"NoReply | AlloArtisan" <noreply@alloartisan.com>',
-                    ),
+                    from: config.get('MAIL_FROM', '"NoReply | AlloArtisan" <vlavonou@e-bd.de>'),
                 },
             }),
         }),

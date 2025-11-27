@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AuthDto } from './dto';
 import * as argon from 'argon2';
@@ -15,6 +15,8 @@ import { LoginAttemptService } from './services/login-attempt.service';
 
 @Injectable()
 export class AuthService {
+    private readonly logger = new Logger(AuthService.name);
+
     constructor(
         private prisma: PrismaService,
         private jwtService: JwtService,
@@ -25,9 +27,8 @@ export class AuthService {
     ) {}
 
     async register(dto: AuthDto): Promise<Tokens> {
-        //Générer le mot de passe haché
         const hash = await argon.hash(dto.password);
-        //Sauvegarder l'utilisateur dans la base de données avec la gestion des erreurs
+
         try {
             const user = await this.prisma.user.create({
                 data: {
@@ -35,68 +36,17 @@ export class AuthService {
                     passwordHash: hash,
                 },
             });
-            //const { passwordHash: _, ...userWithoutpasswordHash } = user;
-            //return userWithoutpasswordHash;
+
             const tokens = await this.getTokens(user.id, user.email, user.role);
             await this.updateRtHash(user.id, tokens.refresh_token);
-            const otp = await this.otpService.create(user.id, OtpType.EMAIL_VERIFICATION);
-            await this.mailerService.sendMail({
-                to: user.email,
-                subject: 'Vérification de votre email - Allo Artisan',
-                html: `
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <meta charset="utf-8">
-                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    </head>
-                    <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
-                        <table role="presentation" style="width: 100%; border-collapse: collapse;">
-                            <tr>
-                                <td align="center" style="padding: 40px 0;">
-                                    <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                                        <!-- Header -->
-                                        <tr>
-                                            <td style="padding: 40px 40px 20px; text-align: center; background-color: #2563eb; border-radius: 8px 8px 0 0;">
-                                                <h1 style="margin: 0; color: #ffffff; font-size: 28px;">Allo Artisan</h1>
-                                            </td>
-                                        </tr>
-                                        <!-- Content -->
-                                        <tr>
-                                            <td style="padding: 40px;">
-                                                <h2 style="margin: 0 0 20px; color: #333333; font-size: 24px;">Vérification de votre email</h2>
-                                                <p style="margin: 0 0 20px; color: #666666; font-size: 16px; line-height: 1.5;">
-                                                    Bienvenue sur Allo Artisan ! Pour finaliser votre inscription, veuillez utiliser le code de vérification ci-dessous :
-                                                </p>
-                                                <div style="text-align: center; margin: 30px 0;">
-                                                    <div style="display: inline-block; padding: 20px 40px; background-color: #f0f7ff; border: 2px dashed #2563eb; border-radius: 8px;">
-                                                        <span style="font-size: 32px; font-weight: bold; color: #2563eb; letter-spacing: 8px;">${otp}</span>
-                                                    </div>
-                                                </div>
-                                                <p style="margin: 0 0 10px; color: #666666; font-size: 14px; line-height: 1.5;">
-                                                    Ce code expire dans <strong>10 minutes</strong>.
-                                                </p>
-                                                <p style="margin: 0; color: #999999; font-size: 14px; line-height: 1.5;">
-                                                    Si vous n'avez pas créé de compte sur Allo Artisan, vous pouvez ignorer cet email.
-                                                </p>
-                                            </td>
-                                        </tr>
-                                        <!-- Footer -->
-                                        <tr>
-                                            <td style="padding: 20px 40px; text-align: center; background-color: #f9fafb; border-radius: 0 0 8px 8px; border-top: 1px solid #e5e7eb;">
-                                                <p style="margin: 0; color: #999999; font-size: 12px;">
-                                                    © 2025 Allo Artisan. Tous droits réservés.
-                                                </p>
-                                            </td>
-                                        </tr>
-                                    </table>
-                                </td>
-                            </tr>
-                        </table>
-                    </body>
-                    </html>
-                `,
+
+            // Envoyer l'email de vérification en arrière-plan avec retry automatique
+            setImmediate(() => {
+                this.sendVerificationEmail(user.id, user.email).catch((error) => {
+                    this.logger.error(`Failed to send verification email to ${user.email}`, error);
+                });
             });
+
             return tokens;
         } catch (error) {
             if (error instanceof PrismaClientKnownRequestError) {
@@ -108,7 +58,103 @@ export class AuthService {
         }
     }
 
+    private async sendVerificationEmail(userId: string, email: string): Promise<void> {
+        const otp = await this.otpService.create(userId, OtpType.EMAIL_VERIFICATION);
+        await this.sendEmailWithRetry(
+            email,
+            'Vérification de votre email - Allo Artisan',
+            this.getVerificationEmailHtml(otp),
+        );
+    }
+
+    private async sendEmailWithRetry(
+        to: string,
+        subject: string,
+        html: string,
+        maxRetries: number = 3,
+    ): Promise<void> {
+        let lastError: Error | null = null;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                await this.mailerService.sendMail({ to, subject, html });
+                this.logger.log(`Email sent to ${to} (attempt ${attempt})`);
+                return;
+            } catch (error) {
+                lastError = error as Error;
+                this.logger.warn(
+                    `Email to ${to} failed (attempt ${attempt}/${maxRetries}): ${lastError.message}`,
+                );
+
+                if (attempt < maxRetries) {
+                    // Attendre avant de réessayer (délai exponentiel: 1s, 2s, 4s)
+                    const delay = Math.pow(2, attempt - 1) * 1000;
+                    await new Promise((resolve) => setTimeout(resolve, delay));
+                }
+            }
+        }
+
+        this.logger.error(`Failed to send email to ${to} after ${maxRetries} attempts`, lastError);
+        throw lastError ?? new Error(`Failed to send email to ${to}`);
+    }
+
+    private getVerificationEmailHtml(otp: string): string {
+        return `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
+                <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                        <td align="center" style="padding: 40px 0;">
+                            <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                <tr>
+                                    <td style="padding: 40px 40px 20px; text-align: center; background-color: #2563eb; border-radius: 8px 8px 0 0;">
+                                        <h1 style="margin: 0; color: #ffffff; font-size: 28px;">Allo Artisan</h1>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 40px;">
+                                        <h2 style="margin: 0 0 20px; color: #333333; font-size: 24px;">Vérification de votre email</h2>
+                                        <p style="margin: 0 0 20px; color: #666666; font-size: 16px; line-height: 1.5;">
+                                            Bienvenue sur Allo Artisan ! Pour finaliser votre inscription, veuillez utiliser le code de vérification ci-dessous :
+                                        </p>
+                                        <div style="text-align: center; margin: 30px 0;">
+                                            <div style="display: inline-block; padding: 20px 40px; background-color: #f0f7ff; border: 2px dashed #2563eb; border-radius: 8px;">
+                                                <span style="font-size: 32px; font-weight: bold; color: #2563eb; letter-spacing: 8px;">${otp}</span>
+                                            </div>
+                                        </div>
+                                        <p style="margin: 0 0 10px; color: #666666; font-size: 14px; line-height: 1.5;">
+                                            Ce code expire dans <strong>10 minutes</strong>.
+                                        </p>
+                                        <p style="margin: 0; color: #999999; font-size: 14px; line-height: 1.5;">
+                                            Si vous n'avez pas créé de compte sur Allo Artisan, vous pouvez ignorer cet email.
+                                        </p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 20px 40px; text-align: center; background-color: #f9fafb; border-radius: 0 0 8px 8px; border-top: 1px solid #e5e7eb;">
+                                        <p style="margin: 0; color: #999999; font-size: 12px;">
+                                            © 2025 Allo Artisan. Tous droits réservés.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </body>
+            </html>
+        `;
+    }
+
     async login(dto: AuthDto): Promise<Tokens> {
+        // Message générique pour éviter l'énumération d'utilisateurs
+        const genericError = 'Email or password incorrect';
+
         // 1. Vérifier si le compte est verrouillé
         const isLocked = await this.loginAttemptService.isLocked(dto.email);
         if (isLocked) {
@@ -128,7 +174,7 @@ export class AuthService {
         // 3. Si non trouvé ou banni/suspendu, enregistrer l'échec
         if (!user || user.statut === 'BANNI' || user.statut === 'SUSPENDU') {
             await this.loginAttemptService.recordFailedAttempt(dto.email);
-            throw new ForbiddenException('Email or password incorrect');
+            throw new ForbiddenException(genericError);
         }
 
         // 4. Vérifier le mot de passe
@@ -142,30 +188,133 @@ export class AuthService {
                 );
             }
 
-            throw new ForbiddenException(
-                `Email or password incorrect. ${remainingAttempts} tentative(s) restante(s).`,
-            );
+            throw new ForbiddenException(genericError);
         }
 
-        // 5. Vérifier si email vérifié
-        if (!user.emailVerified) {
-            throw new ForbiddenException('Veuillez vérifier votre email avant de vous connecter');
+        // 5. Vérifier si email vérifié ET statut actif (message générique pour éviter l'énumération)
+        if (!user.emailVerified || user.statut !== 'ACTIF') {
+            // Envoyer un email d'aide en arrière-plan (sans bloquer la réponse)
+            this.sendAccountStatusEmail(user).catch(() => {});
+            throw new ForbiddenException(genericError);
         }
 
-        // 6. Vérifier le statut
-        if (user.statut !== 'ACTIF') {
-            throw new ForbiddenException(
-                'Veuillez consulter les administrateur pour activer votre compte',
-            );
-        }
-
-        // 7. Login réussi → Reset le compteur de tentatives
+        // 6. Login réussi → Reset le compteur de tentatives
         await this.loginAttemptService.resetAttempts(dto.email);
 
-        // 8. Générer et retourner les tokens
+        // 7. Générer et retourner les tokens
         const tokens = await this.getTokens(user.id, user.email, user.role);
         await this.updateRtHash(user.id, tokens.refresh_token);
         return tokens;
+    }
+
+    private async sendAccountStatusEmail(user: {
+        id: string;
+        email: string;
+        emailVerified: boolean;
+        statut: string;
+    }): Promise<void> {
+        if (!user.emailVerified) {
+            // Renvoyer un code OTP pour vérification
+            const otp = await this.otpService.create(user.id, OtpType.EMAIL_VERIFICATION);
+            await this.mailerService.sendMail({
+                to: user.email,
+                subject: 'Activez votre compte - Allo Artisan',
+                html: `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="utf-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    </head>
+                    <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
+                        <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td align="center" style="padding: 40px 0;">
+                                    <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                        <tr>
+                                            <td style="padding: 40px 40px 20px; text-align: center; background-color: #f59e0b; border-radius: 8px 8px 0 0;">
+                                                <h1 style="margin: 0; color: #ffffff; font-size: 28px;">Allo Artisan</h1>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 40px;">
+                                                <h2 style="margin: 0 0 20px; color: #333333; font-size: 24px;">Votre compte n'est pas encore activé</h2>
+                                                <p style="margin: 0 0 20px; color: #666666; font-size: 16px; line-height: 1.5;">
+                                                    Une tentative de connexion a été détectée sur votre compte. Pour vous connecter, veuillez d'abord vérifier votre adresse email avec le code ci-dessous :
+                                                </p>
+                                                <div style="text-align: center; margin: 30px 0;">
+                                                    <div style="display: inline-block; padding: 20px 40px; background-color: #fef3c7; border: 2px dashed #f59e0b; border-radius: 8px;">
+                                                        <span style="font-size: 32px; font-weight: bold; color: #d97706; letter-spacing: 8px;">${otp}</span>
+                                                    </div>
+                                                </div>
+                                                <p style="margin: 0 0 10px; color: #666666; font-size: 14px; line-height: 1.5;">
+                                                    Ce code expire dans <strong>10 minutes</strong>.
+                                                </p>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 20px 40px; text-align: center; background-color: #f9fafb; border-radius: 0 0 8px 8px; border-top: 1px solid #e5e7eb;">
+                                                <p style="margin: 0; color: #999999; font-size: 12px;">
+                                                    © 2025 Allo Artisan. Tous droits réservés.
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </body>
+                    </html>
+                `,
+            });
+        } else if (user.statut === 'EN_ATTENTE') {
+            await this.mailerService.sendMail({
+                to: user.email,
+                subject: 'Compte en attente de validation - Allo Artisan',
+                html: `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="utf-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    </head>
+                    <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
+                        <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td align="center" style="padding: 40px 0;">
+                                    <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                        <tr>
+                                            <td style="padding: 40px 40px 20px; text-align: center; background-color: #3b82f6; border-radius: 8px 8px 0 0;">
+                                                <h1 style="margin: 0; color: #ffffff; font-size: 28px;">Allo Artisan</h1>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 40px;">
+                                                <h2 style="margin: 0 0 20px; color: #333333; font-size: 24px;">Compte en attente de validation</h2>
+                                                <p style="margin: 0 0 20px; color: #666666; font-size: 16px; line-height: 1.5;">
+                                                    Une tentative de connexion a été détectée sur votre compte. Votre compte est actuellement en attente de validation par notre équipe.
+                                                </p>
+                                                <p style="margin: 0 0 20px; color: #666666; font-size: 16px; line-height: 1.5;">
+                                                    Nous vous enverrons un email dès que votre compte sera activé. Merci de votre patience.
+                                                </p>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 20px 40px; text-align: center; background-color: #f9fafb; border-radius: 0 0 8px 8px; border-top: 1px solid #e5e7eb;">
+                                                <p style="margin: 0; color: #999999; font-size: 12px;">
+                                                    © 2025 Allo Artisan. Tous droits réservés.
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </body>
+                    </html>
+                `,
+            });
+        }
     }
 
     async logout(userId: string) {
@@ -286,7 +435,12 @@ export class AuthService {
         if (otpExists) {
             return 'Un code existe déjà. Veuillez vérifier votre boite mail ou patientez quelques minutes pour demander un nouveau';
         }
-        await this.otpService.create(user.id, OtpType.EMAIL_VERIFICATION);
+
+        // Envoyer l'email avec le nouveau code OTP
+        this.sendVerificationEmail(user.id, user.email).catch((error) => {
+            this.logger.error(`Failed to send OTP email to ${user.email}`, error);
+        });
+
         return 'Veuillez consulter votre boite mail pour recevoir un nouveau code';
     }
 }
