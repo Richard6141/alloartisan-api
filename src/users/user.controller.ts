@@ -31,7 +31,7 @@ export class UserController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Mon profil',
-        description: 'Récupère les informations du profil de l\'utilisateur connecté.',
+        description: "Récupère les informations du profil de l'utilisateur connecté.",
     })
     @ApiResponse({
         status: 200,
@@ -52,7 +52,8 @@ export class UserController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Modifier mon profil',
-        description: 'Met à jour les informations du profil. Seuls les champs fournis sont modifiés.',
+        description:
+            'Met à jour les informations du profil. Seuls les champs fournis sont modifiés.',
     })
     @ApiResponse({
         status: 200,
@@ -74,7 +75,8 @@ export class UserController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Supprimer mon compte',
-        description: 'Supprime définitivement le compte. Nécessite le mot de passe et le code MFA si activé.',
+        description:
+            'Supprime définitivement le compte. Nécessite le mot de passe et le code MFA si activé.',
     })
     @ApiResponse({
         status: 200,

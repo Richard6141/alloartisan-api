@@ -29,7 +29,8 @@ export class ResetPasswordDto {
     code: string;
 
     @ApiProperty({
-        description: 'Nouveau mot de passe (min 8 caractères, 1 majuscule, 1 minuscule, 1 chiffre, 1 caractère spécial)',
+        description:
+            'Nouveau mot de passe (min 8 caractères, 1 majuscule, 1 minuscule, 1 chiffre, 1 caractère spécial)',
         example: 'NouveauMotDePasse123!',
         minLength: 8,
         maxLength: 128,

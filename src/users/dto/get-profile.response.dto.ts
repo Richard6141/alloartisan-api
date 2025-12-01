@@ -3,7 +3,7 @@ import { Role, Statut } from 'src/generated/prisma';
 
 export class GetProfileResponseDto {
     @ApiProperty({
-        description: 'Identifiant unique de l\'utilisateur',
+        description: "Identifiant unique de l'utilisateur",
         example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
     })
     id: string;
@@ -64,7 +64,7 @@ export class GetProfileResponseDto {
     photoUrl: string | null;
 
     @ApiProperty({
-        description: 'Rôle de l\'utilisateur',
+        description: "Rôle de l'utilisateur",
         enum: ['CLIENT', 'ARTISAN', 'ADMIN'],
         example: 'CLIENT',
     })

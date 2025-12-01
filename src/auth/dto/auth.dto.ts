@@ -3,7 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class AuthDto {
     @ApiProperty({
-        description: 'Adresse email de l\'utilisateur',
+        description: "Adresse email de l'utilisateur",
         example: 'john.doe@example.com',
     })
     @IsEmail()
@@ -11,7 +11,8 @@ export class AuthDto {
     email: string;
 
     @ApiProperty({
-        description: 'Mot de passe (min 8 caractères, 1 majuscule, 1 minuscule, 1 chiffre, 1 caractère spécial)',
+        description:
+            'Mot de passe (min 8 caractères, 1 majuscule, 1 minuscule, 1 chiffre, 1 caractère spécial)',
         example: 'MonMotDePasse123!',
         minLength: 8,
         maxLength: 128,

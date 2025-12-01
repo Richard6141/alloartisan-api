@@ -3,7 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class EnableMfaDto {
     @ApiProperty({
-        description: 'Code TOTP à 6 chiffres généré par l\'application d\'authentification',
+        description: "Code TOTP à 6 chiffres généré par l'application d'authentification",
         example: '123456',
         minLength: 6,
         maxLength: 6,
@@ -16,7 +16,7 @@ export class EnableMfaDto {
 
 export class VerifyMfaDto {
     @ApiProperty({
-        description: 'Code TOTP à 6 chiffres généré par l\'application d\'authentification',
+        description: "Code TOTP à 6 chiffres généré par l'application d'authentification",
         example: '123456',
         minLength: 6,
         maxLength: 6,
@@ -50,7 +50,7 @@ export class VerifyMfaLoginDto {
     mfa_token: string;
 
     @ApiProperty({
-        description: 'Code TOTP à 6 chiffres généré par l\'application d\'authentification',
+        description: "Code TOTP à 6 chiffres généré par l'application d'authentification",
         example: '123456',
         minLength: 6,
         maxLength: 6,

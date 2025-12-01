@@ -18,7 +18,6 @@ import {
     ApiBearerAuth,
     ApiUnauthorizedResponse,
     ApiForbiddenResponse,
-    ApiBody,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import {
@@ -67,7 +66,8 @@ export class AuthController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Connexion',
-        description: 'Authentifie un utilisateur. Si MFA activé, retourne un mfa_token à utiliser avec /login/mfa.',
+        description:
+            'Authentifie un utilisateur. Si MFA activé, retourne un mfa_token à utiliser avec /login/mfa.',
     })
     @ApiResponse({
         status: 200,
@@ -90,7 +90,8 @@ export class AuthController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Vérification MFA',
-        description: 'Finalise la connexion en vérifiant le code TOTP après un login avec MFA activé.',
+        description:
+            'Finalise la connexion en vérifiant le code TOTP après un login avec MFA activé.',
     })
     @ApiResponse({ status: 200, description: 'MFA vérifié, tokens retournés', type: Tokens })
     @ApiForbiddenResponse({ description: 'Code MFA invalide ou expiré' })
@@ -125,7 +126,7 @@ export class AuthController {
     @ApiBearerAuth('access-token')
     @ApiOperation({
         summary: 'Déconnexion globale',
-        description: 'Déconnecte toutes les sessions de l\'utilisateur sur tous les appareils.',
+        description: "Déconnecte toutes les sessions de l'utilisateur sur tous les appareils.",
     })
     @ApiResponse({ status: 200, description: 'Toutes les sessions révoquées' })
     @ApiUnauthorizedResponse({ description: 'Token invalide' })
@@ -160,7 +161,8 @@ export class AuthController {
     @ApiBearerAuth('access-token')
     @ApiOperation({
         summary: 'Rafraîchir les tokens',
-        description: 'Génère une nouvelle paire access/refresh token. Utiliser le refresh token dans le header.',
+        description:
+            'Génère une nouvelle paire access/refresh token. Utiliser le refresh token dans le header.',
     })
     @ApiResponse({ status: 200, description: 'Nouveaux tokens générés', type: Tokens })
     @ApiUnauthorizedResponse({ description: 'Refresh token invalide ou expiré' })
@@ -180,7 +182,7 @@ export class AuthController {
     @ApiBearerAuth('access-token')
     @ApiOperation({
         summary: 'Lister mes sessions',
-        description: 'Récupère la liste des sessions actives avec les informations d\'appareil.',
+        description: "Récupère la liste des sessions actives avec les informations d'appareil.",
     })
     @ApiResponse({ status: 200, description: 'Liste des sessions' })
     @ApiUnauthorizedResponse({ description: 'Token invalide' })
@@ -216,7 +218,8 @@ export class AuthController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Mot de passe oublié',
-        description: 'Envoie un code de réinitialisation par email. Limité à 3 requêtes par 10 minutes.',
+        description:
+            'Envoie un code de réinitialisation par email. Limité à 3 requêtes par 10 minutes.',
     })
     @ApiResponse({ status: 200, description: 'Email envoyé si le compte existe' })
     forgotPassword(@Body() dto: ForgotPasswordDto): Promise<string> {
@@ -245,7 +248,8 @@ export class AuthController {
     @ApiBearerAuth('access-token')
     @ApiOperation({
         summary: 'Générer un secret MFA',
-        description: 'Génère un secret TOTP et retourne le QR code pour configurer une app d\'authentification.',
+        description:
+            "Génère un secret TOTP et retourne le QR code pour configurer une app d'authentification.",
     })
     @ApiResponse({ status: 200, description: 'Secret et QR code générés' })
     @ApiUnauthorizedResponse({ description: 'Token invalide' })
@@ -259,7 +263,7 @@ export class AuthController {
     @ApiBearerAuth('access-token')
     @ApiOperation({
         summary: 'Activer le MFA',
-        description: 'Active l\'authentification à deux facteurs après vérification du code TOTP.',
+        description: "Active l'authentification à deux facteurs après vérification du code TOTP.",
     })
     @ApiResponse({ status: 200, description: 'MFA activé' })
     @ApiForbiddenResponse({ description: 'Code TOTP invalide' })
@@ -273,7 +277,8 @@ export class AuthController {
     @ApiBearerAuth('access-token')
     @ApiOperation({
         summary: 'Désactiver le MFA',
-        description: 'Désactive l\'authentification à deux facteurs après vérification du code TOTP.',
+        description:
+            "Désactive l'authentification à deux facteurs après vérification du code TOTP.",
     })
     @ApiResponse({ status: 200, description: 'MFA désactivé' })
     @ApiForbiddenResponse({ description: 'Code TOTP invalide' })
@@ -288,8 +293,8 @@ export class AuthController {
     @Post('verify-otp')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
-        summary: 'Vérifier l\'email',
-        description: 'Vérifie l\'adresse email avec le code OTP reçu.',
+        summary: "Vérifier l'email",
+        description: "Vérifie l'adresse email avec le code OTP reçu.",
     })
     @ApiResponse({ status: 200, description: 'Email vérifié' })
     @ApiForbiddenResponse({ description: 'Code OTP invalide ou expiré' })
@@ -303,7 +308,8 @@ export class AuthController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Renvoyer le code OTP',
-        description: 'Envoie un nouveau code de vérification par email. Limité à 3 requêtes par 10 minutes.',
+        description:
+            'Envoie un nouveau code de vérification par email. Limité à 3 requêtes par 10 minutes.',
     })
     @ApiResponse({ status: 200, description: 'Nouveau code envoyé' })
     newOtpCode(@Body() dto: NewOtpCodeDTO) {

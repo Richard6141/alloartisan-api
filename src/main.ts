@@ -587,7 +587,7 @@ Cette API utilise JWT Bearer Token pour l'authentification.
             `,
             metaData: {
                 title: 'Allo Artisan API',
-                description: 'Documentation interactive de l\'API Allo Artisan',
+                description: "Documentation interactive de l'API Allo Artisan",
                 ogImage: '/logo.svg',
             },
             favicon: '/favicon.svg',
