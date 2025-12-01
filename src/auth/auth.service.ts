@@ -1,4 +1,10 @@
-import { ForbiddenException, Injectable, Logger, BadRequestException, Inject } from '@nestjs/common';
+import {
+    ForbiddenException,
+    Injectable,
+    Logger,
+    BadRequestException,
+    Inject,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AuthDto, ForgotPasswordDto, ResetPasswordDto, EnableMfaDto, VerifyMfaDto } from './dto';
 import * as argon from 'argon2';
@@ -6,7 +12,7 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import { Tokens, LoginResponse } from './types';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { OtpService, EmailService, SessionService } from 'src/common/services';
+import { OtpService, EmailService, SessionService, CryptoService } from 'src/common/services';
 import { OtpType, SessionInfo } from 'src/common/types';
 import { EmailVerificationDto } from 'src/common/services/dto';
 import { NewOtpCodeDTO } from 'src/common/services/dto/new-otp-code.dto';
@@ -39,6 +45,7 @@ export class AuthService {
         private sessionService: SessionService,
         private loginAttemptService: LoginAttemptService,
         private mfaAttemptService: MfaAttemptService,
+        private cryptoService: CryptoService,
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
     ) {}
 
@@ -86,9 +93,13 @@ export class AuthService {
         }
 
         const user = await this.prisma.user.findUnique({
-            where: { email: dto.email },
+            where: {
+                email: dto.email,
+                deletedAt: null, // Point 5: Vérification soft delete
+            },
         });
 
+        // Point 5: Utilisateur supprimé ou banni/suspendu
         if (!user || user.statut === Statut.BANNI || user.statut === Statut.SUSPENDU) {
             await this.loginAttemptService.recordFailedAttempt(dto.email);
             throw new ForbiddenException(genericError);
@@ -105,10 +116,14 @@ export class AuthService {
             throw new ForbiddenException(genericError);
         }
 
+        // Point 3: Timing attack fix - envoyer l'email de façon totalement asynchrone
+        // sans impacter le temps de réponse
         if (!user.emailVerified || user.statut !== Statut.ACTIF) {
-            this.sendAccountStatusEmail(user).catch((error) =>
-                this.logger.error(`Failed to send account status email to ${user.email}`, error),
-            );
+            setImmediate(() => {
+                this.sendAccountStatusEmail(user).catch((error) =>
+                    this.logger.error(`Failed to send account status email to ${user.email}`, error),
+                );
+            });
             throw new ForbiddenException(genericError);
         }
 
@@ -171,7 +186,12 @@ export class AuthService {
             throw new ForbiddenException('Invalid MFA token');
         }
 
-        const isValid = authenticator.verify({ token: code, secret: user.mfaSecret });
+        // Point 1: Déchiffrer le secret MFA avant vérification
+        // Gestion rétrocompatibilité: si le secret n'est pas chiffré, l'utiliser directement
+        const decryptedSecret = this.cryptoService.decrypt(user.mfaSecret);
+        const secretToVerify = decryptedSecret ?? user.mfaSecret;
+
+        const isValid = authenticator.verify({ token: code, secret: secretToVerify });
         if (!isValid) {
             const remainingAttempts = await this.mfaAttemptService.recordFailedAttempt(userId);
             if (remainingAttempts === 0) {
@@ -185,17 +205,29 @@ export class AuthService {
         // Reset des tentatives après succès
         await this.mfaAttemptService.resetAttempts(userId);
 
-        await this.prisma.user.update({
-            where: { id: user.id },
-            data: { derniereConnexion: new Date() },
-        });
+        // Migration automatique: chiffrer l'ancien secret si nécessaire
+        if (decryptedSecret === null) {
+            const encryptedSecret = this.cryptoService.encrypt(user.mfaSecret);
+            await this.prisma.user.update({
+                where: { id: user.id },
+                data: { mfaSecret: encryptedSecret, derniereConnexion: new Date() },
+            });
+        } else {
+            await this.prisma.user.update({
+                where: { id: user.id },
+                data: { derniereConnexion: new Date() },
+            });
+        }
 
         return this.createSession(user.id, deviceInfo);
     }
 
     // ==================== LOGOUT ====================
     async logout(userId: string, sessionId: string): Promise<void> {
-        await this.sessionService.revoke(userId, sessionId);
+        const revoked = await this.sessionService.revoke(userId, sessionId);
+        if (!revoked) {
+            throw new ForbiddenException('Session not found or access denied');
+        }
     }
 
     async logoutAll(userId: string): Promise<void> {
@@ -224,7 +256,10 @@ export class AuthService {
     }
 
     async revokeSession(userId: string, sessionId: string): Promise<void> {
-        await this.sessionService.revoke(userId, sessionId);
+        const revoked = await this.sessionService.revoke(userId, sessionId);
+        if (!revoked) {
+            throw new ForbiddenException('Session not found or access denied');
+        }
     }
 
     // ==================== PASSWORD RESET ====================
@@ -302,11 +337,7 @@ export class AuthService {
         const qrCode = await QRCode.toDataURL(otpAuthUrl);
 
         // Stocker temporairement le secret dans Redis (pas en DB)
-        await this.cacheManager.set(
-            this.getMfaPendingKey(userId),
-            secret,
-            this.MFA_SECRET_TTL,
-        );
+        await this.cacheManager.set(this.getMfaPendingKey(userId), secret, this.MFA_SECRET_TTL);
 
         return { secret, qrCode };
     }
@@ -335,10 +366,13 @@ export class AuthService {
             throw new ForbiddenException('Invalid MFA code');
         }
 
-        // Stocker le secret définitivement en DB et activer MFA
+        // Point 1: Chiffrer le secret avant stockage en DB
+        const encryptedSecret = this.cryptoService.encrypt(pendingSecret);
+
+        // Stocker le secret chiffré en DB et activer MFA
         await this.prisma.user.update({
             where: { id: userId },
-            data: { mfaEnabled: true, mfaSecret: pendingSecret },
+            data: { mfaEnabled: true, mfaSecret: encryptedSecret },
         });
 
         // Supprimer le secret temporaire de Redis
@@ -356,7 +390,11 @@ export class AuthService {
             throw new BadRequestException('MFA is not enabled');
         }
 
-        const isValid = authenticator.verify({ token: dto.code, secret: user.mfaSecret });
+        // Point 1: Déchiffrer le secret MFA avant vérification
+        // Gestion rétrocompatibilité: si le secret n'est pas chiffré, l'utiliser directement
+        const decryptedSecret = this.cryptoService.decrypt(user.mfaSecret);
+        const secretToVerify = decryptedSecret ?? user.mfaSecret;
+        const isValid = authenticator.verify({ token: dto.code, secret: secretToVerify });
         if (!isValid) {
             throw new ForbiddenException('Invalid MFA code');
         }
@@ -401,7 +439,8 @@ export class AuthService {
     }
 
     async newOtpCode(dto: NewOtpCodeDTO): Promise<string> {
-        const successMessage = 'Si cet email existe et nécessite une vérification, un code a été envoyé.';
+        const successMessage =
+            'Si cet email existe et nécessite une vérification, un code a été envoyé.';
 
         const user = await this.prisma.user.findUnique({
             where: { email: dto.email },

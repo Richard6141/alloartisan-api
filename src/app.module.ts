@@ -3,13 +3,14 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-yet';
 import { AuthModule } from './auth/auth.module';
-import { UsersModule } from './users/users.module';
+import { UserModule } from './users/user.module';
 import { ArtisansModule } from './artisans/artisans.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AtGuard } from './common/guards';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { CommonModule } from './common/common.module';
+import { UserController } from './users/user.controller';
 
 @Module({
     imports: [
@@ -53,7 +54,7 @@ import { CommonModule } from './common/common.module';
         }),
         CommonModule,
         AuthModule,
-        UsersModule,
+        UserModule,
         ArtisansModule,
         PrismaModule,
     ],
@@ -67,5 +68,6 @@ import { CommonModule } from './common/common.module';
             useClass: ThrottlerGuard,
         },
     ],
+    controllers: [UserController],
 })
 export class AppModule {}

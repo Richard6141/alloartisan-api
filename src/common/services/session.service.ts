@@ -104,11 +104,25 @@ export class SessionService {
 
     /**
      * Révoque une session spécifique
+     * Point 2: Vérifie que la session appartient bien à l'utilisateur avant révocation
      */
-    async revoke(userId: string, sessionId: string): Promise<void> {
+    async revoke(userId: string, sessionId: string): Promise<boolean> {
         const sessionKey = this.getSessionKey(userId, sessionId);
+        const storedData = await this.cacheManager.get<string>(sessionKey);
+
+        // Vérifier que la session existe et appartient à l'utilisateur
+        if (!storedData) {
+            return false;
+        }
+
+        const sessionData = JSON.parse(storedData) as SessionData;
+        if (sessionData.userId !== userId) {
+            return false;
+        }
+
         await this.cacheManager.del(sessionKey);
         await this.removeSessionFromUserList(userId, sessionId);
+        return true;
     }
 
     /**

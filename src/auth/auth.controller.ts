@@ -145,21 +145,22 @@ export class AuthController {
 
     // ==================== MFA (TOTP) ====================
 
-    @SkipThrottle()
+    // Point 10: Ajout de rate limiting sur les endpoints MFA
+    @Throttle({ short: { limit: 3, ttl: 60000 } }) // 3 requêtes par minute
     @Post('mfa/generate')
     @HttpCode(HttpStatus.OK)
     generateMfaSecret(@GetCurrentUserId() userId: string) {
         return this.authService.generateMfaSecret(userId);
     }
 
-    @SkipThrottle()
+    @Throttle({ short: { limit: 5, ttl: 300000 } }) // 5 requêtes par 5 minutes
     @Post('mfa/enable')
     @HttpCode(HttpStatus.OK)
     enableMfa(@GetCurrentUserId() userId: string, @Body() dto: EnableMfaDto): Promise<string> {
         return this.authService.enableMfa(userId, dto);
     }
 
-    @SkipThrottle()
+    @Throttle({ short: { limit: 5, ttl: 300000 } }) // 5 requêtes par 5 minutes
     @Post('mfa/disable')
     @HttpCode(HttpStatus.OK)
     disableMfa(@GetCurrentUserId() userId: string, @Body() dto: VerifyMfaDto): Promise<string> {
