@@ -121,7 +121,10 @@ export class AuthService {
         if (!user.emailVerified || user.statut !== Statut.ACTIF) {
             setImmediate(() => {
                 this.sendAccountStatusEmail(user).catch((error) =>
-                    this.logger.error(`Failed to send account status email to ${user.email}`, error),
+                    this.logger.error(
+                        `Failed to send account status email to ${user.email}`,
+                        error,
+                    ),
                 );
             });
             throw new ForbiddenException(genericError);
