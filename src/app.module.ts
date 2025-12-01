@@ -10,8 +10,6 @@ import { AtGuard } from './common/guards';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { CommonModule } from './common/common.module';
-import { UserController } from './users/user.controller';
-
 @Module({
     imports: [
         ConfigModule.forRoot({ isGlobal: true }),
@@ -68,6 +66,5 @@ import { UserController } from './users/user.controller';
             useClass: ThrottlerGuard,
         },
     ],
-    controllers: [UserController],
 })
 export class AppModule {}

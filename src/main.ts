@@ -65,6 +65,9 @@ async function bootstrap() {
         }),
     );
 
+    // Préfixe global pour tous les endpoints
+    app.setGlobalPrefix('api/v1');
+
     await app.listen(process.env.PORT ?? 3001);
 }
 void bootstrap();
