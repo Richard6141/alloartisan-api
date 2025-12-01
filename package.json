@@ -43,8 +43,11 @@
     "@nestjs/jwt": "^11.0.1",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.1.9",
+    "@nestjs/swagger": "^11.2.3",
     "@nestjs/throttler": "^6.4.0",
     "@prisma/adapter-pg": "^7.0.0",
+    "@scalar/core": "^0.3.23",
+    "@scalar/nestjs-api-reference": "^1.0.8",
     "argon2": "^0.44.0",
     "cache-manager": "^7.2.5",
     "cache-manager-redis-yet": "^5.1.5",
@@ -60,7 +63,8 @@
     "redis": "^5.10.0",
     "reflect-metadata": "^0.2.2",
     "resend": "^6.5.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.1.0",
