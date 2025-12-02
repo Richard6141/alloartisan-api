@@ -157,9 +157,92 @@ exports.Prisma.UserScalarFieldEnum = {
   deletedAt: 'deletedAt'
 };
 
+exports.Prisma.CategorieMetierScalarFieldEnum = {
+  id: 'id',
+  nom: 'nom',
+  slug: 'slug',
+  description: 'description',
+  iconUrl: 'iconUrl',
+  ordreAffichage: 'ordreAffichage',
+  actif: 'actif',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.MetierScalarFieldEnum = {
+  id: 'id',
+  nom: 'nom',
+  slug: 'slug',
+  description: 'description',
+  iconUrl: 'iconUrl',
+  categorieId: 'categorieId',
+  ordreAffichage: 'ordreAffichage',
+  populaire: 'populaire',
+  actif: 'actif',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.ArtisanScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  nomEntreprise: 'nomEntreprise',
+  numeroIfu: 'numeroIfu',
+  anneesExperience: 'anneesExperience',
+  bio: 'bio',
+  slogan: 'slogan',
+  photoProfilUrl: 'photoProfilUrl',
+  photoCouvertureUrl: 'photoCouvertureUrl',
+  portfolioUrls: 'portfolioUrls',
+  adresseAtelier: 'adresseAtelier',
+  latitude: 'latitude',
+  longitude: 'longitude',
+  villePrincipale: 'villePrincipale',
+  zoneInterventionKm: 'zoneInterventionKm',
+  villesIntervention: 'villesIntervention',
+  noteMoyenne: 'noteMoyenne',
+  nombreAvis: 'nombreAvis',
+  compteurDemandesMoisCourant: 'compteurDemandesMoisCourant',
+  nombreMissionsCompletees: 'nombreMissionsCompletees',
+  tauxCompletion: 'tauxCompletion',
+  tauxReponseMoyen: 'tauxReponseMoyen',
+  disponible: 'disponible',
+  accepteUrgences: 'accepteUrgences',
+  accepteWeekend: 'accepteWeekend',
+  horairesTravail: 'horairesTravail',
+  verified: 'verified',
+  verifiedAt: 'verifiedAt',
+  verifiedBy: 'verifiedBy',
+  badges: 'badges',
+  abonnementType: 'abonnementType',
+  abonnementExpireAt: 'abonnementExpireAt',
+  totalVuesProfil: 'totalVuesProfil',
+  totalContacts: 'totalContacts',
+  statut: 'statut',
+  raisonSuspension: 'raisonSuspension',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  deletedAt: 'deletedAt'
+};
+
+exports.Prisma.ArtisanMetierScalarFieldEnum = {
+  id: 'id',
+  artisanId: 'artisanId',
+  metierId: 'metierId',
+  estPrincipal: 'estPrincipal',
+  anneesExperience: 'anneesExperience',
+  certifie: 'certifie',
+  tarifHoraire: 'tarifHoraire',
+  description: 'description',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
+};
+
+exports.Prisma.NullableJsonNullValueInput = {
+  DbNull: Prisma.DbNull,
+  JsonNull: Prisma.JsonNull
 };
 
 exports.Prisma.QueryMode = {
@@ -170,6 +253,12 @@ exports.Prisma.QueryMode = {
 exports.Prisma.NullsOrder = {
   first: 'first',
   last: 'last'
+};
+
+exports.Prisma.JsonNullValueFilter = {
+  DbNull: Prisma.DbNull,
+  JsonNull: Prisma.JsonNull,
+  AnyNull: Prisma.AnyNull
 };
 exports.Role = exports.$Enums.Role = {
   CLIENT: 'CLIENT',
@@ -184,8 +273,25 @@ exports.Statut = exports.$Enums.Statut = {
   BANNI: 'BANNI'
 };
 
+exports.AbonnementType = exports.$Enums.AbonnementType = {
+  GRATUIT: 'GRATUIT',
+  STANDARD: 'STANDARD',
+  PREMIUM: 'PREMIUM'
+};
+
+exports.StatutArtisan = exports.$Enums.StatutArtisan = {
+  EN_ATTENTE: 'EN_ATTENTE',
+  ACTIF: 'ACTIF',
+  SUSPENDU: 'SUSPENDU',
+  REJETE: 'REJETE'
+};
+
 exports.Prisma.ModelName = {
-  User: 'User'
+  User: 'User',
+  CategorieMetier: 'CategorieMetier',
+  Metier: 'Metier',
+  Artisan: 'Artisan',
+  ArtisanMetier: 'ArtisanMetier'
 };
 
 /**

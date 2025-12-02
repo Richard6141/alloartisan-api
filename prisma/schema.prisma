@@ -26,6 +26,19 @@ enum Statut {
   BANNI
 }
 
+enum StatutArtisan {
+  EN_ATTENTE
+  ACTIF
+  SUSPENDU
+  REJETE
+}
+
+enum AbonnementType {
+  GRATUIT
+  STANDARD
+  PREMIUM
+}
+
 model User {
   id          String   @id @default(uuid()) @db.VarChar(36)
   email       String   @unique(map: "idx_users_email")
@@ -39,6 +52,7 @@ model User {
   adressePrincipale String? @map("adresse_principale")
   latitude    Decimal? @db.Decimal(10, 8)
   longitude   Decimal? @db.Decimal(11, 8)
+  location    Unsupported("geography(Point, 4326)")? // PostGIS - auto-synchronisé via trigger
   ville       String?  @db.VarChar(50)
   quartier    String?  @db.VarChar(100)
 
@@ -79,5 +93,161 @@ model User {
   @@index([statut, role], name: "idx_users_statut_role")
   @@index([deletedAt, statut], name: "idx_users_active")
 
+  // Relations
+  artisan          Artisan?        @relation("UserArtisan")
+  artisansVerified Artisan[]       @relation("VerifiedByUser")
+
   @@map("users")
+}
+
+// ==================== CATEGORIES METIERS ====================
+
+model CategorieMetier {
+  id              String    @id @default(uuid()) @db.VarChar(36)
+  nom             String    @unique @db.VarChar(100)
+  slug            String    @unique @db.VarChar(100)
+  description     String?   @db.Text
+  iconUrl         String?   @db.Text @map("icon_url")
+  ordreAffichage  Int       @default(0) @map("ordre_affichage")
+  actif           Boolean   @default(true)
+  createdAt       DateTime  @default(now()) @db.Timestamptz @map("created_at")
+
+  // Relations
+  metiers         Metier[]
+
+  @@index([slug], name: "idx_categories_slug")
+  @@index([actif, ordreAffichage], name: "idx_categories_display")
+
+  @@map("categories_metiers")
+}
+
+// ==================== METIERS ====================
+
+model Metier {
+  id              String          @id @default(uuid()) @db.VarChar(36)
+  nom             String          @unique @db.VarChar(100)
+  slug            String          @unique @db.VarChar(100)
+  description     String?         @db.Text
+  iconUrl         String?         @db.Text @map("icon_url")
+  categorieId     String          @map("categorie_id") @db.VarChar(36)
+  ordreAffichage  Int             @default(0) @map("ordre_affichage")
+  populaire       Boolean         @default(false)
+  actif           Boolean         @default(true)
+  createdAt       DateTime        @default(now()) @db.Timestamptz @map("created_at")
+
+  // Relations
+  categorie            CategorieMetier @relation(fields: [categorieId], references: [id])
+  artisanMetiers       ArtisanMetier[] // Tous les artisans pratiquant ce métier (principal si estPrincipal=true)
+
+  @@index([slug], name: "idx_metiers_slug")
+  @@index([categorieId], name: "idx_metiers_categorie")
+  @@index([populaire, actif, ordreAffichage], name: "idx_metiers_display")
+
+  @@map("metiers")
+}
+
+// ==================== ARTISANS ====================
+
+model Artisan {
+  id                String          @id @default(uuid()) @db.VarChar(36)
+  userId            String          @unique @map("user_id") @db.VarChar(36)
+
+  // Informations professionnelles
+  nomEntreprise     String?         @db.VarChar(200) @map("nom_entreprise")
+  numeroIfu         String?         @db.VarChar(50) @map("numero_ifu")
+  anneesExperience  Int             @default(0) @map("annees_experience")
+  bio               String?         @db.Text
+  slogan            String?         @db.VarChar(200)
+
+  // Portfolio
+  photoProfilUrl    String?         @db.Text @map("photo_profil_url")
+  photoCouvertureUrl String?        @db.Text @map("photo_couverture_url")
+  portfolioUrls     Json?           @map("portfolio_urls")
+
+  // Localisation et zone intervention
+  adresseAtelier    String?         @db.Text @map("adresse_atelier")
+  latitude          Decimal         @db.Decimal(10, 8)
+  longitude         Decimal         @db.Decimal(11, 8)
+  location          Unsupported("geography(Point, 4326)")? // PostGIS - auto-synchronisé via trigger
+  villePrincipale   String          @db.VarChar(50) @map("ville_principale")
+  zoneInterventionKm Decimal        @default(5) @db.Decimal(5, 2) @map("zone_intervention_km")
+  villesIntervention Json?          @map("villes_intervention")
+
+  // Performance et notation
+  noteMoyenne       Decimal         @default(0) @db.Decimal(3, 2) @map("note_moyenne")
+  nombreAvis        Int             @default(0) @map("nombre_avis")
+  compteurDemandesMoisCourant Int   @default(0) @map("compteur_demandes_mois_courant")
+  nombreMissionsCompletees Int      @default(0) @map("nombre_missions_completees")
+  tauxCompletion    Decimal         @default(0) @db.Decimal(5, 2) @map("taux_completion")
+  tauxReponseMoyen  Int?            @map("taux_reponse_moyen")
+
+  // Disponibilité
+  disponible        Boolean         @default(true)
+  accepteUrgences   Boolean         @default(false) @map("accepte_urgences")
+  accepteWeekend    Boolean         @default(false) @map("accepte_weekend")
+  horairesTravail   Json?           @map("horaires_travail")
+
+  // Vérification et badges
+  verified          Boolean         @default(false)
+  verifiedAt        DateTime?       @db.Timestamptz @map("verified_at")
+  verifiedBy        String?         @db.VarChar(36) @map("verified_by")
+  badges            Json?
+
+  // Abonnement
+  abonnementType    AbonnementType  @default(GRATUIT) @map("abonnement_type")
+  abonnementExpireAt DateTime?      @db.Timestamptz @map("abonnement_expire_at")
+
+  // Statistiques
+  totalVuesProfil   Int             @default(0) @map("total_vues_profil")
+  totalContacts     Int             @default(0) @map("total_contacts")
+
+  // Recherche full-text (géré par trigger PostgreSQL)
+  searchVector      Unsupported("tsvector")? @map("search_vector")
+
+  // Métadonnées
+  statut            StatutArtisan   @default(EN_ATTENTE)
+  raisonSuspension  String?         @db.Text @map("raison_suspension")
+  createdAt         DateTime        @default(now()) @db.Timestamptz @map("created_at")
+  updatedAt         DateTime        @updatedAt @db.Timestamptz @map("updated_at")
+  deletedAt         DateTime?       @db.Timestamptz @map("deleted_at")
+
+  // Relations
+  user              User            @relation("UserArtisan", fields: [userId], references: [id], onDelete: Cascade)
+  verifiedByUser    User?           @relation("VerifiedByUser", fields: [verifiedBy], references: [id])
+  metiers           ArtisanMetier[] // Tous les métiers (principal via estPrincipal=true)
+
+  @@index([userId], name: "idx_artisans_user")
+  @@index([villePrincipale], name: "idx_artisans_ville")
+  @@index([disponible, statut, verified], name: "idx_artisans_disponible")
+  @@index([noteMoyenne, nombreAvis], name: "idx_artisans_rating")
+  @@index([verified], name: "idx_artisans_verified")
+  @@index([createdAt], name: "idx_artisans_created")
+  @@index([deletedAt, statut], name: "idx_artisans_active")
+
+  @@map("artisans")
+}
+
+// ==================== ARTISAN METIERS (Table pivot) ====================
+
+model ArtisanMetier {
+  id               String    @id @default(uuid()) @db.VarChar(36)
+  artisanId        String    @map("artisan_id") @db.VarChar(36)
+  metierId         String    @map("metier_id") @db.VarChar(36)
+  estPrincipal     Boolean   @default(false) @map("est_principal")
+  anneesExperience Int?      @map("annees_experience")
+  certifie         Boolean   @default(false)
+  tarifHoraire     Decimal?  @db.Decimal(10, 2) @map("tarif_horaire")
+  description      String?   @db.Text  // Description spécifique pour ce métier
+  createdAt        DateTime  @default(now()) @db.Timestamptz @map("created_at")
+
+  // Relations
+  artisan          Artisan   @relation(fields: [artisanId], references: [id], onDelete: Cascade)
+  metier           Metier    @relation(fields: [metierId], references: [id])
+
+  @@unique([artisanId, metierId], name: "idx_artisan_metier_unique")
+  @@index([artisanId], name: "idx_artisan_metiers_artisan")
+  @@index([metierId], name: "idx_artisan_metiers_metier")
+  @@index([estPrincipal], name: "idx_artisan_metiers_principal")
+
+  @@map("artisan_metiers")
 }

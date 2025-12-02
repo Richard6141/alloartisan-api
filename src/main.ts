@@ -6,12 +6,31 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { apiReference } from '@scalar/nestjs-api-reference';
 import { join } from 'path';
 import helmet from 'helmet';
+import compression from 'compression';
 
 async function bootstrap() {
     const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
     // Servir les fichiers statiques (logo, favicon)
     app.useStaticAssets(join(__dirname, '..', 'public'));
+
+    // Compression des reponses (gzip/deflate)
+    // Reduit significativement la taille des payloads JSON
+    app.use(
+        compression({
+            // Compresser uniquement si > 1KB
+            threshold: 1024,
+            // Niveau de compression (1-9, 6 est un bon compromis vitesse/taille)
+            level: 6,
+            // Ne pas compresser si le client ne supporte pas
+            filter: (req, res) => {
+                if (req.headers['x-no-compression']) {
+                    return false;
+                }
+                return compression.filter(req, res);
+            },
+        }),
+    );
 
     // Configuration Helmet optimisée pour API REST
     app.use(

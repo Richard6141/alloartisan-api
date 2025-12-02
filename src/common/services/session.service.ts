@@ -1,16 +1,34 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import * as argon from 'argon2';
 import { randomUUID } from 'crypto';
 import { SessionData, SessionInfo, CreateSessionInput } from '../types';
 
+interface RedisStore {
+    mget?: (...keys: string[]) => Promise<(string | null)[]>;
+    del?: (...keys: string[]) => Promise<number>;
+}
+
 @Injectable()
 export class SessionService {
+    private readonly logger = new Logger(SessionService.name);
     private readonly SESSION_TTL = 7 * 24 * 60 * 60 * 1000; // 7 jours en ms
     private readonly MAX_SESSIONS_PER_USER = 5;
 
     constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
+
+    /**
+     * Recupere le store Redis sous-jacent pour les operations batch
+     */
+    private getRedisStore(): RedisStore | null {
+        // cache-manager v7+ utilise 'stores' au lieu de 'store'
+        const stores = (this.cacheManager as unknown as { stores?: RedisStore[] }).stores;
+        if (stores && stores.length > 0 && stores[0].mget) {
+            return stores[0];
+        }
+        return null;
+    }
 
     private getSessionKey(userId: string, sessionId: string): string {
         return `session:${userId}:${sessionId}`;
@@ -164,15 +182,68 @@ export class SessionService {
 
     /**
      * Récupère la liste des sessions d'un utilisateur
+     * Optimise avec MGET pour recuperer toutes les sessions en une seule requete Redis
      */
     async getUserSessions(userId: string, currentSessionId?: string): Promise<SessionInfo[]> {
         const sessionIds = await this.getUserSessionIds(userId);
+        if (sessionIds.length === 0) {
+            return [];
+        }
+
+        const sessions: SessionInfo[] = [];
+        const sessionKeys = sessionIds.map((id) => this.getSessionKey(userId, id));
+
+        // Utiliser MGET si disponible (O(1) vs O(n))
+        const redisStore = this.getRedisStore();
+        if (redisStore?.mget) {
+            try {
+                const results = await redisStore.mget(...sessionKeys);
+                for (let i = 0; i < results.length; i++) {
+                    const storedData = results[i];
+                    if (storedData) {
+                        const sessionData = JSON.parse(storedData) as SessionData;
+                        sessions.push({
+                            sessionId: sessionData.sessionId,
+                            deviceName: sessionData.deviceName,
+                            deviceType: sessionData.deviceType,
+                            ipAddress: sessionData.ipAddress,
+                            createdAt: new Date(sessionData.createdAt),
+                            lastUsedAt: new Date(sessionData.lastUsedAt),
+                            isCurrent: sessionIds[i] === currentSessionId,
+                        });
+                    }
+                }
+            } catch (error) {
+                this.logger.warn('MGET failed, falling back to individual gets', error);
+                return this.getUserSessionsFallback(sessionIds, userId, currentSessionId);
+            }
+        } else {
+            // Fallback: requetes individuelles en parallele
+            return this.getUserSessionsFallback(sessionIds, userId, currentSessionId);
+        }
+
+        return sessions.sort((a, b) => b.lastUsedAt.getTime() - a.lastUsedAt.getTime());
+    }
+
+    /**
+     * Fallback pour getUserSessions si MGET n'est pas disponible
+     */
+    private async getUserSessionsFallback(
+        sessionIds: string[],
+        userId: string,
+        currentSessionId?: string,
+    ): Promise<SessionInfo[]> {
         const sessions: SessionInfo[] = [];
 
-        for (const sessionId of sessionIds) {
-            const sessionKey = this.getSessionKey(userId, sessionId);
-            const storedData = await this.cacheManager.get<string>(sessionKey);
+        // Utiliser Promise.all pour paralleliser les requetes
+        const results = await Promise.all(
+            sessionIds.map((id) =>
+                this.cacheManager.get<string>(this.getSessionKey(userId, id)),
+            ),
+        );
 
+        for (let i = 0; i < results.length; i++) {
+            const storedData = results[i];
             if (storedData) {
                 const sessionData = JSON.parse(storedData) as SessionData;
                 sessions.push({
@@ -182,7 +253,7 @@ export class SessionService {
                     ipAddress: sessionData.ipAddress,
                     createdAt: new Date(sessionData.createdAt),
                     lastUsedAt: new Date(sessionData.lastUsedAt),
-                    isCurrent: sessionId === currentSessionId,
+                    isCurrent: sessionIds[i] === currentSessionId,
                 });
             }
         }
