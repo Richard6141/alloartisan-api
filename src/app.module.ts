@@ -5,6 +5,8 @@ import { redisStore } from 'cache-manager-redis-yet';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './users/user.module';
 import { ArtisansModule } from './artisans/artisans.module';
+import { CategoriesMetiersModule } from './categories-metiers/categories-metiers.module';
+import { MetiersModule } from './metiers/metiers.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AtGuard } from './common/guards';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -53,6 +55,8 @@ import { CommonModule } from './common/common.module';
         CommonModule,
         AuthModule,
         UserModule,
+        CategoriesMetiersModule,
+        MetiersModule,
         ArtisansModule,
         PrismaModule,
     ],

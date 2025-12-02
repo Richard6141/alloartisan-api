@@ -100,11 +100,7 @@ export class CacheService {
     }
 
     async setSearchResults<T>(searchHash: string, data: T): Promise<void> {
-        await this.set(
-            `${this.PREFIX.SEARCH}${searchHash}`,
-            data,
-            CacheService.TTL.SEARCH_RESULTS,
-        );
+        await this.set(`${this.PREFIX.SEARCH}${searchHash}`, data, CacheService.TTL.SEARCH_RESULTS);
     }
 
     // ==================== STATS ====================
@@ -149,7 +145,11 @@ export class CacheService {
     async delByPattern(pattern: string): Promise<void> {
         try {
             // cache-manager v7+ utilise 'stores' au lieu de 'store'
-            const stores = (this.cacheManager as unknown as { stores?: Array<{ keys?: (pattern: string) => Promise<string[]> }> }).stores;
+            const stores = (
+                this.cacheManager as unknown as {
+                    stores?: Array<{ keys?: (pattern: string) => Promise<string[]> }>;
+                }
+            ).stores;
             if (stores && stores.length > 0 && stores[0].keys) {
                 const keys = await stores[0].keys(pattern);
                 for (const key of keys) {
@@ -167,7 +167,11 @@ export class CacheService {
     async mget<T>(keys: string[]): Promise<(T | null)[]> {
         try {
             // cache-manager v7+ utilise 'stores' au lieu de 'store'
-            const stores = (this.cacheManager as unknown as { stores?: Array<{ mget?: (...keys: string[]) => Promise<(string | null)[]> }> }).stores;
+            const stores = (
+                this.cacheManager as unknown as {
+                    stores?: Array<{ mget?: (...keys: string[]) => Promise<(string | null)[]> }>;
+                }
+            ).stores;
             if (stores && stores.length > 0 && stores[0].mget) {
                 const results = await stores[0].mget(...keys);
                 return results.map((r) => (r ? (JSON.parse(r) as T) : null));
@@ -194,11 +198,7 @@ export class CacheService {
     /**
      * Pattern Cache-Aside: recupere du cache ou execute la fonction et cache le resultat
      */
-    async getOrSet<T>(
-        key: string,
-        fetchFn: () => Promise<T>,
-        ttl: number,
-    ): Promise<T> {
+    async getOrSet<T>(key: string, fetchFn: () => Promise<T>, ttl: number): Promise<T> {
         const cached = await this.get<T>(key);
         if (cached !== null) {
             return cached;

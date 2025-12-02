@@ -237,9 +237,7 @@ export class SessionService {
 
         // Utiliser Promise.all pour paralleliser les requetes
         const results = await Promise.all(
-            sessionIds.map((id) =>
-                this.cacheManager.get<string>(this.getSessionKey(userId, id)),
-            ),
+            sessionIds.map((id) => this.cacheManager.get<string>(this.getSessionKey(userId, id))),
         );
 
         for (let i = 0; i < results.length; i++) {

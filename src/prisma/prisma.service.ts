@@ -29,4 +29,20 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     get user() {
         return this.client.user;
     }
+
+    get categorieMetier() {
+        return this.client.categorieMetier;
+    }
+
+    get metier() {
+        return this.client.metier;
+    }
+
+    get artisan() {
+        return this.client.artisan;
+    }
+
+    get artisanMetier() {
+        return this.client.artisanMetier;
+    }
 }
