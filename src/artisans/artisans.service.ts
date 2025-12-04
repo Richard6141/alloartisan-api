@@ -6,19 +6,20 @@ import {
     ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { StatutArtisan, Role, Statut } from 'src/generated/prisma';
+import { StatutArtisan, Role, Statut, Prisma } from 'src/generated/prisma';
 import {
     CreateArtisanDto,
     UpdateArtisanDto,
     ArtisanDetailResponseDto,
     ArtisanListResponseDto,
+    ArtisanSearchResponseDto,
+    ArtisanListItemDto,
     SearchArtisanDto,
     SortBy,
     SortOrder,
     UpdateArtisanMetiersDto,
     UpdateArtisanStatutDto,
 } from './dto';
-import { Prisma } from 'src/generated/prisma';
 
 const ARTISAN_INCLUDE = {
     user: {
@@ -42,6 +43,10 @@ const ARTISAN_INCLUDE = {
         },
     },
 } as const;
+
+type ArtisanWithIncludes = Prisma.ArtisanGetPayload<{
+    include: typeof ARTISAN_INCLUDE;
+}>;
 
 @Injectable()
 export class ArtisansService {
@@ -79,9 +84,7 @@ export class ArtisansService {
         });
 
         if (metiers.length !== metierIds.length) {
-            throw new BadRequestException(
-                'Un ou plusieurs métiers sont invalides ou inactifs',
-            );
+            throw new BadRequestException('Un ou plusieurs métiers sont invalides ou inactifs');
         }
 
         // Vérifier qu'il n'y a qu'un seul métier principal
@@ -176,24 +179,42 @@ export class ArtisansService {
             where.villePrincipale = { contains: dto.ville, mode: 'insensitive' };
         }
 
-        // Filtre par métier
-        if (dto.metierId || dto.metierSlug) {
-            where.metiers = {
-                some: dto.metierId
-                    ? { metierId: dto.metierId }
-                    : { metier: { slug: dto.metierSlug } },
-            };
+        // Filtre par métier - Optimisation: résoudre le slug en ID d'abord pour éviter les joins
+        if (dto.metierId) {
+            where.metiers = { some: { metierId: dto.metierId } };
+        } else if (dto.metierSlug) {
+            const metier = await this.prisma.metier.findUnique({
+                where: { slug: dto.metierSlug },
+                select: { id: true },
+            });
+            if (metier) {
+                where.metiers = { some: { metierId: metier.id } };
+            } else {
+                // Métier non trouvé, retourner une liste vide
+                return { data: [], total: 0, page, limit, totalPages: 0 };
+            }
         }
 
-        // Filtre par catégorie
+        // Filtre par catégorie - Optimisation: résoudre le slug/ID en liste de métiers IDs
         if (dto.categorieId || dto.categorieSlug) {
-            where.metiers = {
-                some: {
-                    metier: dto.categorieId
-                        ? { categorieId: dto.categorieId }
-                        : { categorie: { slug: dto.categorieSlug } },
-                },
-            };
+            let categoryId: string | undefined = dto.categorieId;
+
+            // Résoudre le slug en ID si nécessaire
+            if (!categoryId && dto.categorieSlug) {
+                const categorie = await this.prisma.categorieMetier.findUnique({
+                    where: { slug: dto.categorieSlug },
+                    select: { id: true },
+                });
+                if (!categorie) {
+                    return { data: [], total: 0, page, limit, totalPages: 0 };
+                }
+                categoryId = categorie.id;
+            }
+
+            // Filtrer par categorieId directement sur le métier
+            if (categoryId) {
+                where.metiers = { some: { metier: { categorieId: categoryId } } };
+            }
         }
 
         // Recherche textuelle
@@ -245,6 +266,168 @@ export class ArtisansService {
 
         return {
             data: artisans.map((a) => this.formatArtisanResponse(a)),
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+        };
+    }
+
+    /**
+     * Recherche optimisée avec réponse légère (40-50% plus petit)
+     * Utilisée pour les listes de résultats de recherche
+     */
+    async searchOptimized(dto: SearchArtisanDto): Promise<ArtisanSearchResponseDto> {
+        const page = dto.page ?? 1;
+        const limit = dto.limit ?? 20;
+        const skip = (page - 1) * limit;
+
+        // Construire les conditions de recherche
+        const where: Prisma.ArtisanWhereInput = {
+            deletedAt: null,
+        };
+
+        // Filtres simples
+        if (dto.disponibleOnly === true) where.disponible = true;
+        if (dto.activeOnly === true) where.statut = StatutArtisan.ACTIF;
+        if (dto.verifiedOnly) where.verified = true;
+        if (dto.accepteUrgences) where.accepteUrgences = true;
+        if (dto.accepteWeekend) where.accepteWeekend = true;
+        if (dto.noteMin !== undefined) where.noteMoyenne = { gte: dto.noteMin };
+        if (dto.ville) where.villePrincipale = { contains: dto.ville, mode: 'insensitive' };
+
+        // Filtre par métier - Optimisation: résoudre le slug en ID d'abord
+        if (dto.metierId) {
+            where.metiers = { some: { metierId: dto.metierId } };
+        } else if (dto.metierSlug) {
+            const metier = await this.prisma.metier.findUnique({
+                where: { slug: dto.metierSlug },
+                select: { id: true },
+            });
+            if (metier) {
+                where.metiers = { some: { metierId: metier.id } };
+            } else {
+                return { data: [], total: 0, page, limit, totalPages: 0 };
+            }
+        }
+
+        // Filtre par catégorie - Optimisation
+        if (dto.categorieId || dto.categorieSlug) {
+            let categoryId: string | undefined = dto.categorieId;
+            if (!categoryId && dto.categorieSlug) {
+                const categorie = await this.prisma.categorieMetier.findUnique({
+                    where: { slug: dto.categorieSlug },
+                    select: { id: true },
+                });
+                if (!categorie) {
+                    return { data: [], total: 0, page, limit, totalPages: 0 };
+                }
+                categoryId = categorie.id;
+            }
+            if (categoryId) {
+                where.metiers = { some: { metier: { categorieId: categoryId } } };
+            }
+        }
+
+        // Recherche textuelle
+        if (dto.q) {
+            where.AND = [
+                {
+                    OR: [
+                        { nomEntreprise: { contains: dto.q, mode: 'insensitive' } },
+                        { bio: { contains: dto.q, mode: 'insensitive' } },
+                        { user: { nom: { contains: dto.q, mode: 'insensitive' } } },
+                        { user: { prenom: { contains: dto.q, mode: 'insensitive' } } },
+                    ],
+                },
+            ];
+        }
+
+        // Ordre de tri
+        let orderBy: Prisma.ArtisanOrderByWithRelationInput[] = [];
+        switch (dto.sortBy) {
+            case SortBy.NOTE:
+                orderBy = [{ noteMoyenne: dto.sortOrder ?? SortOrder.DESC }];
+                break;
+            case SortBy.AVIS:
+                orderBy = [{ nombreAvis: dto.sortOrder ?? SortOrder.DESC }];
+                break;
+            case SortBy.EXPERIENCE:
+                orderBy = [{ anneesExperience: dto.sortOrder ?? SortOrder.DESC }];
+                break;
+            case SortBy.RECENT:
+                orderBy = [{ createdAt: dto.sortOrder ?? SortOrder.DESC }];
+                break;
+            default:
+                orderBy = [{ noteMoyenne: 'desc' }, { nombreAvis: 'desc' }];
+        }
+
+        // Requête optimisée avec sélection minimale
+        const [artisans, total] = await Promise.all([
+            this.prisma.artisan.findMany({
+                where,
+                skip,
+                take: limit,
+                orderBy,
+                select: {
+                    id: true,
+                    nomEntreprise: true,
+                    photoProfilUrl: true,
+                    noteMoyenne: true,
+                    nombreAvis: true,
+                    villePrincipale: true,
+                    verified: true,
+                    disponible: true,
+                    abonnementType: true,
+                    anneesExperience: true,
+                    accepteUrgences: true,
+                    accepteWeekend: true,
+                    user: {
+                        select: {
+                            id: true,
+                            prenom: true,
+                            nom: true,
+                            email: true,
+                            telephone: true,
+                        },
+                    },
+                    metiers: {
+                        where: { estPrincipal: true },
+                        take: 1,
+                        include: {
+                            metier: {
+                                select: {
+                                    id: true,
+                                    nom: true,
+                                    slug: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            }),
+            this.prisma.artisan.count({ where }),
+        ]);
+
+        return {
+            data: artisans.map(
+                (a): ArtisanListItemDto => ({
+                    id: a.id,
+                    nomEntreprise: a.nomEntreprise,
+                    photoProfilUrl: a.photoProfilUrl,
+                    noteMoyenne: Number(a.noteMoyenne),
+                    nombreAvis: a.nombreAvis,
+                    villePrincipale: a.villePrincipale,
+                    verified: a.verified,
+                    disponible: a.disponible,
+                    abonnementType: a.abonnementType,
+                    anneesExperience: a.anneesExperience,
+                    accepteUrgences: a.accepteUrgences,
+                    accepteWeekend: a.accepteWeekend,
+                    metierPrincipal: a.metiers[0]?.metier ?? null,
+                    user: a.user,
+                }),
+            ),
             total,
             page,
             limit,
@@ -350,9 +533,7 @@ export class ArtisansService {
         });
 
         if (metiers.length !== metierIds.length) {
-            throw new BadRequestException(
-                'Un ou plusieurs métiers sont invalides ou inactifs',
-            );
+            throw new BadRequestException('Un ou plusieurs métiers sont invalides ou inactifs');
         }
 
         // Vérifier qu'il n'y a qu'un seul métier principal
@@ -522,7 +703,7 @@ export class ArtisansService {
         });
     }
 
-    private formatArtisanResponse(artisan: any): ArtisanDetailResponseDto {
+    private formatArtisanResponse(artisan: ArtisanWithIncludes): ArtisanDetailResponseDto {
         return {
             id: artisan.id,
             userId: artisan.userId,
@@ -533,13 +714,13 @@ export class ArtisansService {
             slogan: artisan.slogan,
             photoProfilUrl: artisan.photoProfilUrl,
             photoCouvertureUrl: artisan.photoCouvertureUrl,
-            portfolioUrls: artisan.portfolioUrls,
+            portfolioUrls: artisan.portfolioUrls as string[] | null,
             adresseAtelier: artisan.adresseAtelier,
             latitude: Number(artisan.latitude),
             longitude: Number(artisan.longitude),
             villePrincipale: artisan.villePrincipale,
             zoneInterventionKm: Number(artisan.zoneInterventionKm),
-            villesIntervention: artisan.villesIntervention,
+            villesIntervention: artisan.villesIntervention as string[] | null,
             noteMoyenne: Number(artisan.noteMoyenne),
             nombreAvis: artisan.nombreAvis,
             compteurDemandesMoisCourant: artisan.compteurDemandesMoisCourant,
@@ -562,7 +743,7 @@ export class ArtisansService {
             createdAt: artisan.createdAt,
             updatedAt: artisan.updatedAt,
             user: artisan.user,
-            metiers: artisan.metiers?.map((am: any) => ({
+            metiers: artisan.metiers.map((am) => ({
                 id: am.id,
                 estPrincipal: am.estPrincipal,
                 anneesExperience: am.anneesExperience,

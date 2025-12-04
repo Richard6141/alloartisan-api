@@ -4,6 +4,7 @@ import {
     NotFoundException,
     ForbiddenException,
     BadRequestException,
+    Logger,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SessionService } from 'src/common/services/session.service';
@@ -12,6 +13,7 @@ import { GetProfileResponseDto, UpdateProfileDto, DeleteAccountDto } from './dto
 import { Statut } from 'src/generated/prisma';
 import * as argon from 'argon2';
 import { authenticator } from 'otplib';
+import { UploadService, ImageVariants } from 'src/upload';
 
 const USER_PROFILE_SELECT = {
     id: true,
@@ -33,6 +35,8 @@ const USER_PROFILE_SELECT = {
 
 @Injectable()
 export class UserService {
+    private readonly logger = new Logger(UserService.name);
+
     constructor(
         private prisma: PrismaService,
         private sessionService: SessionService,
@@ -144,5 +148,77 @@ export class UserService {
         await this.sessionService.revokeAll(userId);
 
         return { message: 'Compte supprimé avec succès' };
+    }
+
+    async updateProfilePhoto(
+        userId: string,
+        buffer: Buffer,
+        uploadService: UploadService,
+    ): Promise<ImageVariants> {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { photoUrl: true },
+        });
+
+        if (!user) {
+            throw new NotFoundException('Utilisateur non trouvé');
+        }
+
+        // Supprimer l'ancienne photo si elle existe
+        if (user.photoUrl) {
+            this.logger.log(`Ancienne photo trouvée: ${user.photoUrl}`);
+            const publicId = uploadService.extractPublicIdFromUrl(user.photoUrl);
+            this.logger.log(`Public ID extrait: ${publicId}`);
+
+            if (publicId) {
+                try {
+                    await uploadService.deleteImage(publicId);
+                    this.logger.log(`Ancienne photo supprimée avec succès: ${publicId}`);
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                    this.logger.warn(`Échec suppression ancienne photo: ${errorMessage}`);
+                }
+            } else {
+                this.logger.warn(`Impossible d'extraire le publicId de: ${user.photoUrl}`);
+            }
+        }
+
+        // Upload la nouvelle photo vers Cloudinary (buffer déjà sanitizé)
+        const variants = await uploadService.uploadProfilePhoto(buffer, userId);
+
+        // Mettre à jour l'utilisateur avec l'URL medium par défaut
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: { photoUrl: variants.medium },
+        });
+
+        return variants;
+    }
+
+    async deleteProfilePhoto(userId: string, uploadService: UploadService): Promise<void> {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { photoUrl: true },
+        });
+
+        if (!user) {
+            throw new NotFoundException('Utilisateur non trouvé');
+        }
+
+        if (!user.photoUrl) {
+            throw new BadRequestException('Aucune photo de profil à supprimer');
+        }
+
+        // Supprimer de Cloudinary
+        const publicId = uploadService.extractPublicIdFromUrl(user.photoUrl);
+        if (publicId) {
+            await uploadService.deleteImage(publicId);
+        }
+
+        // Mettre à jour l'utilisateur
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: { photoUrl: null },
+        });
     }
 }

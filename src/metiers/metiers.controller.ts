@@ -252,7 +252,7 @@ export class MetiersController {
         description: 'Métier non trouvé',
     })
     @ApiBadRequestResponse({
-        description: "Impossible de supprimer, des artisans exercent ce métier",
+        description: 'Impossible de supprimer, des artisans exercent ce métier',
     })
     remove(@Param('id', ParseUUIDPipe) id: string): Promise<{ message: string }> {
         return this.metiersService.remove(id);

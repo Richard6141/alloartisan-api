@@ -28,6 +28,7 @@ import {
     UpdateArtisanDto,
     ArtisanDetailResponseDto,
     ArtisanListResponseDto,
+    ArtisanSearchResponseDto,
     SearchArtisanDto,
     UpdateArtisanMetiersDto,
     UpdateArtisanStatutDto,
@@ -58,6 +59,23 @@ export class ArtisansController {
         return this.artisansService.search(dto);
     }
 
+    @Get('search')
+    @Public()
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Rechercher des artisans (optimisé)',
+        description:
+            'Version optimisée de la recherche avec réponse allégée (40-50% moins de données). Idéal pour les listes et applications mobiles.',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Liste des artisans (format léger)',
+        type: ArtisanSearchResponseDto,
+    })
+    searchOptimized(@Query() dto: SearchArtisanDto): Promise<ArtisanSearchResponseDto> {
+        return this.artisansService.searchOptimized(dto);
+    }
+
     // ==================== ARTISAN ROUTES (statiques - doivent être AVANT :id) ====================
 
     @Post()
@@ -76,8 +94,7 @@ export class ArtisansController {
         description: "L'utilisateur est déjà enregistré comme artisan",
     })
     @ApiBadRequestResponse({
-        description:
-            'Données invalides (métiers inexistants, plusieurs métiers principaux, etc.)',
+        description: 'Données invalides (métiers inexistants, plusieurs métiers principaux, etc.)',
     })
     @ApiForbiddenResponse({
         description: 'Compte utilisateur suspendu ou banni',
@@ -144,8 +161,7 @@ export class ArtisansController {
         type: ArtisanDetailResponseDto,
     })
     @ApiBadRequestResponse({
-        description:
-            'Données invalides (métiers inexistants, plusieurs métiers principaux, etc.)',
+        description: 'Données invalides (métiers inexistants, plusieurs métiers principaux, etc.)',
     })
     async updateMyMetiers(
         @GetCurrentUserId() userId: string,
@@ -215,8 +231,7 @@ export class ArtisansController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: '[Admin] Vérifier un artisan',
-        description:
-            "Vérifie un artisan et passe son statut à ACTIF. Réservé aux administrateurs.",
+        description: 'Vérifie un artisan et passe son statut à ACTIF. Réservé aux administrateurs.',
     })
     @ApiParam({
         name: 'id',
@@ -245,8 +260,7 @@ export class ArtisansController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: '[Admin] Rejeter un artisan',
-        description:
-            "Rejette la demande d'un artisan en attente. Réservé aux administrateurs.",
+        description: "Rejette la demande d'un artisan en attente. Réservé aux administrateurs.",
     })
     @ApiParam({
         name: 'id',
@@ -305,8 +319,7 @@ export class ArtisansController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: '[Admin] Supprimer un artisan',
-        description:
-            "Supprime (soft delete) le profil d'un artisan. Réservé aux administrateurs.",
+        description: "Supprime (soft delete) le profil d'un artisan. Réservé aux administrateurs.",
     })
     @ApiParam({
         name: 'id',

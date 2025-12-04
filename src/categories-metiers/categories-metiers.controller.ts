@@ -60,7 +60,8 @@ export class CategoriesMetiersController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Lister toutes les catégories',
-        description: 'Récupère la liste de toutes les catégories de métiers avec le nombre de métiers.',
+        description:
+            'Récupère la liste de toutes les catégories de métiers avec le nombre de métiers.',
     })
     @ApiQuery({
         name: 'includeInactive',
@@ -84,7 +85,7 @@ export class CategoriesMetiersController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Récupérer une catégorie par ID',
-        description: 'Récupère les détails d\'une catégorie de métier.',
+        description: "Récupère les détails d'une catégorie de métier.",
     })
     @ApiParam({
         name: 'id',
@@ -110,7 +111,7 @@ export class CategoriesMetiersController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
         summary: 'Récupérer une catégorie par slug',
-        description: 'Récupère les détails d\'une catégorie de métier via son slug.',
+        description: "Récupère les détails d'une catégorie de métier via son slug.",
     })
     @ApiParam({
         name: 'slug',

@@ -119,14 +119,14 @@ export class CreateArtisanDto {
 
     @ApiPropertyOptional({
         description: "Biographie de l'artisan",
-        example: 'Plombier passionné avec 10 ans d\'expérience...',
+        example: "Plombier passionné avec 10 ans d'expérience...",
     })
     @IsOptional()
     @IsString()
     bio?: string;
 
     @ApiPropertyOptional({
-        description: 'Slogan ou phrase d\'accroche',
+        description: "Slogan ou phrase d'accroche",
         example: 'Votre satisfaction, notre priorité',
         maxLength: 200,
     })
@@ -189,7 +189,7 @@ export class CreateArtisanDto {
     longitude: number;
 
     @ApiProperty({
-        description: 'Ville principale d\'activité',
+        description: "Ville principale d'activité",
         example: 'Cotonou',
         maxLength: 50,
     })
@@ -198,7 +198,7 @@ export class CreateArtisanDto {
     villePrincipale: string;
 
     @ApiPropertyOptional({
-        description: 'Zone d\'intervention en km',
+        description: "Zone d'intervention en km",
         example: 10,
         default: 5,
     })
@@ -209,7 +209,7 @@ export class CreateArtisanDto {
     zoneInterventionKm?: number;
 
     @ApiPropertyOptional({
-        description: 'Liste des villes d\'intervention',
+        description: "Liste des villes d'intervention",
         example: ['Cotonou', 'Abomey-Calavi', 'Porto-Novo'],
     })
     @IsOptional()
@@ -255,11 +255,11 @@ export class CreateArtisanDto {
     horairesTravail?: HoraireTravailDto[];
 
     @ApiProperty({
-        description: 'Métiers exercés par l\'artisan',
+        description: "Métiers exercés par l'artisan",
         type: [ArtisanMetierInputDto],
     })
     @IsArray()
-    @ArrayMinSize(1, { message: 'L\'artisan doit exercer au moins un métier' })
+    @ArrayMinSize(1, { message: "L'artisan doit exercer au moins un métier" })
     @ValidateNested({ each: true })
     @Type(() => ArtisanMetierInputDto)
     metiers: ArtisanMetierInputDto[];

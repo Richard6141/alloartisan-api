@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
+import { BullModule } from '@nestjs/bull';
 import { redisStore } from 'cache-manager-redis-yet';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './users/user.module';
@@ -8,6 +9,7 @@ import { ArtisansModule } from './artisans/artisans.module';
 import { CategoriesMetiersModule } from './categories-metiers/categories-metiers.module';
 import { MetiersModule } from './metiers/metiers.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { UploadModule } from './upload/upload.module';
 import { AtGuard } from './common/guards';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
@@ -52,6 +54,18 @@ import { CommonModule } from './common/common.module';
                 ],
             }),
         }),
+        // Bull Queue pour traitement asynchrone des uploads
+        BullModule.forRootAsync({
+            imports: [ConfigModule],
+            inject: [ConfigService],
+            useFactory: (config: ConfigService) => ({
+                redis: {
+                    host: config.get<string>('REDIS_HOST', 'localhost'),
+                    port: config.get<number>('REDIS_PORT', 6379),
+                    password: config.get<string>('REDIS_PASSWORD'),
+                },
+            }),
+        }),
         CommonModule,
         AuthModule,
         UserModule,
@@ -59,6 +73,7 @@ import { CommonModule } from './common/common.module';
         MetiersModule,
         ArtisansModule,
         PrismaModule,
+        UploadModule,
     ],
     providers: [
         {

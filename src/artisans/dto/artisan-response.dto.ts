@@ -313,3 +313,127 @@ export class ArtisanListResponseDto {
     })
     totalPages: number;
 }
+
+/**
+ * DTO léger pour les listes de recherche (40-50% plus petit que ArtisanDetailResponseDto)
+ * Utilisé pour optimiser les réponses de recherche avec moins de données
+ */
+export class ArtisanListItemDto {
+    @ApiProperty({
+        description: 'Identifiant unique',
+        example: '550e8400-e29b-41d4-a716-446655440000',
+    })
+    id: string;
+
+    @ApiPropertyOptional({
+        description: "Nom de l'entreprise",
+        example: 'Plomberie Express',
+    })
+    nomEntreprise: string | null;
+
+    @ApiPropertyOptional({
+        description: 'URL photo de profil',
+    })
+    photoProfilUrl: string | null;
+
+    @ApiProperty({
+        description: 'Note moyenne',
+        example: 4.5,
+    })
+    noteMoyenne: number;
+
+    @ApiProperty({
+        description: "Nombre d'avis",
+        example: 25,
+    })
+    nombreAvis: number;
+
+    @ApiProperty({
+        description: 'Ville principale',
+        example: 'Cotonou',
+    })
+    villePrincipale: string;
+
+    @ApiProperty({
+        description: 'Artisan vérifié',
+        example: true,
+    })
+    verified: boolean;
+
+    @ApiProperty({
+        description: 'Disponible',
+        example: true,
+    })
+    disponible: boolean;
+
+    @ApiProperty({
+        description: "Type d'abonnement",
+        enum: AbonnementType,
+        example: 'GRATUIT',
+    })
+    abonnementType: AbonnementType;
+
+    @ApiProperty({
+        description: "Années d'expérience",
+        example: 10,
+    })
+    anneesExperience: number;
+
+    @ApiProperty({
+        description: 'Accepte les urgences',
+        example: true,
+    })
+    accepteUrgences: boolean;
+
+    @ApiProperty({
+        description: 'Travaille le weekend',
+        example: false,
+    })
+    accepteWeekend: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Métier principal',
+    })
+    metierPrincipal: MetierMinimalDto | null;
+
+    @ApiProperty({
+        description: 'Informations utilisateur',
+        type: UserMinimalDto,
+    })
+    user: UserMinimalDto;
+}
+
+/**
+ * DTO de réponse optimisé pour les recherches
+ */
+export class ArtisanSearchResponseDto {
+    @ApiProperty({
+        description: 'Liste des artisans (format léger)',
+        type: [ArtisanListItemDto],
+    })
+    data: ArtisanListItemDto[];
+
+    @ApiProperty({
+        description: "Nombre total d'artisans",
+        example: 100,
+    })
+    total: number;
+
+    @ApiProperty({
+        description: 'Page actuelle',
+        example: 1,
+    })
+    page: number;
+
+    @ApiProperty({
+        description: "Nombre d'éléments par page",
+        example: 20,
+    })
+    limit: number;
+
+    @ApiProperty({
+        description: 'Nombre total de pages',
+        example: 5,
+    })
+    totalPages: number;
+}

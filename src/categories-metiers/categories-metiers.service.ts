@@ -5,6 +5,7 @@ import {
     BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { CacheService } from 'src/common/services/cache.service';
 import {
     CreateCategorieMetierDto,
     UpdateCategorieMetierDto,
@@ -14,7 +15,10 @@ import {
 
 @Injectable()
 export class CategoriesMetiersService {
-    constructor(private prisma: PrismaService) {}
+    constructor(
+        private prisma: PrismaService,
+        private cacheService: CacheService,
+    ) {}
 
     async create(dto: CreateCategorieMetierDto): Promise<CategorieMetierResponseDto> {
         // Vérifier l'unicité du nom et du slug
@@ -31,7 +35,7 @@ export class CategoriesMetiersService {
             throw new ConflictException('Une catégorie avec ce slug existe déjà');
         }
 
-        return this.prisma.categorieMetier.create({
+        const result = await this.prisma.categorieMetier.create({
             data: {
                 nom: dto.nom,
                 slug: dto.slug,
@@ -41,12 +45,26 @@ export class CategoriesMetiersService {
                 actif: dto.actif ?? true,
             },
         });
+
+        // Invalider le cache des catégories
+        await this.cacheService.invalidateCategories();
+
+        return result;
     }
 
     async findAll(includeInactive = false): Promise<CategorieMetierWithMetiersResponseDto[]> {
+        // Vérifier le cache d'abord
+        const cached =
+            await this.cacheService.getCategories<CategorieMetierWithMetiersResponseDto[]>(
+                includeInactive,
+            );
+        if (cached) {
+            return cached;
+        }
+
         const where = includeInactive ? {} : { actif: true };
 
-        return this.prisma.categorieMetier.findMany({
+        const result = await this.prisma.categorieMetier.findMany({
             where,
             orderBy: [{ ordreAffichage: 'asc' }, { nom: 'asc' }],
             include: {
@@ -55,6 +73,11 @@ export class CategoriesMetiersService {
                 },
             },
         });
+
+        // Mettre en cache
+        await this.cacheService.setCategories(result, includeInactive);
+
+        return result;
     }
 
     async findOne(id: string): Promise<CategorieMetierWithMetiersResponseDto> {
@@ -127,7 +150,7 @@ export class CategoriesMetiersService {
             }
         }
 
-        return this.prisma.categorieMetier.update({
+        const result = await this.prisma.categorieMetier.update({
             where: { id },
             data: {
                 nom: dto.nom,
@@ -138,6 +161,12 @@ export class CategoriesMetiersService {
                 actif: dto.actif,
             },
         });
+
+        // Invalider le cache des catégories et métiers (car les métiers référencent les catégories)
+        await this.cacheService.invalidateCategories();
+        await this.cacheService.invalidateMetiers();
+
+        return result;
     }
 
     async remove(id: string): Promise<{ message: string }> {
@@ -163,6 +192,9 @@ export class CategoriesMetiersService {
         await this.prisma.categorieMetier.delete({
             where: { id },
         });
+
+        // Invalider le cache des catégories
+        await this.cacheService.invalidateCategories();
 
         return { message: 'Catégorie supprimée avec succès' };
     }

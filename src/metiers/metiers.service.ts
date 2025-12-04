@@ -5,6 +5,8 @@ import {
     BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { CacheService } from 'src/common/services/cache.service';
+import { Prisma } from 'src/generated/prisma';
 import {
     CreateMetierDto,
     UpdateMetierDto,
@@ -14,7 +16,10 @@ import {
 
 @Injectable()
 export class MetiersService {
-    constructor(private prisma: PrismaService) {}
+    constructor(
+        private prisma: PrismaService,
+        private cacheService: CacheService,
+    ) {}
 
     async create(dto: CreateMetierDto): Promise<MetierResponseDto> {
         // Vérifier que la catégorie existe
@@ -40,7 +45,7 @@ export class MetiersService {
             throw new ConflictException('Un métier avec ce slug existe déjà');
         }
 
-        return this.prisma.metier.create({
+        const result = await this.prisma.metier.create({
             data: {
                 nom: dto.nom,
                 slug: dto.slug,
@@ -52,6 +57,12 @@ export class MetiersService {
                 actif: dto.actif ?? true,
             },
         });
+
+        // Invalider le cache des métiers et catégories (count des métiers)
+        await this.cacheService.invalidateMetiers();
+        await this.cacheService.invalidateCategories();
+
+        return result;
     }
 
     async findAll(options?: {
@@ -59,9 +70,21 @@ export class MetiersService {
         populaire?: boolean;
         includeInactive?: boolean;
     }): Promise<MetierWithCategorieResponseDto[]> {
-        const where: any = {};
+        // Si pas de filtres spécifiques, utiliser le cache
+        const includeInactive = options?.includeInactive ?? false;
+        if (!options?.categorieId && options?.populaire === undefined) {
+            const cached =
+                await this.cacheService.getAllMetiers<MetierWithCategorieResponseDto[]>(
+                    includeInactive,
+                );
+            if (cached) {
+                return cached;
+            }
+        }
 
-        if (!options?.includeInactive) {
+        const where: Prisma.MetierWhereInput = {};
+
+        if (!includeInactive) {
             where.actif = true;
         }
 
@@ -73,7 +96,7 @@ export class MetiersService {
             where.populaire = options.populaire;
         }
 
-        return this.prisma.metier.findMany({
+        const result = await this.prisma.metier.findMany({
             where,
             orderBy: [{ ordreAffichage: 'asc' }, { nom: 'asc' }],
             include: {
@@ -89,6 +112,13 @@ export class MetiersService {
                 },
             },
         });
+
+        // Mettre en cache si pas de filtres spécifiques
+        if (!options?.categorieId && options?.populaire === undefined) {
+            await this.cacheService.setAllMetiers(result, includeInactive);
+        }
+
+        return result;
     }
 
     async findOne(id: string): Promise<MetierWithCategorieResponseDto> {
@@ -148,7 +178,15 @@ export class MetiersService {
             throw new NotFoundException('Catégorie de métier non trouvée');
         }
 
-        return this.prisma.metier.findMany({
+        // Vérifier le cache
+        const cached = await this.cacheService.getMetiersByCategory<
+            MetierWithCategorieResponseDto[]
+        >(categorie.id);
+        if (cached) {
+            return cached;
+        }
+
+        const result = await this.prisma.metier.findMany({
             where: {
                 categorieId: categorie.id,
                 actif: true,
@@ -167,10 +205,22 @@ export class MetiersService {
                 },
             },
         });
+
+        // Mettre en cache
+        await this.cacheService.setMetiersByCategory(categorie.id, result);
+
+        return result;
     }
 
     async findPopulaires(limit = 10): Promise<MetierWithCategorieResponseDto[]> {
-        return this.prisma.metier.findMany({
+        // Vérifier le cache
+        const cached =
+            await this.cacheService.getMetiersPopulaires<MetierWithCategorieResponseDto[]>(limit);
+        if (cached) {
+            return cached;
+        }
+
+        const result = await this.prisma.metier.findMany({
             where: {
                 populaire: true,
                 actif: true,
@@ -190,6 +240,11 @@ export class MetiersService {
                 },
             },
         });
+
+        // Mettre en cache
+        await this.cacheService.setMetiersPopulaires(limit, result);
+
+        return result;
     }
 
     async update(id: string, dto: UpdateMetierDto): Promise<MetierResponseDto> {
@@ -239,7 +294,7 @@ export class MetiersService {
             }
         }
 
-        return this.prisma.metier.update({
+        const result = await this.prisma.metier.update({
             where: { id },
             data: {
                 nom: dto.nom,
@@ -252,6 +307,11 @@ export class MetiersService {
                 actif: dto.actif,
             },
         });
+
+        // Invalider le cache des métiers
+        await this.cacheService.invalidateMetiers();
+
+        return result;
     }
 
     async remove(id: string): Promise<{ message: string }> {
@@ -277,6 +337,10 @@ export class MetiersService {
         await this.prisma.metier.delete({
             where: { id },
         });
+
+        // Invalider le cache des métiers et catégories (count des métiers)
+        await this.cacheService.invalidateMetiers();
+        await this.cacheService.invalidateCategories();
 
         return { message: 'Métier supprimé avec succès' };
     }

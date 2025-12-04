@@ -195,7 +195,7 @@ export class SearchArtisanDto {
     page?: number;
 
     @ApiPropertyOptional({
-        description: 'Nombre d\'éléments par page',
+        description: "Nombre d'éléments par page",
         example: 20,
         default: 20,
     })

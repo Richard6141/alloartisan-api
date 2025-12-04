@@ -10,21 +10,25 @@ export interface CacheOptions {
 export class CacheService {
     private readonly logger = new Logger(CacheService.name);
 
-    // TTL par defaut pour differents types de donnees
+    // TTL par defaut pour differents types de donnees (en millisecondes)
     static readonly TTL = {
         CATEGORIES: 24 * 60 * 60 * 1000, // 24 heures
         METIERS: 24 * 60 * 60 * 1000, // 24 heures
         METIERS_BY_CATEGORY: 12 * 60 * 60 * 1000, // 12 heures
+        METIERS_POPULAIRES: 6 * 60 * 60 * 1000, // 6 heures
         ARTISAN_PROFILE: 5 * 60 * 1000, // 5 minutes
-        SEARCH_RESULTS: 2 * 60 * 1000, // 2 minutes
+        SEARCH_RESULTS: 10 * 60 * 1000, // 10 minutes (augmenté de 2 à 10 min pour meilleur hit rate)
         STATS: 15 * 60 * 1000, // 15 minutes
     };
 
     // Prefixes de cles
-    private readonly PREFIX = {
+    static readonly PREFIX = {
         CATEGORIES: 'cache:categories',
+        CATEGORIES_ALL: 'cache:categories:all',
         METIERS: 'cache:metiers',
+        METIERS_ALL: 'cache:metiers:all',
         METIERS_BY_CATEGORY: 'cache:metiers:cat:',
+        METIERS_POPULAIRES: 'cache:metiers:populaires',
         ARTISAN: 'cache:artisan:',
         SEARCH: 'cache:search:',
         STATS: 'cache:stats:',
@@ -34,83 +38,106 @@ export class CacheService {
 
     // ==================== CATEGORIES ====================
 
-    async getCategories<T>(): Promise<T | null> {
-        return this.get<T>(this.PREFIX.CATEGORIES);
+    async getCategories<T>(includeInactive = false): Promise<T | null> {
+        return this.get<T>(`${CacheService.PREFIX.CATEGORIES_ALL}:${includeInactive}`);
     }
 
-    async setCategories<T>(data: T): Promise<void> {
-        await this.set(this.PREFIX.CATEGORIES, data, CacheService.TTL.CATEGORIES);
+    async setCategories<T>(data: T, includeInactive = false): Promise<void> {
+        await this.set(
+            `${CacheService.PREFIX.CATEGORIES_ALL}:${includeInactive}`,
+            data,
+            CacheService.TTL.CATEGORIES,
+        );
     }
 
     async invalidateCategories(): Promise<void> {
-        await this.del(this.PREFIX.CATEGORIES);
+        await this.delByPattern(`${CacheService.PREFIX.CATEGORIES}*`);
         this.logger.debug('Categories cache invalidated');
     }
 
     // ==================== METIERS ====================
 
-    async getAllMetiers<T>(): Promise<T | null> {
-        return this.get<T>(this.PREFIX.METIERS);
+    async getAllMetiers<T>(includeInactive = false): Promise<T | null> {
+        return this.get<T>(`${CacheService.PREFIX.METIERS_ALL}:${includeInactive}`);
     }
 
-    async setAllMetiers<T>(data: T): Promise<void> {
-        await this.set(this.PREFIX.METIERS, data, CacheService.TTL.METIERS);
+    async setAllMetiers<T>(data: T, includeInactive = false): Promise<void> {
+        await this.set(
+            `${CacheService.PREFIX.METIERS_ALL}:${includeInactive}`,
+            data,
+            CacheService.TTL.METIERS,
+        );
     }
 
     async getMetiersByCategory<T>(categoryId: string): Promise<T | null> {
-        return this.get<T>(`${this.PREFIX.METIERS_BY_CATEGORY}${categoryId}`);
+        return this.get<T>(`${CacheService.PREFIX.METIERS_BY_CATEGORY}${categoryId}`);
     }
 
     async setMetiersByCategory<T>(categoryId: string, data: T): Promise<void> {
         await this.set(
-            `${this.PREFIX.METIERS_BY_CATEGORY}${categoryId}`,
+            `${CacheService.PREFIX.METIERS_BY_CATEGORY}${categoryId}`,
             data,
             CacheService.TTL.METIERS_BY_CATEGORY,
         );
     }
 
+    async getMetiersPopulaires<T>(limit: number): Promise<T | null> {
+        return this.get<T>(`${CacheService.PREFIX.METIERS_POPULAIRES}:${limit}`);
+    }
+
+    async setMetiersPopulaires<T>(limit: number, data: T): Promise<void> {
+        await this.set(
+            `${CacheService.PREFIX.METIERS_POPULAIRES}:${limit}`,
+            data,
+            CacheService.TTL.METIERS_POPULAIRES,
+        );
+    }
+
     async invalidateMetiers(): Promise<void> {
-        await this.del(this.PREFIX.METIERS);
-        await this.delByPattern(`${this.PREFIX.METIERS_BY_CATEGORY}*`);
+        await this.delByPattern(`${CacheService.PREFIX.METIERS}*`);
         this.logger.debug('Metiers cache invalidated');
     }
 
     // ==================== ARTISAN ====================
 
     async getArtisanProfile<T>(artisanId: string): Promise<T | null> {
-        return this.get<T>(`${this.PREFIX.ARTISAN}${artisanId}`);
+        return this.get<T>(`${CacheService.PREFIX.ARTISAN}${artisanId}`);
     }
 
     async setArtisanProfile<T>(artisanId: string, data: T): Promise<void> {
         await this.set(
-            `${this.PREFIX.ARTISAN}${artisanId}`,
+            `${CacheService.PREFIX.ARTISAN}${artisanId}`,
             data,
             CacheService.TTL.ARTISAN_PROFILE,
         );
     }
 
     async invalidateArtisanProfile(artisanId: string): Promise<void> {
-        await this.del(`${this.PREFIX.ARTISAN}${artisanId}`);
+        await this.del(`${CacheService.PREFIX.ARTISAN}${artisanId}`);
     }
 
     // ==================== SEARCH RESULTS ====================
 
     async getSearchResults<T>(searchHash: string): Promise<T | null> {
-        return this.get<T>(`${this.PREFIX.SEARCH}${searchHash}`);
+        return this.get<T>(`${CacheService.PREFIX.SEARCH}${searchHash}`);
     }
 
     async setSearchResults<T>(searchHash: string, data: T): Promise<void> {
-        await this.set(`${this.PREFIX.SEARCH}${searchHash}`, data, CacheService.TTL.SEARCH_RESULTS);
+        await this.set(
+            `${CacheService.PREFIX.SEARCH}${searchHash}`,
+            data,
+            CacheService.TTL.SEARCH_RESULTS,
+        );
     }
 
     // ==================== STATS ====================
 
     async getStats<T>(key: string): Promise<T | null> {
-        return this.get<T>(`${this.PREFIX.STATS}${key}`);
+        return this.get<T>(`${CacheService.PREFIX.STATS}${key}`);
     }
 
     async setStats<T>(key: string, data: T): Promise<void> {
-        await this.set(`${this.PREFIX.STATS}${key}`, data, CacheService.TTL.STATS);
+        await this.set(`${CacheService.PREFIX.STATS}${key}`, data, CacheService.TTL.STATS);
     }
 
     // ==================== UTILITAIRES GENERIQUES ====================
