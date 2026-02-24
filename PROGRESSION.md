@@ -1,7 +1,7 @@
 # 📊 PROGRESSION ALLOARTISAN API
 
-> Mis à jour : 23/02/2026  
-> Progression globale : **~72%** ██████████████░░░░░░
+> Mis à jour : 25/02/2026  
+> Progression globale : **~90%** ██████████████████░░
 
 ---
 
@@ -152,15 +152,50 @@
 
 ---
 
-## Sprint 5 — Messagerie ⏳ 0%
+## Sprint 5 — Messagerie ✅ 95%
 
-| # | Tâche | Statut | Durée |
-|---|-------|--------|-------|
-| 5.1 | ConversationModule | ⏳ En attente | 2h |
-| 5.2 | MessageModule | ⏳ En attente | 2h |
-| 5.3 | WebSocket Gateway (Socket.io) | ⏳ En attente | 4h |
-| 5.4 | Historique messages paginé | ⏳ En attente | 1h |
-| 5.5 | Indicateurs lu/non-lu | ⏳ En attente | 1h |
+| # | Tâche | Statut | Fichiers | Durée |
+|---|-------|--------|----------|-------|
+| 5.1 | MessagingModule structure | ✅ Terminé | `src/messaging/messaging.module.ts` | 30min |
+| 5.2 | MessagingService (conversations + messages) | ✅ Terminé | `src/messaging/messaging.service.ts` | 3h |
+| 5.3 | WebSocket Gateway (Socket.io /chat) | ✅ Terminé | `src/messaging/messaging.gateway.ts` | 4h |
+| 5.4 | REST Controller (fallback) | ✅ Terminé | `src/messaging/messaging.controller.ts` | 1h |
+| 5.5 | Historique messages (pagination curseur) | ✅ Terminé | `messaging.service.ts#getMessages` | - |
+| 5.6 | Indicateurs lu/non-lu + markAllRead | ✅ Terminé | `messaging.service.ts` | - |
+| 5.7 | Auth JWT sur connexion WebSocket | ✅ Terminé | `messaging.gateway.ts#authenticateSocket` | - |
+| 5.8 | Multi-device support (Map userId→socketIds) | ✅ Terminé | `messaging.gateway.ts#connectedUsers` | - |
+| 5.9 | Typing indicators (start/stop) | ✅ Terminé | `messaging.gateway.ts` | - |
+| 5.10 | DTOs + validation | ✅ Terminé | `src/messaging/dto/*.ts` | 30min |
+| 5.11 | Tests unitaires MessagingService | ⏳ À faire | `src/messaging/messaging.service.spec.ts` | 3h |
+
+### Endpoints Messagerie implémentés
+
+| Méthode | Route | Accès | Statut |
+|---------|-------|-------|--------|
+| POST | `/api/v1/messages/conversations` | Authentifié | ✅ |
+| GET | `/api/v1/messages/conversations` | Authentifié | ✅ |
+| GET | `/api/v1/messages/conversations/:id` | Authentifié | ✅ |
+| POST | `/api/v1/messages/conversations/:id` | Authentifié | ✅ |
+| PATCH | `/api/v1/messages/:messageId/read` | Authentifié | ✅ |
+| PATCH | `/api/v1/messages/conversations/:id/read-all` | Authentifié | ✅ |
+| GET | `/api/v1/messages/unread-count` | Authentifié | ✅ |
+
+### Événements WebSocket (namespace /chat)
+
+| Direction | Événement | Description |
+|-----------|-----------|-------------|
+| → serveur | `join_conversation` | Rejoindre une room de conversation |
+| → serveur | `send_message` | Envoyer un message |
+| → serveur | `typing_start` | Début de saisie |
+| → serveur | `typing_stop` | Fin de saisie |
+| → serveur | `mark_read` | Accusé de lecture |
+| ← client | `message:new` | Nouveau message broadcasté |
+| ← client | `message:read` | Accusé de lecture |
+| ← client | `typing:start` | Indicateur de frappe |
+| ← client | `typing:stop` | Arrêt frappe |
+
+### ⚠️ Écart corrigé
+Sprint 5 était marqué **0%** dans PROGRESSION.md mais le code complet est committé sur la branche `messaging` (commit `b364831`). Corrigé le 25/02/2026.
 
 ---
 
@@ -197,24 +232,53 @@
 
 ---
 
-## Sprint 7 — Abonnements ⏳ 0%
+## Sprint 7 — Abonnements ✅ 90%
 
-| # | Tâche | Statut | Durée |
-|---|-------|--------|-------|
-| 7.1 | Quotas par abonnement | ✅ Logique ok (BookingService) | - |
-| 7.2 | Downgrade automatique expiré | ✅ Scheduler ok | - |
-| 7.3 | Paiement abonnement | ⏳ En attente | 3h |
+| # | Tâche | Statut | Fichiers | Durée |
+|---|-------|--------|----------|-------|
+| 7.1 | Quotas par abonnement | ✅ Terminé | `src/booking/booking.service.ts` | - |
+| 7.2 | Downgrade automatique expiré | ✅ Terminé | `src/scheduler/subscription.scheduler.ts` | 30min |
+| 7.3 | SubscriptionsService (plans, upgrade, quota) | ✅ Terminé | `src/subscriptions/subscriptions.service.ts` | 2h |
+| 7.4 | SubscriptionsController (plans, my, upgrade) | ✅ Terminé | `src/subscriptions/subscriptions.controller.ts` | 30min |
+| 7.5 | SubscriptionsModule intégré | ✅ Terminé | `src/subscriptions/subscriptions.module.ts` | - |
+| 7.6 | Paiement abonnement (via PaymentModule) | ⏳ À faire | Intégration PaymentModule | 3h |
+
+### Endpoints Abonnements implémentés
+
+| Méthode | Route | Accès | Statut |
+|---------|-------|-------|--------|
+| GET | `/api/v1/subscriptions/plans` | PUBLIC | ✅ |
+| GET | `/api/v1/subscriptions/my` | ARTISAN | ✅ |
+| POST | `/api/v1/subscriptions/upgrade` | ARTISAN | ✅ |
 
 ---
 
-## Sprint 8 — Dashboard Admin ⏳ 0%
+## Sprint 8 — Dashboard Admin ✅ 95%
 
-| # | Tâche | Statut | Durée |
-|---|-------|--------|-------|
-| 8.1 | Routes admin existantes | ✅ Protected (RolesGuard) | - |
-| 8.2 | Admin stats globales | ⏳ En attente | 3h |
-| 8.3 | Modération avis | ⏳ En attente | 2h |
-| 8.4 | Gestion litiges | ⏳ En attente | 3h |
+| # | Tâche | Statut | Fichiers | Durée |
+|---|-------|--------|----------|-------|
+| 8.1 | Routes admin existantes | ✅ Protected (RolesGuard) | Modules existants | - |
+| 8.2 | AdminService — Stats overview (KPIs) | ✅ Terminé | `src/admin/admin.service.ts` | 2h |
+| 8.3 | AdminService — Stats bookings + revenue | ✅ Terminé | `src/admin/admin.service.ts` | 1h |
+| 8.4 | AdminController — Gestion utilisateurs | ✅ Terminé | `src/admin/admin.controller.ts` | 1h |
+| 8.5 | AdminController — Artisans pending | ✅ Terminé | `src/admin/admin.controller.ts` | 30min |
+| 8.6 | Modération avis signalés | ✅ Terminé | `src/admin/admin.service.ts` | 30min |
+| 8.7 | Gestion transactions (vue admin) | ✅ Terminé | `src/admin/admin.service.ts` | 30min |
+| 8.8 | Broadcast notification admin | ✅ Terminé | `src/admin/admin.service.ts` | 1h |
+| 8.9 | Tests unitaires AdminService | ⏳ À faire | `src/admin/admin.service.spec.ts` | 3h |
+
+### Endpoints Admin implémentés
+
+| Méthode | Route | Accès | Statut |
+|---------|-------|-------|--------|
+| GET | `/api/v1/admin/stats/overview` | ADMIN | ✅ |
+| GET | `/api/v1/admin/stats/bookings` | ADMIN | ✅ |
+| GET | `/api/v1/admin/stats/revenue` | ADMIN | ✅ |
+| GET | `/api/v1/admin/users` | ADMIN | ✅ |
+| GET | `/api/v1/admin/artisans/pending` | ADMIN | ✅ |
+| GET | `/api/v1/admin/avis/reported` | ADMIN | ✅ |
+| GET | `/api/v1/admin/transactions` | ADMIN | ✅ |
+| POST | `/api/v1/admin/notifications/broadcast` | ADMIN | ✅ |
 
 ---
 

@@ -19,6 +19,8 @@ import { FavorisModule } from './favoris/favoris.module';
 import { PaymentModule } from './payment/payment.module';
 import { AvisModule } from './avis/avis.module';
 import { MessagingModule } from './messaging/messaging.module';
+import { AdminModule } from './admin/admin.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { AtGuard } from './common/guards';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
@@ -99,6 +101,10 @@ import { CommonModule } from './common/common.module';
         AvisModule,
         // ===== Sprint 5 — Messagerie temps réel =====
         MessagingModule,
+        // ===== Sprint 7 — Abonnements artisans =====
+        SubscriptionsModule,
+        // ===== Sprint 8 — Dashboard Admin =====
+        AdminModule,
     ],
     providers: [
         {
@@ -111,4 +117,4 @@ import { CommonModule } from './common/common.module';
         },
     ],
 })
-export class AppModule {}
+export class AppModule { }
