@@ -112,3 +112,42 @@ export const multerPortfolioConfig = (configService: ConfigService): MulterModul
         },
     };
 };
+
+/**
+ * Configuration Multer pour les documents de certification
+ * Accepte images (JPEG, PNG, WebP) ET PDF jusqu'à 10MB
+ */
+export const multerCertificationConfig: MulterModuleOptions = {
+    storage: diskStorage({
+        destination: (req, file, cb) => {
+            const uploadDir = './temp-uploads';
+            if (!fs.existsSync(uploadDir)) {
+                fs.mkdirSync(uploadDir, { recursive: true });
+            }
+            cb(null, uploadDir);
+        },
+        filename: (req, file, cb) => {
+            const uniqueId = uuidv4();
+            const ext = path.extname(file.originalname).toLowerCase();
+            const allowedExts = ['.jpg', '.jpeg', '.png', '.webp', '.pdf'];
+            const safeExt = allowedExts.includes(ext) ? ext : '.tmp';
+            cb(null, `${uniqueId}${safeExt}`);
+        },
+    }),
+    limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB
+        files: 1,
+    },
+    fileFilter: (req, file, cb) => {
+        const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+        if (!allowedMimes.includes(file.mimetype)) {
+            return cb(
+                new BadRequestException(
+                    `Type de fichier non autorisé: ${file.mimetype}. Autorisés: JPEG, PNG, WebP, PDF`,
+                ),
+                false,
+            );
+        }
+        cb(null, true);
+    },
+};

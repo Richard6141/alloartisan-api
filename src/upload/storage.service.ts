@@ -66,7 +66,6 @@ export class StorageService implements OnModuleInit {
             this.logger.warn('Supabase credentials not configured');
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         this.supabase = createClient(this.supabaseUrl, supabaseKey, {
             auth: { persistSession: false },
         });

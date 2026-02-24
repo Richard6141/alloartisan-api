@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 datasource db {
   provider = "postgresql"
 }
@@ -12,6 +9,8 @@ generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
 }
+
+// ==================== ENUMS ====================
 
 enum Role {
   CLIENT
@@ -38,6 +37,57 @@ enum AbonnementType {
   STANDARD
   PREMIUM
 }
+
+enum StatutBooking {
+  SOUMISE
+  ACCEPTEE
+  PRIX_PROPOSE
+  CONTRE_OFFRE
+  CONFIRMEE
+  EN_COURS
+  TERMINEE
+  ANNULEE
+  LITIGE
+}
+
+enum TypeBooking {
+  STANDARD
+  URGENCE
+  DEVIS
+}
+
+enum StatutTransaction {
+  EN_ATTENTE
+  COMPLETEE
+  ECHOUEE
+  REMBOURSEE
+}
+
+enum TypeNotification {
+  BOOKING_NOUVEAU
+  BOOKING_ACCEPTE
+  BOOKING_REFUSE
+  BOOKING_PRIX_PROPOSE
+  BOOKING_CONFIRME
+  BOOKING_TERMINE
+  BOOKING_ANNULE
+  PAIEMENT_RECU
+  PAIEMENT_ECHEC
+  AVIS_NOUVEAU
+  AVIS_REPONSE
+  MESSAGE_NOUVEAU
+  ABONNEMENT_EXPIRE
+  SYSTEME
+}
+
+enum CanalNotification {
+  PUSH
+  EMAIL
+  SMS
+  IN_APP
+}
+
+// ==================== USER ====================
 
 model User {
   id          String   @id @default(uuid()) @db.VarChar(36)
@@ -94,8 +144,13 @@ model User {
   @@index([deletedAt, statut], name: "idx_users_active")
 
   // Relations
-  artisan          Artisan?        @relation("UserArtisan")
-  artisansVerified Artisan[]       @relation("VerifiedByUser")
+  artisan          Artisan?       @relation("UserArtisan")
+  artisansVerified Artisan[]      @relation("VerifiedByUser")
+  bookingsClient   Booking[]      @relation("ClientBookings")
+  avisClient       Avis[]         @relation("ClientAvis")
+  favoris          Favori[]       @relation("ClientFavoris")
+  fcmTokens        FcmToken[]
+  logsActivite     LogActivite[]
 
   @@map("users")
 }
@@ -137,7 +192,8 @@ model Metier {
 
   // Relations
   categorie            CategorieMetier @relation(fields: [categorieId], references: [id])
-  artisanMetiers       ArtisanMetier[] // Tous les artisans pratiquant ce métier (principal si estPrincipal=true)
+  artisanMetiers       ArtisanMetier[]
+  bookings             Booking[]
 
   @@index([slug], name: "idx_metiers_slug")
   @@index([categorieId], name: "idx_metiers_categorie")
@@ -181,6 +237,10 @@ model Artisan {
   tauxCompletion    Decimal         @default(0) @db.Decimal(5, 2) @map("taux_completion")
   tauxReponseMoyen  Int?            @map("taux_reponse_moyen")
 
+  // Tarification
+  tarifHoraire      Decimal?        @db.Decimal(10, 2) @map("tarif_horaire")
+  tarifDeplacement  Decimal?        @db.Decimal(10, 2) @map("tarif_deplacement")
+
   // Disponibilité
   disponible        Boolean         @default(true)
   accepteUrgences   Boolean         @default(false) @map("accepte_urgences")
@@ -214,7 +274,11 @@ model Artisan {
   // Relations
   user              User            @relation("UserArtisan", fields: [userId], references: [id], onDelete: Cascade)
   verifiedByUser    User?           @relation("VerifiedByUser", fields: [verifiedBy], references: [id])
-  metiers           ArtisanMetier[] // Tous les métiers (principal via estPrincipal=true)
+  metiers           ArtisanMetier[]
+  certifications    Certification[]
+  bookings          Booking[]       @relation("ArtisanBookings")
+  avis              Avis[]          @relation("ArtisanAvis")
+  favoris           Favori[]        @relation("ArtisanFavoris")
 
   @@index([userId], name: "idx_artisans_user")
   @@index([villePrincipale], name: "idx_artisans_ville")
@@ -223,6 +287,7 @@ model Artisan {
   @@index([verified], name: "idx_artisans_verified")
   @@index([createdAt], name: "idx_artisans_created")
   @@index([deletedAt, statut], name: "idx_artisans_active")
+  @@index([abonnementType, abonnementExpireAt], name: "idx_artisans_abonnement")
 
   @@map("artisans")
 }
@@ -237,7 +302,7 @@ model ArtisanMetier {
   anneesExperience Int?      @map("annees_experience")
   certifie         Boolean   @default(false)
   tarifHoraire     Decimal?  @db.Decimal(10, 2) @map("tarif_horaire")
-  description      String?   @db.Text  // Description spécifique pour ce métier
+  description      String?   @db.Text
   createdAt        DateTime  @default(now()) @db.Timestamptz @map("created_at")
 
   // Relations
@@ -250,4 +315,275 @@ model ArtisanMetier {
   @@index([estPrincipal], name: "idx_artisan_metiers_principal")
 
   @@map("artisan_metiers")
+}
+
+// ==================== CERTIFICATIONS ====================
+
+model Certification {
+  id                  String    @id @default(uuid()) @db.VarChar(36)
+  artisanId           String    @map("artisan_id") @db.VarChar(36)
+  titre               String    @db.VarChar(200)
+  organisme           String?   @db.VarChar(200)
+  dateObtention       DateTime? @db.Date @map("date_obtention")
+  numeroCertification String?   @db.VarChar(100) @map("numero_certification")
+  documentUrl         String?   @db.Text @map("document_url")
+  verifie             Boolean   @default(false)
+  createdAt           DateTime  @default(now()) @db.Timestamptz @map("created_at")
+
+  // Relations
+  artisan             Artisan   @relation(fields: [artisanId], references: [id], onDelete: Cascade)
+
+  @@index([artisanId], name: "idx_certifications_artisan")
+  @@index([verifie, artisanId], name: "idx_certifications_verified")
+
+  @@map("certifications")
+}
+
+// ==================== BOOKINGS ====================
+
+model Booking {
+  id                  String        @id @default(uuid()) @db.VarChar(36)
+  clientId            String        @map("client_id") @db.VarChar(36)
+  artisanId           String        @map("artisan_id") @db.VarChar(36)
+  metierId            String        @map("metier_id") @db.VarChar(36)
+  statut              StatutBooking @default(SOUMISE)
+  type                TypeBooking   @default(STANDARD)
+
+  // Détails intervention
+  titre               String        @db.VarChar(200)
+  description         String        @db.Text
+  adresseIntervention String        @db.Text @map("adresse_intervention")
+  latitudeIntervention Decimal?     @db.Decimal(10, 8) @map("latitude_intervention")
+  longitudeIntervention Decimal?    @db.Decimal(11, 8) @map("longitude_intervention")
+
+  // Planning
+  datePreferee        DateTime?     @db.Timestamptz @map("date_preferee")
+  dateFin             DateTime?     @db.Timestamptz @map("date_fin")
+  dureeEstimeeHeures  Decimal?      @db.Decimal(5, 2) @map("duree_estimee_heures")
+
+  // Tarification
+  budgetClient        Decimal?      @db.Decimal(10, 2) @map("budget_client")
+  prixPropose         Decimal?      @db.Decimal(10, 2) @map("prix_propose")
+  prixFinal           Decimal?      @db.Decimal(10, 2) @map("prix_final")
+
+  // Urgence
+  estUrgent           Boolean       @default(false) @map("est_urgent")
+
+  // Suivi
+  raisonAnnulation    String?       @db.Text @map("raison_annulation")
+  noteClient          Int?          // 1-5 étoiles (deprecated: use Avis)
+  commentaireClient   String?       @db.Text @map("commentaire_client")
+
+  // Timestamps de workflow
+  accepteAt           DateTime?     @db.Timestamptz @map("accepte_at")
+  debutAt             DateTime?     @db.Timestamptz @map("debut_at")
+  finAt               DateTime?     @db.Timestamptz @map("fin_at")
+  createdAt           DateTime      @default(now()) @db.Timestamptz @map("created_at")
+  updatedAt           DateTime      @updatedAt @db.Timestamptz @map("updated_at")
+
+  // Relations
+  client              User          @relation("ClientBookings", fields: [clientId], references: [id])
+  artisan             Artisan       @relation("ArtisanBookings", fields: [artisanId], references: [id])
+  metier              Metier        @relation(fields: [metierId], references: [id])
+  transaction         Transaction?
+  avis                Avis?
+
+  @@index([clientId, statut], name: "idx_bookings_client")
+  @@index([artisanId, statut], name: "idx_bookings_artisan")
+  @@index([statut, createdAt], name: "idx_bookings_statut")
+  @@index([datePreferee], name: "idx_bookings_date")
+  @@index([estUrgent, statut], name: "idx_bookings_urgence")
+  @@index([createdAt], name: "idx_bookings_created")
+
+  @@map("bookings")
+}
+
+// ==================== TRANSACTIONS ====================
+
+model Transaction {
+  id                    String            @id @default(uuid()) @db.VarChar(36)
+  bookingId             String            @unique @map("booking_id") @db.VarChar(36)
+  clientId              String            @map("client_id") @db.VarChar(36)
+  artisanId             String            @map("artisan_id") @db.VarChar(36)
+  montant               Decimal           @db.Decimal(10, 2)
+  commission            Decimal           @default(0) @db.Decimal(10, 2)
+  montantArtisan        Decimal           @db.Decimal(10, 2) @map("montant_artisan")
+  statut                StatutTransaction @default(EN_ATTENTE)
+  provider              String            @db.VarChar(50) // fedapay, kkiapay, cash
+  providerTransactionId String?           @unique @db.VarChar(200) @map("provider_transaction_id")
+  providerResponse      Json?             @map("provider_response")
+  webhookReceivedAt     DateTime?         @db.Timestamptz @map("webhook_received_at")
+  createdAt             DateTime          @default(now()) @db.Timestamptz @map("created_at")
+  updatedAt             DateTime          @updatedAt @db.Timestamptz @map("updated_at")
+
+  // Relations
+  booking               Booking           @relation(fields: [bookingId], references: [id])
+
+  @@index([clientId], name: "idx_transactions_client")
+  @@index([artisanId], name: "idx_transactions_artisan")
+  @@index([statut], name: "idx_transactions_statut")
+  @@index([createdAt], name: "idx_transactions_created")
+
+  @@map("transactions")
+}
+
+// ==================== AVIS ====================
+
+model Avis {
+  id                String    @id @default(uuid()) @db.VarChar(36)
+  bookingId         String    @unique @map("booking_id") @db.VarChar(36)
+  clientId          String    @map("client_id") @db.VarChar(36)
+  artisanId         String    @map("artisan_id") @db.VarChar(36)
+  note              Int       // 1-5
+  notePonctualite   Int?      @map("note_ponctualite")
+  noteQualite       Int?      @map("note_qualite")
+  noteCommunication Int?      @map("note_communication")
+  commentaire       String?   @db.Text
+  reponseArtisan    String?   @db.Text @map("reponse_artisan")
+  reponseAt         DateTime? @db.Timestamptz @map("reponse_at")
+  photosUrls        Json?     @map("photos_urls")
+  signale           Boolean   @default(false)
+  raisonSignalement String?   @db.Text @map("raison_signalement")
+  signaleBy         String?   @db.VarChar(36) @map("signale_by")
+  visible           Boolean   @default(true)
+  createdAt         DateTime  @default(now()) @db.Timestamptz @map("created_at")
+
+  // Relations
+  booking           Booking   @relation(fields: [bookingId], references: [id])
+  client            User      @relation("ClientAvis", fields: [clientId], references: [id])
+  artisan           Artisan   @relation("ArtisanAvis", fields: [artisanId], references: [id])
+
+  @@index([artisanId, visible], name: "idx_avis_artisan")
+  @@index([clientId], name: "idx_avis_client")
+  @@index([createdAt], name: "idx_avis_created")
+
+  @@map("avis")
+}
+
+// ==================== CONVERSATIONS & MESSAGES ====================
+
+model Conversation {
+  id            String    @id @default(uuid()) @db.VarChar(36)
+  clientId      String    @map("client_id") @db.VarChar(36)
+  artisanId     String    @map("artisan_id") @db.VarChar(36)
+  bookingId     String?   @map("booking_id") @db.VarChar(36)
+  lastMessageAt DateTime? @db.Timestamptz @map("last_message_at")
+  createdAt     DateTime  @default(now()) @db.Timestamptz @map("created_at")
+
+  // Relations
+  messages      Message[]
+
+  @@unique([clientId, artisanId, bookingId])
+  @@index([clientId, lastMessageAt], name: "idx_conv_client")
+  @@index([artisanId, lastMessageAt], name: "idx_conv_artisan")
+  @@index([lastMessageAt], name: "idx_conv_last_message")
+
+  @@map("conversations")
+}
+
+model Message {
+  id              String       @id @default(uuid()) @db.VarChar(36)
+  conversationId  String       @map("conversation_id") @db.VarChar(36)
+  senderId        String       @map("sender_id") @db.VarChar(36)
+  type            String       @default("text") @db.VarChar(20) // text, image, audio, video, location
+  contenu         String?      @db.Text
+  mediaUrl        String?      @db.Text @map("media_url")
+  mediaDuree      Int?         @map("media_duree")
+  latitude        Decimal?     @db.Decimal(10, 8)
+  longitude       Decimal?     @db.Decimal(11, 8)
+  lu              Boolean      @default(false)
+  luAt            DateTime?    @db.Timestamptz @map("lu_at")
+  createdAt       DateTime     @default(now()) @db.Timestamptz @map("created_at")
+
+  // Relations
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt], name: "idx_messages_conv")
+  @@index([senderId], name: "idx_messages_sender")
+  @@index([lu, senderId], name: "idx_messages_non_lus")
+
+  @@map("messages")
+}
+
+// ==================== NOTIFICATIONS ====================
+
+model Notification {
+  id          String              @id @default(uuid()) @db.VarChar(36)
+  userId      String              @map("user_id") @db.VarChar(36)
+  type        TypeNotification
+  canal       CanalNotification   @default(IN_APP)
+  titre       String              @db.VarChar(200)
+  corps       String              @db.Text
+  data        Json?
+  lu          Boolean             @default(false)
+  luAt        DateTime?           @db.Timestamptz @map("lu_at")
+  createdAt   DateTime            @default(now()) @db.Timestamptz @map("created_at")
+  expiresAt   DateTime?           @db.Timestamptz @map("expires_at")
+
+  @@index([userId, lu, createdAt], name: "idx_notifs_user")
+  @@index([createdAt], name: "idx_notifs_created")
+  @@index([expiresAt], name: "idx_notifs_expiry")
+
+  @@map("notifications")
+}
+
+model FcmToken {
+  id          String    @id @default(uuid()) @db.VarChar(36)
+  userId      String    @map("user_id") @db.VarChar(36)
+  token       String    @unique @db.Text
+  deviceName  String?   @db.VarChar(100) @map("device_name")
+  platform    String?   @db.VarChar(20) // android, ios, web
+  actif       Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @db.Timestamptz @map("created_at")
+  updatedAt   DateTime  @updatedAt @db.Timestamptz @map("updated_at")
+
+  // Relations
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, actif], name: "idx_fcm_user")
+
+  @@map("fcm_tokens")
+}
+
+// ==================== FAVORIS ====================
+
+model Favori {
+  id          String    @id @default(uuid()) @db.VarChar(36)
+  clientId    String    @map("client_id") @db.VarChar(36)
+  artisanId   String    @map("artisan_id") @db.VarChar(36)
+  createdAt   DateTime  @default(now()) @db.Timestamptz @map("created_at")
+
+  // Relations
+  client      User      @relation("ClientFavoris", fields: [clientId], references: [id], onDelete: Cascade)
+  artisan     Artisan   @relation("ArtisanFavoris", fields: [artisanId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, artisanId])
+  @@index([clientId], name: "idx_favoris_client")
+  @@index([artisanId], name: "idx_favoris_artisan")
+
+  @@map("favoris")
+}
+
+// ==================== LOGS ACTIVITE ====================
+
+model LogActivite {
+  id          String    @id @default(uuid()) @db.VarChar(36)
+  userId      String?   @map("user_id") @db.VarChar(36)
+  action      String    @db.VarChar(100)
+  entite      String?   @db.VarChar(50)
+  entiteId    String?   @db.VarChar(36) @map("entite_id")
+  metadata    Json?
+  ipAddress   String?   @db.VarChar(45) @map("ip_address")
+  userAgent   String?   @db.Text @map("user_agent")
+  createdAt   DateTime  @default(now()) @db.Timestamptz @map("created_at")
+
+  // Relations
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt], name: "idx_logs_user")
+  @@index([action, createdAt], name: "idx_logs_action")
+  @@index([entite, entiteId], name: "idx_logs_entite")
+  @@index([createdAt], name: "idx_logs_created")
+
+  @@map("logs_activites")
 }
