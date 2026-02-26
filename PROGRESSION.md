@@ -1,7 +1,7 @@
 # 📊 PROGRESSION ALLOARTISAN API
 
-> Mis à jour : 25/02/2026  
-> Progression globale : **~90%** ██████████████████░░
+> Mis à jour : 26/02/2026  
+> Progression globale : **~95%** ███████████████████░
 
 ---
 
@@ -282,6 +282,44 @@ Sprint 5 était marqué **0%** dans PROGRESSION.md mais le code complet est comm
 
 ---
 
+## Sprint 9 — Performance & Cache Redis ✅ 95%
+
+| # | Tâche | Statut | Fichiers | Durée |
+|---|-------|--------|----------|-------|
+| 9.1 | CacheService (cache-aside, TTL, patterns) | ✅ Terminé | `src/common/services/cache.service.ts` | 2h |
+| 9.2 | Cache catégories (TTL 24h) | ✅ Terminé | `src/categories-metiers/categories-metiers.service.ts` | 30min |
+| 9.3 | Cache métiers (TTL 24h + par catégorie + populaires) | ✅ Terminé | `src/metiers/metiers.service.ts` | 1h |
+| 9.4 | Cache profil artisan (TTL 5min) + searchOptimized (TTL 10min) | ✅ Terminé | `src/artisans/artisans.service.ts` | 2h |
+| 9.5 | Invalidation intelligente cache (profil + search) | ✅ Terminé | `artisans.service.ts` (update/verify/reject/delete) | 30min |
+| 9.6 | Rate Limiting avancé (ThrottlerModule + 3 tiers) | ✅ Terminé | `src/app.module.ts` | 1h |
+| 9.7 | ArtisansModule import CommonModule (CacheService DI) | ✅ Terminé | `src/artisans/artisans.module.ts` | 10min |
+| 9.8 | Tests unitaires Sprint 9 | ⏳ À faire | `*.service.spec.ts` | 4h |
+
+### Stratégie de cache implémentée
+
+| Donnée | TTL | Stratégie |
+|--------|-----|-----------|
+| Catégories métiers | 24h | Cache-Aside, invalidation sur mutation |
+| Métiers (tous) | 24h | Cache-Aside, invalidation sur mutation |
+| Métiers par catégorie | 12h | Cache-Aside, invalidation sur mutation |
+| Métiers populaires | 6h | Cache-Aside |
+| Profil artisan | 5min | Cache-Aside, invalidation sur update/verify/delete |
+| Résultats recherche | 10min | Cache-Aside (clé MD5 du DTO), invalidation globale sur mutation |
+| Stats admin | 15min | Cache-Aside |
+
+### Rate Limiting (ThrottlerModule)
+
+| Tier | TTL | Limite | Usage |
+|------|-----|--------|-------|
+| `short` | 1s | 3 req | Brute force protection |
+| `medium` | 10s | 20 req | Normal API usage |
+| `long` | 60s | 100 req | Global rate limit |
+
+### ⚠️ Écart corrigé
+Sprint 9 était absent de `PROGRESSION.md` mais le code est partiellement commité sur `sprint/9-performance-cache`. CacheService, MetiersService, CategoriesMetiersService déjà committés. ArtisansService stagé → commit en cours.
+
+---
+
 ## 🔧 Commandes à exécuter (ordre strict)
 
 ```bash
@@ -315,7 +353,10 @@ pnpm start:dev
 | `@nestjs/platform-socket.io` | ^11.1.14 | Socket.io (Sprint 5) |
 | `socket.io` | ^4.8.3 | Messaging temps réel |
 | `resend` | ^6.5.2 | Emails transactionnels ✅ |
-| `firebase-admin` | latest | Push notifications FCM ⚠️ À installer |
+| `firebase-admin` | latest | Push notifications FCM ✅ |
+| `@nestjs/throttler` | latest | Rate limiting avancé ✅ |
+| `@nestjs/cache-manager` | latest | Cache Redis (Sprint 9) ✅ |
+| `cache-manager-redis-yet` | latest | Adapter Redis pour cache ✅ |
 
 ---
 
@@ -353,19 +394,35 @@ src/
 │   ├── favoris.service.ts   ✅
 │   └── favoris.controller.ts ✅
 ├── scheduler/
-│   ├── scheduler.module.ts       ✅ (étendu)
-│   ├── booking.scheduler.ts      ✅
-│   └── notification.scheduler.ts ✅ (nouveau)
+│   ├── scheduler.module.ts           ✅ (étendu)
+│   ├── booking.scheduler.ts          ✅
+│   ├── notification.scheduler.ts     ✅
+│   └── subscription.scheduler.ts     ✅
+├── common/
+│   ├── common.module.ts              ✅
+│   ├── guards/
+│   │   ├── roles.guard.ts            ✅
+│   │   └── at.guard.ts               ✅
+│   ├── decorators/
+│   │   ├── roles.decorator.ts        ✅
+│   │   └── get-current-user.decorator.ts ✅
+│   └── services/
+│       ├── cache.service.ts          ✅ (Sprint 9 — Cache-Aside, TTL multi-niveaux)
+│       ├── email.service.ts          ✅
+│       ├── otp.service.ts            ✅
+│       └── session.service.ts        ✅
 └── prisma/
-    └── prisma.service.ts      ✅
+    └── prisma.service.ts             ✅
 ```
 
 ---
 
 ## ⚠️ Points d'attention (dette technique)
 
-1. **firebase-admin** : À installer manuellement avec `pnpm add firebase-admin`
-2. **Migration Prisma** : La migration n'a pas encore été exécutée — la DB est peut-être décalée
-3. **JWT RS256** : Prévu mais pas encore implémenté — rester sur HS256 pour l'instant
-4. **Tests** : Aucun test unitaire ou E2E — dette croissante
-5. **PostGIS** : L'extension doit être activée sur PostgreSQL avant d'utiliser GeolocationService
+1. **Migration Prisma** : La migration n'a pas encore été exécutée en DB réelle — s'assurer que Docker est up avant `npx prisma migrate dev`
+2. **JWT RS256** : Prévu (tâche 0.6) mais pas encore implémenté — rester sur HS256 pour l'instant
+3. **Tests** : Aucun test unitaire ou E2E — dette croissante sur 9 sprints (~30h de travail)
+4. **PostGIS** : L'extension doit être activée sur PostgreSQL avant d'utiliser GeolocationService
+5. **Cache patterns Redis** : `delByPattern` utilise `stores[0].keys()` — à valider avec la version exacte de `cache-manager-redis-yet`
+6. **Paiement abonnements** : Intégration PaymentModule → SubscriptionsModule (tâche 7.6) non implémentée
+7. **Sprint suivant** : Sprint 10 (Sécurité avancée OWASP + Monitoring) ou Tests (Sprint 11)
