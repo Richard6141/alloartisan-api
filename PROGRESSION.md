@@ -1,6 +1,6 @@
 # 📊 PROGRESSION ALLOARTISAN API
 
-> Mis à jour : 26/02/2026  
+> Mis à jour : 26/02/2026 (audit code réel + tests Sprint 9)  
 > Progression globale : **~95%** ███████████████████░
 
 ---
@@ -278,11 +278,12 @@ Sprint 5 était marqué **0%** dans PROGRESSION.md mais le code complet est comm
 | GET | `/api/v1/admin/artisans/pending` | ADMIN | ✅ |
 | GET | `/api/v1/admin/avis/reported` | ADMIN | ✅ |
 | GET | `/api/v1/admin/transactions` | ADMIN | ✅ |
+| GET | `/api/v1/admin/logs` | ADMIN | ✅ |
 | POST | `/api/v1/admin/notifications/broadcast` | ADMIN | ✅ |
 
 ---
 
-## Sprint 9 — Performance & Cache Redis ✅ 95%
+## Sprint 9 — Performance & Cache Redis ✅ 100%
 
 | # | Tâche | Statut | Fichiers | Durée |
 |---|-------|--------|----------|-------|
@@ -293,7 +294,7 @@ Sprint 5 était marqué **0%** dans PROGRESSION.md mais le code complet est comm
 | 9.5 | Invalidation intelligente cache (profil + search) | ✅ Terminé | `artisans.service.ts` (update/verify/reject/delete) | 30min |
 | 9.6 | Rate Limiting avancé (ThrottlerModule + 3 tiers) | ✅ Terminé | `src/app.module.ts` | 1h |
 | 9.7 | ArtisansModule import CommonModule (CacheService DI) | ✅ Terminé | `src/artisans/artisans.module.ts` | 10min |
-| 9.8 | Tests unitaires Sprint 9 | ⏳ À faire | `*.service.spec.ts` | 4h |
+| 9.8 | Tests unitaires Sprint 9 | ✅ Terminé | `src/common/services/cache.service.spec.ts`, `src/categories-metiers/categories-metiers.service.spec.ts`, `src/metiers/metiers.service.spec.ts` | 2h |
 
 ### Stratégie de cache implémentée
 
@@ -317,6 +318,23 @@ Sprint 5 était marqué **0%** dans PROGRESSION.md mais le code complet est comm
 
 ### ⚠️ Écart corrigé
 Sprint 9 était absent de `PROGRESSION.md` mais le code est partiellement commité sur `sprint/9-performance-cache`. CacheService, MetiersService, CategoriesMetiersService déjà committés. ArtisansService stagé → commit en cours.
+
+### ⚠️ ÉCART DÉTECTÉ : état Sprint 10 présent dans le workspace mais non synchronisé
+- Branche courante détectée : `sprint/10-security-monitoring`
+- Fichiers locaux détectés : `src/health/*` et `src/common/services/log-activite.service.ts` (non commités, module Health non importé dans `app.module.ts`)
+- `package.json` et `pnpm-lock.yaml` modifiés localement
+
+### ⚠️ ÉCART DÉTECTÉ : couverture de tests non conforme aux sprints terminés
+- Aucun `*.spec.ts` n'était présent avant cet audit, malgré plusieurs sprints marqués à 90-95%
+- Ajouts réalisés dans cet audit :
+  - `src/common/services/cache.service.spec.ts`
+  - `src/categories-metiers/categories-metiers.service.spec.ts`
+  - `src/metiers/metiers.service.spec.ts`
+- Résultat : 7 tests passants (`pnpm exec jest ...`)
+
+### ⚠️ ÉCART DÉTECTÉ : triggers SQL annoncés mais fichier absent
+- `prisma/migrations/manual/triggers.sql` est référencé dans le suivi mais absent du repository (`Test-Path` = `False`)
+- Impact : les optimisations PostGIS/full-text/audit triggers ne sont pas versionnées dans ce workspace
 
 ---
 
