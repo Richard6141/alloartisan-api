@@ -178,10 +178,20 @@ export class PaymentService {
     // ============================================================
 
     async getTransactionStatus(transactionId: string, userId: string) {
+        const artisan = await this.prisma.artisan.findUnique({
+            where: { userId },
+            select: { id: true },
+        });
+
+        const actorArtisanId = artisan?.id;
+
         const transaction = await this.prisma.transaction.findFirst({
             where: {
                 id: transactionId,
-                OR: [{ clientId: userId }, { artisanId: userId }],
+                OR: [
+                    { clientId: userId },
+                    ...(actorArtisanId ? [{ artisanId: actorArtisanId }] : []),
+                ],
             },
             include: {
                 booking: {
@@ -202,7 +212,22 @@ export class PaymentService {
     // ============================================================
 
     async getHistory(userId: string, isArtisan: boolean) {
-        const where = isArtisan ? { artisanId: userId } : { clientId: userId };
+        let where: { artisanId: string } | { clientId: string };
+
+        if (isArtisan) {
+            const artisan = await this.prisma.artisan.findUnique({
+                where: { userId },
+                select: { id: true },
+            });
+
+            if (!artisan) {
+                return [];
+            }
+
+            where = { artisanId: artisan.id };
+        } else {
+            where = { clientId: userId };
+        }
 
         const transactions = await this.prisma.transaction.findMany({
             where,
@@ -345,13 +370,20 @@ export class PaymentService {
             data: { bookingId: transaction.bookingId, transactionId: transaction.id },
         });
 
-        void this.notificationService.send({
-            userId: transaction.artisanId,
-            type: 'PAIEMENT_RECU',
-            titre: '💰 Paiement reçu',
-            corps: `Vous avez reçu ${transaction.montantArtisan} FCFA pour la réservation. Vous pouvez commencer l'intervention.`,
-            data: { bookingId: transaction.bookingId, transactionId: transaction.id },
+        const artisan = await this.prisma.artisan.findUnique({
+            where: { id: transaction.artisanId },
+            select: { userId: true },
         });
+
+        if (artisan) {
+            void this.notificationService.send({
+                userId: artisan.userId,
+                type: 'PAIEMENT_RECU',
+                titre: '💰 Paiement reçu',
+                corps: `Vous avez reçu ${transaction.montantArtisan} FCFA pour la réservation. Vous pouvez commencer l'intervention.`,
+                data: { bookingId: transaction.bookingId, transactionId: transaction.id },
+            });
+        }
     }
 
     // ============================================================
