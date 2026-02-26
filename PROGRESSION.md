@@ -320,7 +320,7 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 
 ---
 
-## Sprint 10 — Sécurité avancée & Monitoring ✅ 75%
+## Sprint 10 — Sécurité avancée & Monitoring ✅ 85%
 
 | # | Tâche | Statut | Fichiers | Durée |
 |---|-------|--------|----------|-------|
@@ -329,8 +329,9 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 | 10.3 | LogActiviteService branché dans CommonModule | ✅ Terminé | `src/common/common.module.ts`, `src/common/services/*` | 30min |
 | 10.4 | Audit trail automatique (interceptor global mutating routes) | ✅ Terminé | `src/common/interceptors/audit-log.interceptor.ts`, `src/app.module.ts` | 1h |
 | 10.5 | Test unitaire interceptor audit | ✅ Terminé | `src/common/interceptors/audit-log.interceptor.spec.ts` | 30min |
-| 10.6 | Audit ownership global services | ⏳ À faire | multi-modules | 3h |
-| 10.7 | `npm audit` + corrections HIGH/CRITICAL | ⏳ À faire | dépendances | 1h |
+| 10.6 | Audit ownership global services | 🔄 En cours | `src/payment/payment.service.ts` (fix ownership artisan), autres modules à auditer | 2h |
+| 10.7 | `pnpm audit` + corrections HIGH/CRITICAL | 🔄 En cours | `package.json` overrides + `pnpm-lock.yaml` | 1h |
+| 10.8 | Tests unitaires ownership paiement | ✅ Terminé | `src/payment/payment.service.spec.ts` | 30min |
 
 ### Endpoints Monitoring implémentés
 
@@ -342,6 +343,14 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 - `pnpm exec tsc --noEmit` ✅
 - `pnpm exec eslint ...` ✅
 - `pnpm exec jest src/common/interceptors/audit-log.interceptor.spec.ts` ✅ (2 tests passants)
+- `pnpm exec jest src/payment/payment.service.spec.ts` ✅ (2 tests passants)
+- `pnpm audit --audit-level high` ✅ partiel : `critical` supprimé, reste `5 high` résiduelles
+
+### ⚠️ ÉCART DÉTECTÉ : vulnérabilités résiduelles après durcissement
+- Restant après correctifs transitive overrides :
+  - `html-minifier` (via `@nestjs-modules/mailer > mjml > mjml-cli`) — pas de version patch publiée
+  - `minimatch` sur chaînes transitive multiples (`eslint`, `nestjs/cli`, `mjml`)
+- Impact : dette sécurité transitive non bloquante runtime API immédiat, mais à traiter via upgrade/remplacement de dépendances amont
 
 ### ⚠️ ÉCART DÉTECTÉ : triggers SQL versionnés absents
 - `prisma/migrations/manual/triggers.sql` est référencé dans le suivi mais absent du repository
