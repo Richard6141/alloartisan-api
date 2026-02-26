@@ -58,7 +58,7 @@ export class ArtisansService {
     constructor(
         private prisma: PrismaService,
         private cacheService: CacheService,
-    ) { }
+    ) {}
 
     async create(userId: string, dto: CreateArtisanDto): Promise<ArtisanDetailResponseDto> {
         // Vérifier que l'utilisateur existe et n'est pas déjà artisan

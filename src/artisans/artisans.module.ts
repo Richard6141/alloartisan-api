@@ -9,4 +9,4 @@ import { CommonModule } from 'src/common/common.module';
     providers: [ArtisansService],
     exports: [ArtisansService],
 })
-export class ArtisansModule { }
+export class ArtisansModule {}
