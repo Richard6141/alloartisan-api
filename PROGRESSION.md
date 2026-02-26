@@ -1,310 +1,310 @@
-# 📊 PROGRESSION ALLOARTISAN API
+﻿# ðŸ“Š PROGRESSION ALLOARTISAN API
 
-> Mis à jour : 26/02/2026  
-> Progression globale : **~95%** ███████████████████░
+> Mis à jour : 26/02/2026 (Sprint 10 - sécurité monitoring en cours)  
+> Progression globale : **~97%** ████████████████████░
 
 ---
 
-## Sprint 0 — Fondations (critique) ✅ 95%
+## Sprint 0 â€” Fondations (critique) âœ… 95%
 
-| # | Tâche | Statut | Fichiers | Durée |
+| # | TÃ¢che | Statut | Fichiers | DurÃ©e |
 |---|-------|--------|----------|-------|
-| 0.1 | RolesGuard + Roles decorator | ✅ Terminé | `common/guards/roles.guard.ts`, `common/decorators/roles.decorator.ts` | 1h |
-| 0.2 | Schéma Prisma complet | ✅ Terminé | `prisma/schema.prisma` | 3h |
-| 0.3 | Triggers PostgreSQL | ✅ Terminé | `prisma/migrations/manual/triggers.sql` | 2h |
-| 0.4a | Helmet + Compression | ✅ Terminé | `src/main.ts` | 30min |
-| 0.4b | Variables d'env complètes | ✅ Terminé | `.env.example` | 30min |
-| 0.5 | **Migration Prisma** | ⏳ À exécuter | DB doit être up | - |
-| 0.6 | JWT RS256 | ⏳ En attente | `src/auth/strategies/` | 2h |
+| 0.1 | RolesGuard + Roles decorator | âœ… TerminÃ© | `common/guards/roles.guard.ts`, `common/decorators/roles.decorator.ts` | 1h |
+| 0.2 | SchÃ©ma Prisma complet | âœ… TerminÃ© | `prisma/schema.prisma` | 3h |
+| 0.3 | Triggers PostgreSQL | âœ… TerminÃ© | `prisma/migrations/manual/triggers.sql` | 2h |
+| 0.4a | Helmet + Compression | âœ… TerminÃ© | `src/main.ts` | 30min |
+| 0.4b | Variables d'env complÃ¨tes | âœ… TerminÃ© | `.env.example` | 30min |
+| 0.5 | **Migration Prisma** | â³ Ã€ exÃ©cuter | DB doit Ãªtre up | - |
+| 0.6 | JWT RS256 | â³ En attente | `src/auth/strategies/` | 2h |
 
 **Action requise :** Lancer la migration Prisma (voir commandes ci-dessous)
 
 ---
 
-## Sprint 1 — Module Booking (core) ✅ 80%
+## Sprint 1 â€” Module Booking (core) âœ… 80%
 
-| # | Tâche | Statut | Fichiers | Durée |
+| # | TÃ¢che | Statut | Fichiers | DurÃ©e |
 |---|-------|--------|----------|-------|
-| 1.1 | BookingModule structure | ✅ Terminé | `src/booking/booking.module.ts` | 30min |
-| 1.2 | BookingService complet | ✅ Terminé | `src/booking/booking.service.ts` | 4h |
-| 1.3 | BookingController (tous endpoints) | ✅ Terminé | `src/booking/booking.controller.ts` | 2h |
-| 1.4 | DTOs + validation | ✅ Terminé | `src/booking/dto/*.ts` | 1h |
-| 1.5 | Scheduler tâches planifiées | ✅ Terminé | `src/scheduler/*.ts` | 1h |
-| 1.6 | PrismaService étendu | ✅ Terminé | `src/prisma/prisma.service.ts` | 30min |
-| 1.7 | Intégration notifications Booking | ✅ Terminé | `src/booking/booking.service.ts` | 1h |
-| 1.8 | Tests unitaires BookingService | ⏳ À faire | `src/booking/booking.service.spec.ts` | 3h |
-| 1.9 | Tests E2E endpoints Booking | ⏳ À faire | `test/booking.e2e-spec.ts` | 3h |
+| 1.1 | BookingModule structure | âœ… TerminÃ© | `src/booking/booking.module.ts` | 30min |
+| 1.2 | BookingService complet | âœ… TerminÃ© | `src/booking/booking.service.ts` | 4h |
+| 1.3 | BookingController (tous endpoints) | âœ… TerminÃ© | `src/booking/booking.controller.ts` | 2h |
+| 1.4 | DTOs + validation | âœ… TerminÃ© | `src/booking/dto/*.ts` | 1h |
+| 1.5 | Scheduler tÃ¢ches planifiÃ©es | âœ… TerminÃ© | `src/scheduler/*.ts` | 1h |
+| 1.6 | PrismaService Ã©tendu | âœ… TerminÃ© | `src/prisma/prisma.service.ts` | 30min |
+| 1.7 | IntÃ©gration notifications Booking | âœ… TerminÃ© | `src/booking/booking.service.ts` | 1h |
+| 1.8 | Tests unitaires BookingService | â³ Ã€ faire | `src/booking/booking.service.spec.ts` | 3h |
+| 1.9 | Tests E2E endpoints Booking | â³ Ã€ faire | `test/booking.e2e-spec.ts` | 3h |
 
-### Endpoints Booking implémentés
+### Endpoints Booking implÃ©mentÃ©s
 
-| Méthode | Route | Accès | Statut |
+| MÃ©thode | Route | AccÃ¨s | Statut |
 |---------|-------|-------|--------|
-| POST | `/api/v1/bookings` | CLIENT | ✅ |
-| GET | `/api/v1/bookings` | CLIENT / ARTISAN / ADMIN | ✅ |
-| GET | `/api/v1/bookings/stats` | ARTISAN | ✅ |
-| GET | `/api/v1/bookings/:id` | Propriétaire | ✅ |
-| PATCH | `/api/v1/bookings/:id/accept` | ARTISAN | ✅ |
-| PATCH | `/api/v1/bookings/:id/propose-price` | ARTISAN | ✅ |
-| PATCH | `/api/v1/bookings/:id/confirm` | CLIENT | ✅ |
-| PATCH | `/api/v1/bookings/:id/start` | ARTISAN | ✅ |
-| PATCH | `/api/v1/bookings/:id/complete` | ARTISAN | ✅ |
-| PATCH | `/api/v1/bookings/:id/cancel` | CLIENT / ARTISAN | ✅ |
+| POST | `/api/v1/bookings` | CLIENT | âœ… |
+| GET | `/api/v1/bookings` | CLIENT / ARTISAN / ADMIN | âœ… |
+| GET | `/api/v1/bookings/stats` | ARTISAN | âœ… |
+| GET | `/api/v1/bookings/:id` | PropriÃ©taire | âœ… |
+| PATCH | `/api/v1/bookings/:id/accept` | ARTISAN | âœ… |
+| PATCH | `/api/v1/bookings/:id/propose-price` | ARTISAN | âœ… |
+| PATCH | `/api/v1/bookings/:id/confirm` | CLIENT | âœ… |
+| PATCH | `/api/v1/bookings/:id/start` | ARTISAN | âœ… |
+| PATCH | `/api/v1/bookings/:id/complete` | ARTISAN | âœ… |
+| PATCH | `/api/v1/bookings/:id/cancel` | CLIENT / ARTISAN | âœ… |
 
 ---
 
-## Sprint 2 — Notifications & FCM ✅ 85%
+## Sprint 2 â€” Notifications & FCM âœ… 85%
 
-| # | Tâche | Statut | Fichiers | Durée |
+| # | TÃ¢che | Statut | Fichiers | DurÃ©e |
 |---|-------|--------|----------|-------|
-| 2.1 | NotificationModule structure | ✅ Terminé | `src/notification/notification.module.ts` | 30min |
-| 2.2 | Firebase FCM Push Notifications | ✅ Terminé | `src/notification/notification.service.ts` | 2h |
-| 2.3 | Notification templates (BookingEvents) | ✅ Terminé | `src/notification/notification.types.ts` | 1h |
-| 2.4 | Notification in-app (REST) | ✅ Terminé | `src/notification/notification.controller.ts` | 1h |
-| 2.5 | Email notifications (Resend) | ✅ Terminé | `src/notification/notification.service.ts` | 1h |
-| 2.6 | Badge count + lecture | ✅ Terminé | `/notifications/unread-count`, `/read-all` | 30min |
-| 2.7 | Envoi automatique sur events Booking | ✅ Terminé | `src/booking/booking.service.ts` intégré | 1h |
-| 2.8 | Scheduler nettoyage notifications expirées | ✅ Terminé | `src/scheduler/notification.scheduler.ts` | 30min |
-| 2.9 | **firebase-admin installé** | ✅ Terminé | `pnpm add firebase-admin` | - |
+| 2.1 | NotificationModule structure | âœ… TerminÃ© | `src/notification/notification.module.ts` | 30min |
+| 2.2 | Firebase FCM Push Notifications | âœ… TerminÃ© | `src/notification/notification.service.ts` | 2h |
+| 2.3 | Notification templates (BookingEvents) | âœ… TerminÃ© | `src/notification/notification.types.ts` | 1h |
+| 2.4 | Notification in-app (REST) | âœ… TerminÃ© | `src/notification/notification.controller.ts` | 1h |
+| 2.5 | Email notifications (Resend) | âœ… TerminÃ© | `src/notification/notification.service.ts` | 1h |
+| 2.6 | Badge count + lecture | âœ… TerminÃ© | `/notifications/unread-count`, `/read-all` | 30min |
+| 2.7 | Envoi automatique sur events Booking | âœ… TerminÃ© | `src/booking/booking.service.ts` intÃ©grÃ© | 1h |
+| 2.8 | Scheduler nettoyage notifications expirÃ©es | âœ… TerminÃ© | `src/scheduler/notification.scheduler.ts` | 30min |
+| 2.9 | **firebase-admin installÃ©** | âœ… TerminÃ© | `pnpm add firebase-admin` | - |
 
-### Endpoints Notifications implémentés
+### Endpoints Notifications implÃ©mentÃ©s
 
-| Méthode | Route | Accès | Statut |
+| MÃ©thode | Route | AccÃ¨s | Statut |
 |---------|-------|-------|--------|
-| POST | `/api/v1/notifications/fcm-token` | Authentifié | ✅ |
-| DELETE | `/api/v1/notifications/fcm-token` | Authentifié | ✅ |
-| GET | `/api/v1/notifications` | Authentifié | ✅ |
-| GET | `/api/v1/notifications/unread-count` | Authentifié | ✅ |
-| PATCH | `/api/v1/notifications/read-all` | Authentifié | ✅ |
-| PATCH | `/api/v1/notifications/:id/read` | Authentifié | ✅ |
+| POST | `/api/v1/notifications/fcm-token` | AuthentifiÃ© | âœ… |
+| DELETE | `/api/v1/notifications/fcm-token` | AuthentifiÃ© | âœ… |
+| GET | `/api/v1/notifications` | AuthentifiÃ© | âœ… |
+| GET | `/api/v1/notifications/unread-count` | AuthentifiÃ© | âœ… |
+| PATCH | `/api/v1/notifications/read-all` | AuthentifiÃ© | âœ… |
+| PATCH | `/api/v1/notifications/:id/read` | AuthentifiÃ© | âœ… |
 
 ---
 
-## Sprint 3 — Géolocalisation ✅ 90%
+## Sprint 3 â€” GÃ©olocalisation âœ… 90%
 
-| # | Tâche | Statut | Durée |
+| # | TÃ¢che | Statut | DurÃ©e |
 |---|-------|--------|-------|
-| 3.1 | Recherche artisans par zone (PostGIS) | ✅ Terminé | 3h |
-| 3.2 | PostGIS queries optimisées (ST_DWithin) | ✅ Terminé | 1h |
-| 3.3 | Calcul distances temps réel | ✅ Terminé | 1h |
-| 3.4 | Index GiST efficaces | ✅ Triggers SQL ok | - |
-| 3.5 | Fallback Haversine (sans PostGIS) | ✅ Terminé | 30min |
-| 3.6 | Tri par abonnement + distance | ✅ Terminé | 30min |
+| 3.1 | Recherche artisans par zone (PostGIS) | âœ… TerminÃ© | 3h |
+| 3.2 | PostGIS queries optimisÃ©es (ST_DWithin) | âœ… TerminÃ© | 1h |
+| 3.3 | Calcul distances temps rÃ©el | âœ… TerminÃ© | 1h |
+| 3.4 | Index GiST efficaces | âœ… Triggers SQL ok | - |
+| 3.5 | Fallback Haversine (sans PostGIS) | âœ… TerminÃ© | 30min |
+| 3.6 | Tri par abonnement + distance | âœ… TerminÃ© | 30min |
 
-### Endpoints Géolocalisation implémentés
+### Endpoints GÃ©olocalisation implÃ©mentÃ©s
 
-| Méthode | Route | Accès | Statut |
+| MÃ©thode | Route | AccÃ¨s | Statut |
 |---------|-------|-------|--------|
-| GET | `/api/v1/geolocation/artisans/nearby` | PUBLIC | ✅ |
-| GET | `/api/v1/geolocation/artisans/:id/distance` | Authentifié | ✅ |
+| GET | `/api/v1/geolocation/artisans/nearby` | PUBLIC | âœ… |
+| GET | `/api/v1/geolocation/artisans/:id/distance` | AuthentifiÃ© | âœ… |
 
 ---
 
-## Sprint 3b — Favoris ✅ 100%
+## Sprint 3b â€” Favoris âœ… 100%
 
-| # | Tâche | Statut | Durée |
+| # | TÃ¢che | Statut | DurÃ©e |
 |---|-------|--------|-------|
-| 3b.1 | FavorisModule | ✅ Terminé | 1h |
-| 3b.2 | FavorisService (CRUD + check) | ✅ Terminé | 1h |
-| 3b.3 | FavorisController | ✅ Terminé | 30min |
+| 3b.1 | FavorisModule | âœ… TerminÃ© | 1h |
+| 3b.2 | FavorisService (CRUD + check) | âœ… TerminÃ© | 1h |
+| 3b.3 | FavorisController | âœ… TerminÃ© | 30min |
 
-### Endpoints Favoris implémentés
+### Endpoints Favoris implÃ©mentÃ©s
 
-| Méthode | Route | Accès | Statut |
+| MÃ©thode | Route | AccÃ¨s | Statut |
 |---------|-------|-------|--------|
-| POST | `/api/v1/favoris/:artisanId` | CLIENT | ✅ |
-| DELETE | `/api/v1/favoris/:artisanId` | CLIENT | ✅ |
-| GET | `/api/v1/favoris` | CLIENT | ✅ |
-| GET | `/api/v1/favoris/:artisanId/check` | CLIENT | ✅ |
+| POST | `/api/v1/favoris/:artisanId` | CLIENT | âœ… |
+| DELETE | `/api/v1/favoris/:artisanId` | CLIENT | âœ… |
+| GET | `/api/v1/favoris` | CLIENT | âœ… |
+| GET | `/api/v1/favoris/:artisanId/check` | CLIENT | âœ… |
 
 ---
 
-## Sprint 4 — Paiements ✅ 95%
+## Sprint 4 â€” Paiements âœ… 95%
 
-| # | Tâche | Statut | Fichiers | Durée |
+| # | TÃ¢che | Statut | Fichiers | DurÃ©e |
 |---|-------|--------|----------|-------|
-| 4.1 | FedaPayProvider (sandbox + prod) | ✅ Terminé | `src/payment/providers/fedapay.provider.ts` | 2h |
-| 4.2 | KkiaPayProvider (Mobile Money) | ✅ Terminé | `src/payment/providers/kkiapay.provider.ts` | 1h |
-| 4.3 | Webhook HMAC-SHA256 (timingSafeEqual) | ✅ Terminé | `src/payment/payment.webhook.controller.ts` | 2h |
-| 4.4 | Transaction lifecycle complet | ✅ Terminé | `src/payment/payment.service.ts` | 2h |
-| 4.5 | Commission 10% + montantArtisan | ✅ Terminé | `src/payment/payment.service.ts` | 30min |
-| 4.6 | Idempotence webhook (anti-double) | ✅ Terminé | `src/payment/payment.service.ts` | 30min |
-| 4.7 | Remboursement ADMIN | ✅ Terminé | `src/payment/payment.controller.ts` | 30min |
-| 4.8 | Historique transactions | ✅ Terminé | `src/payment/payment.controller.ts` | 30min |
-| 4.9 | DTOs + ValidationPipe | ✅ Terminé | `src/payment/dto/*.ts` | 30min |
-| 4.10 | Tests paiements | ⏳ À faire | `test/payment.e2e-spec.ts` | 4h |
+| 4.1 | FedaPayProvider (sandbox + prod) | âœ… TerminÃ© | `src/payment/providers/fedapay.provider.ts` | 2h |
+| 4.2 | KkiaPayProvider (Mobile Money) | âœ… TerminÃ© | `src/payment/providers/kkiapay.provider.ts` | 1h |
+| 4.3 | Webhook HMAC-SHA256 (timingSafeEqual) | âœ… TerminÃ© | `src/payment/payment.webhook.controller.ts` | 2h |
+| 4.4 | Transaction lifecycle complet | âœ… TerminÃ© | `src/payment/payment.service.ts` | 2h |
+| 4.5 | Commission 10% + montantArtisan | âœ… TerminÃ© | `src/payment/payment.service.ts` | 30min |
+| 4.6 | Idempotence webhook (anti-double) | âœ… TerminÃ© | `src/payment/payment.service.ts` | 30min |
+| 4.7 | Remboursement ADMIN | âœ… TerminÃ© | `src/payment/payment.controller.ts` | 30min |
+| 4.8 | Historique transactions | âœ… TerminÃ© | `src/payment/payment.controller.ts` | 30min |
+| 4.9 | DTOs + ValidationPipe | âœ… TerminÃ© | `src/payment/dto/*.ts` | 30min |
+| 4.10 | Tests paiements | â³ Ã€ faire | `test/payment.e2e-spec.ts` | 4h |
 
-### Endpoints Paiements implémentés
+### Endpoints Paiements implÃ©mentÃ©s
 
-| Méthode | Route | Accès | Statut |
+| MÃ©thode | Route | AccÃ¨s | Statut |
 |---------|-------|-------|--------|
-| POST | `/api/v1/payments/initiate/:bookingId` | CLIENT | ✅ |
-| GET | `/api/v1/payments/history` | CLIENT / ARTISAN | ✅ |
-| GET | `/api/v1/payments/:transactionId` | Propriétaire | ✅ |
-| POST | `/api/v1/payments/refund/:transactionId` | ADMIN | ✅ |
-| POST | `/api/v1/payments/webhook/fedapay` | PUBLIC (HMAC) | ✅ |
-| POST | `/api/v1/payments/webhook/kkiapay` | PUBLIC (HMAC) | ✅ |
+| POST | `/api/v1/payments/initiate/:bookingId` | CLIENT | âœ… |
+| GET | `/api/v1/payments/history` | CLIENT / ARTISAN | âœ… |
+| GET | `/api/v1/payments/:transactionId` | PropriÃ©taire | âœ… |
+| POST | `/api/v1/payments/refund/:transactionId` | ADMIN | âœ… |
+| POST | `/api/v1/payments/webhook/fedapay` | PUBLIC (HMAC) | âœ… |
+| POST | `/api/v1/payments/webhook/kkiapay` | PUBLIC (HMAC) | âœ… |
 
-### Sécurité Webhooks
+### SÃ©curitÃ© Webhooks
 - Validation HMAC-SHA256 avec `crypto.timingSafeEqual` (anti-timing-attack)
-- Routes webhook séparées du controller principal
-- Toujours HTTP 200 en réponse (évite les retry loops FedaPay/KkiaPay)
-- Idempotence : vérification du statut avant tout traitement
+- Routes webhook sÃ©parÃ©es du controller principal
+- Toujours HTTP 200 en rÃ©ponse (Ã©vite les retry loops FedaPay/KkiaPay)
+- Idempotence : vÃ©rification du statut avant tout traitement
 
 ---
 
-## Sprint 5 — Messagerie ✅ 95%
+## Sprint 5 â€” Messagerie âœ… 95%
 
-| # | Tâche | Statut | Fichiers | Durée |
+| # | TÃ¢che | Statut | Fichiers | DurÃ©e |
 |---|-------|--------|----------|-------|
-| 5.1 | MessagingModule structure | ✅ Terminé | `src/messaging/messaging.module.ts` | 30min |
-| 5.2 | MessagingService (conversations + messages) | ✅ Terminé | `src/messaging/messaging.service.ts` | 3h |
-| 5.3 | WebSocket Gateway (Socket.io /chat) | ✅ Terminé | `src/messaging/messaging.gateway.ts` | 4h |
-| 5.4 | REST Controller (fallback) | ✅ Terminé | `src/messaging/messaging.controller.ts` | 1h |
-| 5.5 | Historique messages (pagination curseur) | ✅ Terminé | `messaging.service.ts#getMessages` | - |
-| 5.6 | Indicateurs lu/non-lu + markAllRead | ✅ Terminé | `messaging.service.ts` | - |
-| 5.7 | Auth JWT sur connexion WebSocket | ✅ Terminé | `messaging.gateway.ts#authenticateSocket` | - |
-| 5.8 | Multi-device support (Map userId→socketIds) | ✅ Terminé | `messaging.gateway.ts#connectedUsers` | - |
-| 5.9 | Typing indicators (start/stop) | ✅ Terminé | `messaging.gateway.ts` | - |
-| 5.10 | DTOs + validation | ✅ Terminé | `src/messaging/dto/*.ts` | 30min |
-| 5.11 | Tests unitaires MessagingService | ⏳ À faire | `src/messaging/messaging.service.spec.ts` | 3h |
+| 5.1 | MessagingModule structure | âœ… TerminÃ© | `src/messaging/messaging.module.ts` | 30min |
+| 5.2 | MessagingService (conversations + messages) | âœ… TerminÃ© | `src/messaging/messaging.service.ts` | 3h |
+| 5.3 | WebSocket Gateway (Socket.io /chat) | âœ… TerminÃ© | `src/messaging/messaging.gateway.ts` | 4h |
+| 5.4 | REST Controller (fallback) | âœ… TerminÃ© | `src/messaging/messaging.controller.ts` | 1h |
+| 5.5 | Historique messages (pagination curseur) | âœ… TerminÃ© | `messaging.service.ts#getMessages` | - |
+| 5.6 | Indicateurs lu/non-lu + markAllRead | âœ… TerminÃ© | `messaging.service.ts` | - |
+| 5.7 | Auth JWT sur connexion WebSocket | âœ… TerminÃ© | `messaging.gateway.ts#authenticateSocket` | - |
+| 5.8 | Multi-device support (Map userIdâ†’socketIds) | âœ… TerminÃ© | `messaging.gateway.ts#connectedUsers` | - |
+| 5.9 | Typing indicators (start/stop) | âœ… TerminÃ© | `messaging.gateway.ts` | - |
+| 5.10 | DTOs + validation | âœ… TerminÃ© | `src/messaging/dto/*.ts` | 30min |
+| 5.11 | Tests unitaires MessagingService | â³ Ã€ faire | `src/messaging/messaging.service.spec.ts` | 3h |
 
-### Endpoints Messagerie implémentés
+### Endpoints Messagerie implÃ©mentÃ©s
 
-| Méthode | Route | Accès | Statut |
+| MÃ©thode | Route | AccÃ¨s | Statut |
 |---------|-------|-------|--------|
-| POST | `/api/v1/messages/conversations` | Authentifié | ✅ |
-| GET | `/api/v1/messages/conversations` | Authentifié | ✅ |
-| GET | `/api/v1/messages/conversations/:id` | Authentifié | ✅ |
-| POST | `/api/v1/messages/conversations/:id` | Authentifié | ✅ |
-| PATCH | `/api/v1/messages/:messageId/read` | Authentifié | ✅ |
-| PATCH | `/api/v1/messages/conversations/:id/read-all` | Authentifié | ✅ |
-| GET | `/api/v1/messages/unread-count` | Authentifié | ✅ |
+| POST | `/api/v1/messages/conversations` | AuthentifiÃ© | âœ… |
+| GET | `/api/v1/messages/conversations` | AuthentifiÃ© | âœ… |
+| GET | `/api/v1/messages/conversations/:id` | AuthentifiÃ© | âœ… |
+| POST | `/api/v1/messages/conversations/:id` | AuthentifiÃ© | âœ… |
+| PATCH | `/api/v1/messages/:messageId/read` | AuthentifiÃ© | âœ… |
+| PATCH | `/api/v1/messages/conversations/:id/read-all` | AuthentifiÃ© | âœ… |
+| GET | `/api/v1/messages/unread-count` | AuthentifiÃ© | âœ… |
 
-### Événements WebSocket (namespace /chat)
+### Ã‰vÃ©nements WebSocket (namespace /chat)
 
-| Direction | Événement | Description |
+| Direction | Ã‰vÃ©nement | Description |
 |-----------|-----------|-------------|
-| → serveur | `join_conversation` | Rejoindre une room de conversation |
-| → serveur | `send_message` | Envoyer un message |
-| → serveur | `typing_start` | Début de saisie |
-| → serveur | `typing_stop` | Fin de saisie |
-| → serveur | `mark_read` | Accusé de lecture |
-| ← client | `message:new` | Nouveau message broadcasté |
-| ← client | `message:read` | Accusé de lecture |
-| ← client | `typing:start` | Indicateur de frappe |
-| ← client | `typing:stop` | Arrêt frappe |
+| â†’ serveur | `join_conversation` | Rejoindre une room de conversation |
+| â†’ serveur | `send_message` | Envoyer un message |
+| â†’ serveur | `typing_start` | DÃ©but de saisie |
+| â†’ serveur | `typing_stop` | Fin de saisie |
+| â†’ serveur | `mark_read` | AccusÃ© de lecture |
+| â† client | `message:new` | Nouveau message broadcastÃ© |
+| â† client | `message:read` | AccusÃ© de lecture |
+| â† client | `typing:start` | Indicateur de frappe |
+| â† client | `typing:stop` | ArrÃªt frappe |
 
-### ⚠️ Écart corrigé
-Sprint 5 était marqué **0%** dans PROGRESSION.md mais le code complet est committé sur la branche `messaging` (commit `b364831`). Corrigé le 25/02/2026.
+### âš ï¸ Ã‰cart corrigÃ©
+Sprint 5 Ã©tait marquÃ© **0%** dans PROGRESSION.md mais le code complet est committÃ© sur la branche `messaging` (commit `b364831`). CorrigÃ© le 25/02/2026.
 
 ---
 
-## Sprint 6 — Avis & Notes ✅ 90%
+## Sprint 6 â€” Avis & Notes âœ… 90%
 
-| # | Tâche | Statut | Fichiers | Durée |
+| # | TÃ¢che | Statut | Fichiers | DurÃ©e |
 |---|-------|--------|----------|-------|
-| 6.1 | AvisModule + AvisService + AvisController | ✅ Terminé | `src/avis/avis.{module,service,controller}.ts` | 3h |
-| 6.2 | Trigger note_moyenne (PostgreSQL) | ✅ SQL ok | `prisma/migrations/manual/triggers.sql` | - |
-| 6.3 | Réponse artisan (1 seule réponse/avis) | ✅ Terminé | `src/avis/avis.service.ts` | 30min |
-| 6.4 | Signalement avis | ✅ Terminé | `src/avis/avis.service.ts` | 30min |
-| 6.5 | Modération Admin (masquer/réactiver) | ✅ Terminé | `src/avis/avis.controller.ts` | 30min |
-| 6.6 | Calcul stats multi-critères pondérés | ✅ Terminé | `src/avis/avis.service.ts` | 30min |
-| 6.7 | Mise à jour stats artisan (fallback trigger) | ✅ Terminé | `src/avis/avis.service.ts` | 30min |
-| 6.8 | Tests unitaires AvisService | ⏳ À faire | `src/avis/avis.service.spec.ts` | 2h |
+| 6.1 | AvisModule + AvisService + AvisController | âœ… TerminÃ© | `src/avis/avis.{module,service,controller}.ts` | 3h |
+| 6.2 | Trigger note_moyenne (PostgreSQL) | âœ… SQL ok | `prisma/migrations/manual/triggers.sql` | - |
+| 6.3 | RÃ©ponse artisan (1 seule rÃ©ponse/avis) | âœ… TerminÃ© | `src/avis/avis.service.ts` | 30min |
+| 6.4 | Signalement avis | âœ… TerminÃ© | `src/avis/avis.service.ts` | 30min |
+| 6.5 | ModÃ©ration Admin (masquer/rÃ©activer) | âœ… TerminÃ© | `src/avis/avis.controller.ts` | 30min |
+| 6.6 | Calcul stats multi-critÃ¨res pondÃ©rÃ©s | âœ… TerminÃ© | `src/avis/avis.service.ts` | 30min |
+| 6.7 | Mise Ã  jour stats artisan (fallback trigger) | âœ… TerminÃ© | `src/avis/avis.service.ts` | 30min |
+| 6.8 | Tests unitaires AvisService | â³ Ã€ faire | `src/avis/avis.service.spec.ts` | 2h |
 
-### Endpoints Avis implémentés
+### Endpoints Avis implÃ©mentÃ©s
 
-| Méthode | Route | Accès | Statut |
+| MÃ©thode | Route | AccÃ¨s | Statut |
 |---------|-------|-------|--------|
-| POST | `/api/v1/avis` | CLIENT | ✅ |
-| GET | `/api/v1/avis/artisan/:artisanId` | Authentifié | ✅ |
-| GET | `/api/v1/avis/my` | CLIENT | ✅ |
-| PATCH | `/api/v1/avis/:id/response` | ARTISAN | ✅ |
-| POST | `/api/v1/avis/:id/report` | Authentifié | ✅ |
-| PATCH | `/api/v1/avis/:id/moderate` | ADMIN | ✅ |
+| POST | `/api/v1/avis` | CLIENT | âœ… |
+| GET | `/api/v1/avis/artisan/:artisanId` | AuthentifiÃ© | âœ… |
+| GET | `/api/v1/avis/my` | CLIENT | âœ… |
+| PATCH | `/api/v1/avis/:id/response` | ARTISAN | âœ… |
+| POST | `/api/v1/avis/:id/report` | AuthentifiÃ© | âœ… |
+| PATCH | `/api/v1/avis/:id/moderate` | ADMIN | âœ… |
 
-### Règles métier Avis
-- Seulement sur booking `TERMINEE` — délai max 14 jours
+### RÃ¨gles mÃ©tier Avis
+- Seulement sur booking `TERMINEE` â€” dÃ©lai max 14 jours
 - 1 seul avis par booking (contrainte BDD + guard applicatif)
-- Note pondérée : 50% note principale + 50% moyenne sous-notes (ponctualité, qualité, communication)
-- 1 seule réponse artisan par avis
-- Modération admin : masquer/réactiver recalcule `noteMoyenne`
+- Note pondÃ©rÃ©e : 50% note principale + 50% moyenne sous-notes (ponctualitÃ©, qualitÃ©, communication)
+- 1 seule rÃ©ponse artisan par avis
+- ModÃ©ration admin : masquer/rÃ©activer recalcule `noteMoyenne`
 
 ---
 
-## Sprint 7 — Abonnements ✅ 90%
+## Sprint 7 â€” Abonnements âœ… 90%
 
-| # | Tâche | Statut | Fichiers | Durée |
+| # | TÃ¢che | Statut | Fichiers | DurÃ©e |
 |---|-------|--------|----------|-------|
-| 7.1 | Quotas par abonnement | ✅ Terminé | `src/booking/booking.service.ts` | - |
-| 7.2 | Downgrade automatique expiré | ✅ Terminé | `src/scheduler/subscription.scheduler.ts` | 30min |
-| 7.3 | SubscriptionsService (plans, upgrade, quota) | ✅ Terminé | `src/subscriptions/subscriptions.service.ts` | 2h |
-| 7.4 | SubscriptionsController (plans, my, upgrade) | ✅ Terminé | `src/subscriptions/subscriptions.controller.ts` | 30min |
-| 7.5 | SubscriptionsModule intégré | ✅ Terminé | `src/subscriptions/subscriptions.module.ts` | - |
-| 7.6 | Paiement abonnement (via PaymentModule) | ⏳ À faire | Intégration PaymentModule | 3h |
+| 7.1 | Quotas par abonnement | âœ… TerminÃ© | `src/booking/booking.service.ts` | - |
+| 7.2 | Downgrade automatique expirÃ© | âœ… TerminÃ© | `src/scheduler/subscription.scheduler.ts` | 30min |
+| 7.3 | SubscriptionsService (plans, upgrade, quota) | âœ… TerminÃ© | `src/subscriptions/subscriptions.service.ts` | 2h |
+| 7.4 | SubscriptionsController (plans, my, upgrade) | âœ… TerminÃ© | `src/subscriptions/subscriptions.controller.ts` | 30min |
+| 7.5 | SubscriptionsModule intÃ©grÃ© | âœ… TerminÃ© | `src/subscriptions/subscriptions.module.ts` | - |
+| 7.6 | Paiement abonnement (via PaymentModule) | â³ Ã€ faire | IntÃ©gration PaymentModule | 3h |
 
-### Endpoints Abonnements implémentés
+### Endpoints Abonnements implÃ©mentÃ©s
 
-| Méthode | Route | Accès | Statut |
+| MÃ©thode | Route | AccÃ¨s | Statut |
 |---------|-------|-------|--------|
-| GET | `/api/v1/subscriptions/plans` | PUBLIC | ✅ |
-| GET | `/api/v1/subscriptions/my` | ARTISAN | ✅ |
-| POST | `/api/v1/subscriptions/upgrade` | ARTISAN | ✅ |
+| GET | `/api/v1/subscriptions/plans` | PUBLIC | âœ… |
+| GET | `/api/v1/subscriptions/my` | ARTISAN | âœ… |
+| POST | `/api/v1/subscriptions/upgrade` | ARTISAN | âœ… |
 
 ---
 
-## Sprint 8 — Dashboard Admin ✅ 95%
+## Sprint 8 â€” Dashboard Admin âœ… 95%
 
-| # | Tâche | Statut | Fichiers | Durée |
+| # | TÃ¢che | Statut | Fichiers | DurÃ©e |
 |---|-------|--------|----------|-------|
-| 8.1 | Routes admin existantes | ✅ Protected (RolesGuard) | Modules existants | - |
-| 8.2 | AdminService — Stats overview (KPIs) | ✅ Terminé | `src/admin/admin.service.ts` | 2h |
-| 8.3 | AdminService — Stats bookings + revenue | ✅ Terminé | `src/admin/admin.service.ts` | 1h |
-| 8.4 | AdminController — Gestion utilisateurs | ✅ Terminé | `src/admin/admin.controller.ts` | 1h |
-| 8.5 | AdminController — Artisans pending | ✅ Terminé | `src/admin/admin.controller.ts` | 30min |
-| 8.6 | Modération avis signalés | ✅ Terminé | `src/admin/admin.service.ts` | 30min |
-| 8.7 | Gestion transactions (vue admin) | ✅ Terminé | `src/admin/admin.service.ts` | 30min |
-| 8.8 | Broadcast notification admin | ✅ Terminé | `src/admin/admin.service.ts` | 1h |
-| 8.9 | Tests unitaires AdminService | ⏳ À faire | `src/admin/admin.service.spec.ts` | 3h |
+| 8.1 | Routes admin existantes | âœ… Protected (RolesGuard) | Modules existants | - |
+| 8.2 | AdminService â€” Stats overview (KPIs) | âœ… TerminÃ© | `src/admin/admin.service.ts` | 2h |
+| 8.3 | AdminService â€” Stats bookings + revenue | âœ… TerminÃ© | `src/admin/admin.service.ts` | 1h |
+| 8.4 | AdminController â€” Gestion utilisateurs | âœ… TerminÃ© | `src/admin/admin.controller.ts` | 1h |
+| 8.5 | AdminController â€” Artisans pending | âœ… TerminÃ© | `src/admin/admin.controller.ts` | 30min |
+| 8.6 | ModÃ©ration avis signalÃ©s | âœ… TerminÃ© | `src/admin/admin.service.ts` | 30min |
+| 8.7 | Gestion transactions (vue admin) | âœ… TerminÃ© | `src/admin/admin.service.ts` | 30min |
+| 8.8 | Broadcast notification admin | âœ… TerminÃ© | `src/admin/admin.service.ts` | 1h |
+| 8.9 | Tests unitaires AdminService | â³ Ã€ faire | `src/admin/admin.service.spec.ts` | 3h |
 
-### Endpoints Admin implémentés
+### Endpoints Admin implÃ©mentÃ©s
 
-| Méthode | Route | Accès | Statut |
+| MÃ©thode | Route | AccÃ¨s | Statut |
 |---------|-------|-------|--------|
-| GET | `/api/v1/admin/stats/overview` | ADMIN | ✅ |
-| GET | `/api/v1/admin/stats/bookings` | ADMIN | ✅ |
-| GET | `/api/v1/admin/stats/revenue` | ADMIN | ✅ |
-| GET | `/api/v1/admin/users` | ADMIN | ✅ |
-| GET | `/api/v1/admin/artisans/pending` | ADMIN | ✅ |
-| GET | `/api/v1/admin/avis/reported` | ADMIN | ✅ |
-| GET | `/api/v1/admin/transactions` | ADMIN | ✅ |
-| POST | `/api/v1/admin/notifications/broadcast` | ADMIN | ✅ |
+| GET | `/api/v1/admin/stats/overview` | ADMIN | âœ… |
+| GET | `/api/v1/admin/stats/bookings` | ADMIN | âœ… |
+| GET | `/api/v1/admin/stats/revenue` | ADMIN | âœ… |
+| GET | `/api/v1/admin/users` | ADMIN | âœ… |
+| GET | `/api/v1/admin/artisans/pending` | ADMIN | âœ… |
+| GET | `/api/v1/admin/avis/reported` | ADMIN | âœ… |
+| GET | `/api/v1/admin/transactions` | ADMIN | âœ… |
+| POST | `/api/v1/admin/notifications/broadcast` | ADMIN | âœ… |
 
 ---
 
-## Sprint 9 — Performance & Cache Redis ✅ 95%
+## Sprint 9 â€” Performance & Cache Redis âœ… 95%
 
-| # | Tâche | Statut | Fichiers | Durée |
+| # | TÃ¢che | Statut | Fichiers | DurÃ©e |
 |---|-------|--------|----------|-------|
-| 9.1 | CacheService (cache-aside, TTL, patterns) | ✅ Terminé | `src/common/services/cache.service.ts` | 2h |
-| 9.2 | Cache catégories (TTL 24h) | ✅ Terminé | `src/categories-metiers/categories-metiers.service.ts` | 30min |
-| 9.3 | Cache métiers (TTL 24h + par catégorie + populaires) | ✅ Terminé | `src/metiers/metiers.service.ts` | 1h |
-| 9.4 | Cache profil artisan (TTL 5min) + searchOptimized (TTL 10min) | ✅ Terminé | `src/artisans/artisans.service.ts` | 2h |
-| 9.5 | Invalidation intelligente cache (profil + search) | ✅ Terminé | `artisans.service.ts` (update/verify/reject/delete) | 30min |
-| 9.6 | Rate Limiting avancé (ThrottlerModule + 3 tiers) | ✅ Terminé | `src/app.module.ts` | 1h |
-| 9.7 | ArtisansModule import CommonModule (CacheService DI) | ✅ Terminé | `src/artisans/artisans.module.ts` | 10min |
-| 9.8 | Tests unitaires Sprint 9 | ⏳ À faire | `*.service.spec.ts` | 4h |
+| 9.1 | CacheService (cache-aside, TTL, patterns) | âœ… TerminÃ© | `src/common/services/cache.service.ts` | 2h |
+| 9.2 | Cache catÃ©gories (TTL 24h) | âœ… TerminÃ© | `src/categories-metiers/categories-metiers.service.ts` | 30min |
+| 9.3 | Cache mÃ©tiers (TTL 24h + par catÃ©gorie + populaires) | âœ… TerminÃ© | `src/metiers/metiers.service.ts` | 1h |
+| 9.4 | Cache profil artisan (TTL 5min) + searchOptimized (TTL 10min) | âœ… TerminÃ© | `src/artisans/artisans.service.ts` | 2h |
+| 9.5 | Invalidation intelligente cache (profil + search) | âœ… TerminÃ© | `artisans.service.ts` (update/verify/reject/delete) | 30min |
+| 9.6 | Rate Limiting avancÃ© (ThrottlerModule + 3 tiers) | âœ… TerminÃ© | `src/app.module.ts` | 1h |
+| 9.7 | ArtisansModule import CommonModule (CacheService DI) | âœ… TerminÃ© | `src/artisans/artisans.module.ts` | 10min |
+| 9.8 | Tests unitaires Sprint 9 | â³ Ã€ faire | `*.service.spec.ts` | 4h |
 
-### Stratégie de cache implémentée
+### StratÃ©gie de cache implÃ©mentÃ©e
 
-| Donnée | TTL | Stratégie |
+| DonnÃ©e | TTL | StratÃ©gie |
 |--------|-----|-----------|
-| Catégories métiers | 24h | Cache-Aside, invalidation sur mutation |
-| Métiers (tous) | 24h | Cache-Aside, invalidation sur mutation |
-| Métiers par catégorie | 12h | Cache-Aside, invalidation sur mutation |
-| Métiers populaires | 6h | Cache-Aside |
+| CatÃ©gories mÃ©tiers | 24h | Cache-Aside, invalidation sur mutation |
+| MÃ©tiers (tous) | 24h | Cache-Aside, invalidation sur mutation |
+| MÃ©tiers par catÃ©gorie | 12h | Cache-Aside, invalidation sur mutation |
+| MÃ©tiers populaires | 6h | Cache-Aside |
 | Profil artisan | 5min | Cache-Aside, invalidation sur update/verify/delete |
-| Résultats recherche | 10min | Cache-Aside (clé MD5 du DTO), invalidation globale sur mutation |
+| RÃ©sultats recherche | 10min | Cache-Aside (clÃ© MD5 du DTO), invalidation globale sur mutation |
 | Stats admin | 15min | Cache-Aside |
 
 ### Rate Limiting (ThrottlerModule)
@@ -315,114 +315,145 @@ Sprint 5 était marqué **0%** dans PROGRESSION.md mais le code complet est comm
 | `medium` | 10s | 20 req | Normal API usage |
 | `long` | 60s | 100 req | Global rate limit |
 
-### ⚠️ Écart corrigé
-Sprint 9 était absent de `PROGRESSION.md` mais le code est partiellement commité sur `sprint/9-performance-cache`. CacheService, MetiersService, CategoriesMetiersService déjà committés. ArtisansService stagé → commit en cours.
+### âš ï¸ Ã‰cart corrigÃ©
+Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement commitÃ© sur `sprint/9-performance-cache`. CacheService, MetiersService, CategoriesMetiersService dÃ©jÃ  committÃ©s. ArtisansService stagÃ© â†’ commit en cours.
 
 ---
 
-## 🔧 Commandes à exécuter (ordre strict)
+## Sprint 10 — Sécurité avancée & Monitoring ✅ 75%
+
+| # | Tâche | Statut | Fichiers | Durée |
+|---|-------|--------|----------|-------|
+| 10.1 | HealthModule intégré dans AppModule | ✅ Terminé | `src/app.module.ts`, `src/health/health.module.ts` | 30min |
+| 10.2 | Endpoint health complet (DB, Redis, Bull, Cloudinary, Memory, Disk) | ✅ Terminé | `src/health/*.ts` | 2h |
+| 10.3 | LogActiviteService branché dans CommonModule | ✅ Terminé | `src/common/common.module.ts`, `src/common/services/*` | 30min |
+| 10.4 | Audit trail automatique (interceptor global mutating routes) | ✅ Terminé | `src/common/interceptors/audit-log.interceptor.ts`, `src/app.module.ts` | 1h |
+| 10.5 | Test unitaire interceptor audit | ✅ Terminé | `src/common/interceptors/audit-log.interceptor.spec.ts` | 30min |
+| 10.6 | Audit ownership global services | ⏳ À faire | multi-modules | 3h |
+| 10.7 | `npm audit` + corrections HIGH/CRITICAL | ⏳ À faire | dépendances | 1h |
+
+### Endpoints Monitoring implémentés
+
+| Méthode | Route | Accès | Statut |
+|---------|-------|-------|--------|
+| GET | `/api/v1/health` | PUBLIC | ✅ |
+
+### Résultats de validation Sprint 10
+- `pnpm exec tsc --noEmit` ✅
+- `pnpm exec eslint ...` ✅
+- `pnpm exec jest src/common/interceptors/audit-log.interceptor.spec.ts` ✅ (2 tests passants)
+
+### ⚠️ ÉCART DÉTECTÉ : triggers SQL versionnés absents
+- `prisma/migrations/manual/triggers.sql` est référencé dans le suivi mais absent du repository
+- Impact : les triggers PostgreSQL annoncés ne sont pas traçables dans Git actuellement
+
+---
+## ðŸ”§ Commandes Ã  exÃ©cuter (ordre strict)
 
 ```bash
 # 1. Installer firebase-admin (REQUIS pour les notifications push)
 pnpm add firebase-admin
 
-# 2. S'assurer que la DB est démarrée
+# 2. S'assurer que la DB est dÃ©marrÃ©e
 pnpm docker:up
 
-# 3. Créer et appliquer la migration (Sprint 0+1+2 combiné)
+# 3. CrÃ©er et appliquer la migration (Sprint 0+1+2 combinÃ©)
 npx prisma migrate dev --name "sprint0-1-2-complete"
 
-# 4. Régénérer le client Prisma
+# 4. RÃ©gÃ©nÃ©rer le client Prisma
 npx prisma generate
 
 # 5. Appliquer les triggers PostGIS manuellement
 psql $DATABASE_URL -f prisma/migrations/manual/triggers.sql
 
-# 6. Démarrer l'API en mode dev
+# 6. DÃ©marrer l'API en mode dev
 pnpm start:dev
 ```
 
 ---
 
-## 📦 Packages installés (npm)
+## ðŸ“¦ Packages installÃ©s (npm)
 
 | Package | Version | Usage |
 |---------|---------|-------|
-| `@nestjs/schedule` | ^6.1.1 | Tâches planifiées (cron) |
+| `@nestjs/schedule` | ^6.1.1 | TÃ¢ches planifiÃ©es (cron) |
 | `@nestjs/websockets` | ^11.1.14 | WebSocket (Sprint 5) |
 | `@nestjs/platform-socket.io` | ^11.1.14 | Socket.io (Sprint 5) |
-| `socket.io` | ^4.8.3 | Messaging temps réel |
-| `resend` | ^6.5.2 | Emails transactionnels ✅ |
-| `firebase-admin` | latest | Push notifications FCM ✅ |
+| `socket.io` | ^4.8.3 | Messaging temps rÃ©el |
+| `resend` | ^6.5.2 | Emails transactionnels âœ… |
+| `firebase-admin` | latest | Push notifications FCM âœ… |
 | `@nestjs/throttler` | latest | Rate limiting avancé ✅ |
-| `@nestjs/cache-manager` | latest | Cache Redis (Sprint 9) ✅ |
-| `cache-manager-redis-yet` | latest | Adapter Redis pour cache ✅ |
+| `@nestjs/terminus` | latest | Health checks monitoring ✅ |
+| `@nestjs/cache-manager` | latest | Cache Redis (Sprint 9) âœ… |
+| `cache-manager-redis-yet` | latest | Adapter Redis pour cache âœ… |
 
 ---
 
-## 🏗️ Architecture des modules créés
+## ðŸ—ï¸ Architecture des modules crÃ©Ã©s
 
 ```
 src/
-├── booking/
-│   ├── booking.module.ts      ✅
-│   ├── booking.service.ts     ✅ (+ notifications intégrées)
-│   ├── booking.controller.ts  ✅
-│   └── dto/
-│       ├── create-booking.dto.ts   ✅
-│       ├── propose-price.dto.ts    ✅
-│       ├── search-booking.dto.ts   ✅
-│       ├── cancel-booking.dto.ts   ✅
-│       └── index.ts               ✅
-├── notification/
-│   ├── notification.module.ts    ✅
-│   ├── notification.service.ts   ✅ (FCM + Resend + in-app)
-│   ├── notification.controller.ts ✅
-│   ├── notification.types.ts     ✅ (templates)
-│   └── dto/
-│       ├── register-fcm-token.dto.ts ✅
-│       ├── get-notifications.dto.ts  ✅
-│       └── index.ts                  ✅
-├── geolocation/
-│   ├── geolocation.module.ts    ✅
-│   ├── geolocation.service.ts   ✅ (PostGIS + Haversine fallback)
-│   ├── geolocation.controller.ts ✅
-│   └── dto/
-│       └── search-nearby.dto.ts  ✅
-├── favoris/
-│   ├── favoris.module.ts    ✅
-│   ├── favoris.service.ts   ✅
-│   └── favoris.controller.ts ✅
-├── scheduler/
-│   ├── scheduler.module.ts           ✅ (étendu)
-│   ├── booking.scheduler.ts          ✅
-│   ├── notification.scheduler.ts     ✅
-│   └── subscription.scheduler.ts     ✅
-├── common/
-│   ├── common.module.ts              ✅
-│   ├── guards/
-│   │   ├── roles.guard.ts            ✅
-│   │   └── at.guard.ts               ✅
-│   ├── decorators/
-│   │   ├── roles.decorator.ts        ✅
-│   │   └── get-current-user.decorator.ts ✅
-│   └── services/
-│       ├── cache.service.ts          ✅ (Sprint 9 — Cache-Aside, TTL multi-niveaux)
-│       ├── email.service.ts          ✅
-│       ├── otp.service.ts            ✅
-│       └── session.service.ts        ✅
-└── prisma/
-    └── prisma.service.ts             ✅
+â”œâ”€â”€ booking/
+â”‚   â”œâ”€â”€ booking.module.ts      âœ…
+â”‚   â”œâ”€â”€ booking.service.ts     âœ… (+ notifications intÃ©grÃ©es)
+â”‚   â”œâ”€â”€ booking.controller.ts  âœ…
+â”‚   â””â”€â”€ dto/
+â”‚       â”œâ”€â”€ create-booking.dto.ts   âœ…
+â”‚       â”œâ”€â”€ propose-price.dto.ts    âœ…
+â”‚       â”œâ”€â”€ search-booking.dto.ts   âœ…
+â”‚       â”œâ”€â”€ cancel-booking.dto.ts   âœ…
+â”‚       â””â”€â”€ index.ts               âœ…
+â”œâ”€â”€ notification/
+â”‚   â”œâ”€â”€ notification.module.ts    âœ…
+â”‚   â”œâ”€â”€ notification.service.ts   âœ… (FCM + Resend + in-app)
+â”‚   â”œâ”€â”€ notification.controller.ts âœ…
+â”‚   â”œâ”€â”€ notification.types.ts     âœ… (templates)
+â”‚   â””â”€â”€ dto/
+â”‚       â”œâ”€â”€ register-fcm-token.dto.ts âœ…
+â”‚       â”œâ”€â”€ get-notifications.dto.ts  âœ…
+â”‚       â””â”€â”€ index.ts                  âœ…
+â”œâ”€â”€ geolocation/
+â”‚   â”œâ”€â”€ geolocation.module.ts    âœ…
+â”‚   â”œâ”€â”€ geolocation.service.ts   âœ… (PostGIS + Haversine fallback)
+â”‚   â”œâ”€â”€ geolocation.controller.ts âœ…
+â”‚   â””â”€â”€ dto/
+â”‚       â””â”€â”€ search-nearby.dto.ts  âœ…
+â”œâ”€â”€ favoris/
+â”‚   â”œâ”€â”€ favoris.module.ts    âœ…
+â”‚   â”œâ”€â”€ favoris.service.ts   âœ…
+â”‚   â””â”€â”€ favoris.controller.ts âœ…
+â”œâ”€â”€ scheduler/
+â”‚   â”œâ”€â”€ scheduler.module.ts           âœ… (Ã©tendu)
+â”‚   â”œâ”€â”€ booking.scheduler.ts          âœ…
+â”‚   â”œâ”€â”€ notification.scheduler.ts     âœ…
+â”‚   â””â”€â”€ subscription.scheduler.ts     âœ…
+â”œâ”€â”€ common/
+â”‚   â”œâ”€â”€ common.module.ts              âœ…
+â”‚   â”œâ”€â”€ guards/
+â”‚   â”‚   â”œâ”€â”€ roles.guard.ts            âœ…
+â”‚   â”‚   â””â”€â”€ at.guard.ts               âœ…
+â”‚   â”œâ”€â”€ decorators/
+â”‚   â”‚   â”œâ”€â”€ roles.decorator.ts        âœ…
+â”‚   â”‚   â””â”€â”€ get-current-user.decorator.ts âœ…
+â”‚   â””â”€â”€ services/
+â”‚       â”œâ”€â”€ cache.service.ts          âœ… (Sprint 9 â€” Cache-Aside, TTL multi-niveaux)
+â”‚       â”œâ”€â”€ email.service.ts          âœ…
+â”‚       â”œâ”€â”€ otp.service.ts            âœ…
+â”‚       â””â”€â”€ session.service.ts        âœ…
+â””â”€â”€ prisma/
+    â””â”€â”€ prisma.service.ts             âœ…
 ```
 
 ---
 
-## ⚠️ Points d'attention (dette technique)
+## âš ï¸ Points d'attention (dette technique)
 
-1. **Migration Prisma** : La migration n'a pas encore été exécutée en DB réelle — s'assurer que Docker est up avant `npx prisma migrate dev`
-2. **JWT RS256** : Prévu (tâche 0.6) mais pas encore implémenté — rester sur HS256 pour l'instant
-3. **Tests** : Aucun test unitaire ou E2E — dette croissante sur 9 sprints (~30h de travail)
-4. **PostGIS** : L'extension doit être activée sur PostgreSQL avant d'utiliser GeolocationService
-5. **Cache patterns Redis** : `delByPattern` utilise `stores[0].keys()` — à valider avec la version exacte de `cache-manager-redis-yet`
-6. **Paiement abonnements** : Intégration PaymentModule → SubscriptionsModule (tâche 7.6) non implémentée
-7. **Sprint suivant** : Sprint 10 (Sécurité avancée OWASP + Monitoring) ou Tests (Sprint 11)
+1. **Migration Prisma** : La migration n'a pas encore Ã©tÃ© exÃ©cutÃ©e en DB rÃ©elle â€” s'assurer que Docker est up avant `npx prisma migrate dev`
+2. **JWT RS256** : PrÃ©vu (tÃ¢che 0.6) mais pas encore implÃ©mentÃ© â€” rester sur HS256 pour l'instant
+3. **Tests** : Aucun test unitaire ou E2E â€” dette croissante sur 9 sprints (~30h de travail)
+4. **PostGIS** : L'extension doit Ãªtre activÃ©e sur PostgreSQL avant d'utiliser GeolocationService
+5. **Cache patterns Redis** : `delByPattern` utilise `stores[0].keys()` â€” Ã  valider avec la version exacte de `cache-manager-redis-yet`
+6. **Paiement abonnements** : IntÃ©gration PaymentModule â†’ SubscriptionsModule (tÃ¢che 7.6) non implÃ©mentÃ©e
+7. **Sprint suivant** : Sprint 10 (SÃ©curitÃ© avancÃ©e OWASP + Monitoring) ou Tests (Sprint 11)
+
+

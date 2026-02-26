@@ -1,8 +1,10 @@
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
 import { BullModule } from '@nestjs/bull';
 import { redisStore } from 'cache-manager-redis-yet';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './users/user.module';
 import { ArtisansModule } from './artisans/artisans.module';
@@ -22,9 +24,9 @@ import { MessagingModule } from './messaging/messaging.module';
 import { AdminModule } from './admin/admin.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { AtGuard } from './common/guards';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
 import { CommonModule } from './common/common.module';
+import { AuditLogInterceptor } from './common/interceptors';
+import { HealthModule } from './health/health.module';
 
 @Module({
     imports: [
@@ -66,7 +68,6 @@ import { CommonModule } from './common/common.module';
                 ],
             }),
         }),
-        // Bull Queue pour traitement asynchrone
         BullModule.forRootAsync({
             imports: [ConfigModule],
             inject: [ConfigService],
@@ -78,7 +79,6 @@ import { CommonModule } from './common/common.module';
                 },
             }),
         }),
-        // ===== Modules métier =====
         CommonModule,
         PrismaModule,
         AuthModule,
@@ -88,23 +88,17 @@ import { CommonModule } from './common/common.module';
         MetiersModule,
         CertificationsModule,
         UploadModule,
-        // ===== Sprint 1 =====
         BookingModule,
         SchedulerModule,
-        // ===== Sprint 2 =====
         NotificationModule,
         GeolocationModule,
         FavorisModule,
-        // ===== Sprint 4 — Paiements =====
         PaymentModule,
-        // ===== Sprint 6 — Avis =====
         AvisModule,
-        // ===== Sprint 5 — Messagerie temps réel =====
         MessagingModule,
-        // ===== Sprint 7 — Abonnements artisans =====
         SubscriptionsModule,
-        // ===== Sprint 8 — Dashboard Admin =====
         AdminModule,
+        HealthModule,
     ],
     providers: [
         {
@@ -114,6 +108,10 @@ import { CommonModule } from './common/common.module';
         {
             provide: APP_GUARD,
             useClass: ThrottlerGuard,
+        },
+        {
+            provide: APP_INTERCEPTOR,
+            useClass: AuditLogInterceptor,
         },
     ],
 })
