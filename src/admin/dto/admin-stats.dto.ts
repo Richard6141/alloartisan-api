@@ -58,7 +58,7 @@ export class AdminLogsFilterDto extends PaginationDto {
     @IsString()
     userId?: string;
 
-    @ApiPropertyOptional({ description: 'Filtrer par type d\'action (ex: LOGIN, CREATE_BOOKING)' })
+    @ApiPropertyOptional({ description: "Filtrer par type d'action (ex: LOGIN, CREATE_BOOKING)" })
     @IsOptional()
     @IsString()
     action?: string;

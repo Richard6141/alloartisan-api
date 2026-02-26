@@ -13,7 +13,7 @@ import { Role } from 'src/generated/prisma';
 export class AdminService {
     private readonly logger = new Logger(AdminService.name);
 
-    constructor(private readonly prisma: PrismaService) { }
+    constructor(private readonly prisma: PrismaService) {}
 
     // ─── Stats globales ─────────────────────────────────────────────────────────
 
@@ -214,13 +214,13 @@ export class AdminService {
             ...(role ? { role } : {}),
             ...(search
                 ? {
-                    OR: [
-                        { nom: { contains: search, mode: 'insensitive' as const } },
-                        { prenom: { contains: search, mode: 'insensitive' as const } },
-                        { email: { contains: search, mode: 'insensitive' as const } },
-                        { telephone: { contains: search, mode: 'insensitive' as const } },
-                    ],
-                }
+                      OR: [
+                          { nom: { contains: search, mode: 'insensitive' as const } },
+                          { prenom: { contains: search, mode: 'insensitive' as const } },
+                          { email: { contains: search, mode: 'insensitive' as const } },
+                          { telephone: { contains: search, mode: 'insensitive' as const } },
+                      ],
+                  }
                 : {}),
         };
 
@@ -337,11 +337,11 @@ export class AdminService {
             ...(statut ? { statut } : {}),
             ...(search
                 ? {
-                    OR: [
-                        { id: { contains: search } },
-                        { providerTransactionId: { contains: search } },
-                    ],
-                }
+                      OR: [
+                          { id: { contains: search } },
+                          { providerTransactionId: { contains: search } },
+                      ],
+                  }
                 : {}),
         };
 
@@ -446,11 +446,11 @@ export class AdminService {
             ...(entite ? { entite: { contains: entite, mode: 'insensitive' as const } } : {}),
             ...(dateDebut || dateFin
                 ? {
-                    createdAt: {
-                        ...(dateDebut ? { gte: new Date(dateDebut) } : {}),
-                        ...(dateFin ? { lte: new Date(dateFin) } : {}),
-                    },
-                }
+                      createdAt: {
+                          ...(dateDebut ? { gte: new Date(dateDebut) } : {}),
+                          ...(dateFin ? { lte: new Date(dateFin) } : {}),
+                      },
+                  }
                 : {}),
         };
 

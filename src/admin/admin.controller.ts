@@ -32,7 +32,7 @@ import { Role } from 'src/generated/prisma';
 @Roles(Role.ADMIN)
 @Controller('admin')
 export class AdminController {
-    constructor(private readonly adminService: AdminService) { }
+    constructor(private readonly adminService: AdminService) {}
 
     // ─── Stats globales ─────────────────────────────────────────────────────────
 
@@ -135,9 +135,9 @@ export class AdminController {
     // ─── Logs d'audit ────────────────────────────────────────────────────
 
     @ApiOperation({
-        summary: 'Logs d\'audit (traçabilité des actions)',
+        summary: "Logs d'audit (traçabilité des actions)",
         description:
-            'Retourne l\'historique des actions enregistrées dans logs_activites. Filtrable par userId, action, entité et plage de dates. Paginaté (max 100/page).',
+            "Retourne l'historique des actions enregistrées dans logs_activites. Filtrable par userId, action, entité et plage de dates. Paginaté (max 100/page).",
     })
     @Get('logs')
     getActivityLogs(@Query() dto: AdminLogsFilterDto) {
