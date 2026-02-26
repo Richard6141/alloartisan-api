@@ -50,6 +50,35 @@ export class AdminTransactionsFilterDto extends PaginationDto {
     statut?: 'EN_ATTENTE' | 'COMPLETEE' | 'ECHOUEE' | 'REMBOURSEE';
 }
 
+// ─── Filtre logs d'audit ─────────────────────────────────────────────────────
+
+export class AdminLogsFilterDto extends PaginationDto {
+    @ApiPropertyOptional({ description: 'Filtrer par userId' })
+    @IsOptional()
+    @IsString()
+    userId?: string;
+
+    @ApiPropertyOptional({ description: 'Filtrer par type d\'action (ex: LOGIN, CREATE_BOOKING)' })
+    @IsOptional()
+    @IsString()
+    action?: string;
+
+    @ApiPropertyOptional({ description: 'Filtrer par entité (ex: booking, artisan)' })
+    @IsOptional()
+    @IsString()
+    entite?: string;
+
+    @ApiPropertyOptional({ description: 'Date de début (ISO 8601)' })
+    @IsOptional()
+    @IsString()
+    dateDebut?: string;
+
+    @ApiPropertyOptional({ description: 'Date de fin (ISO 8601)' })
+    @IsOptional()
+    @IsString()
+    dateFin?: string;
+}
+
 // ─── Broadcast notification ─────────────────────────────────────────────────
 
 export class BroadcastNotificationDto {

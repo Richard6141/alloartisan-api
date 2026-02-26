@@ -19,5 +19,4 @@ import { SubscriptionsModule } from 'src/subscriptions/subscriptions.module';
     providers: [BookingScheduler, NotificationScheduler, SubscriptionScheduler],
     exports: [BookingScheduler, NotificationScheduler, SubscriptionScheduler],
 })
-export class SchedulerModule { }
-
+export class SchedulerModule {}

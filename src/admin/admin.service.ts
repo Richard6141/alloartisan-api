@@ -4,14 +4,16 @@ import {
     AdminUsersFilterDto,
     AdminTransactionsFilterDto,
     BroadcastNotificationDto,
+    AdminLogsFilterDto,
 } from './dto/admin-stats.dto';
+
 import { Role } from 'src/generated/prisma';
 
 @Injectable()
 export class AdminService {
     private readonly logger = new Logger(AdminService.name);
 
-    constructor(private readonly prisma: PrismaService) {}
+    constructor(private readonly prisma: PrismaService) { }
 
     // ─── Stats globales ─────────────────────────────────────────────────────────
 
@@ -212,13 +214,13 @@ export class AdminService {
             ...(role ? { role } : {}),
             ...(search
                 ? {
-                      OR: [
-                          { nom: { contains: search, mode: 'insensitive' as const } },
-                          { prenom: { contains: search, mode: 'insensitive' as const } },
-                          { email: { contains: search, mode: 'insensitive' as const } },
-                          { telephone: { contains: search, mode: 'insensitive' as const } },
-                      ],
-                  }
+                    OR: [
+                        { nom: { contains: search, mode: 'insensitive' as const } },
+                        { prenom: { contains: search, mode: 'insensitive' as const } },
+                        { email: { contains: search, mode: 'insensitive' as const } },
+                        { telephone: { contains: search, mode: 'insensitive' as const } },
+                    ],
+                }
                 : {}),
         };
 
@@ -335,11 +337,11 @@ export class AdminService {
             ...(statut ? { statut } : {}),
             ...(search
                 ? {
-                      OR: [
-                          { id: { contains: search } },
-                          { providerTransactionId: { contains: search } },
-                      ],
-                  }
+                    OR: [
+                        { id: { contains: search } },
+                        { providerTransactionId: { contains: search } },
+                    ],
+                }
                 : {}),
         };
 
@@ -425,5 +427,58 @@ export class AdminService {
         );
 
         return { sent: totalCreated, segment, titre };
+    }
+
+    // ─── Logs d'audit ───────────────────────────────────────────────────────────────────────
+
+    /**
+     * Historique des actions : récupère les entrées de logs_activites
+     * avec filtres optionnels (user, action, entite, plage de dates).
+     * Utile pour l'audit de sécurité et la traçabilité des opérations admin.
+     */
+    async getActivityLogs(dto: AdminLogsFilterDto) {
+        const { page = 1, limit = 50, userId, action, entite, dateDebut, dateFin } = dto;
+        const skip = (page - 1) * limit;
+
+        const where = {
+            ...(userId ? { userId } : {}),
+            ...(action ? { action: { contains: action, mode: 'insensitive' as const } } : {}),
+            ...(entite ? { entite: { contains: entite, mode: 'insensitive' as const } } : {}),
+            ...(dateDebut || dateFin
+                ? {
+                    createdAt: {
+                        ...(dateDebut ? { gte: new Date(dateDebut) } : {}),
+                        ...(dateFin ? { lte: new Date(dateFin) } : {}),
+                    },
+                }
+                : {}),
+        };
+
+        const [logs, total] = await Promise.all([
+            this.prisma.logActivite.findMany({
+                where,
+                skip,
+                take: limit,
+                orderBy: { createdAt: 'desc' },
+                // Sélection précise pour réduire le payload
+                select: {
+                    id: true,
+                    userId: true,
+                    action: true,
+                    entite: true,
+                    entiteId: true,
+                    metadata: true,
+                    ipAddress: true,
+                    userAgent: true,
+                    createdAt: true,
+                },
+            }),
+            this.prisma.logActivite.count({ where }),
+        ]);
+
+        return {
+            data: logs,
+            meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+        };
     }
 }
