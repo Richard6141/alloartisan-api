@@ -11,6 +11,7 @@ import {
     HttpStatus,
     ParseUUIDPipe,
     ParseIntPipe,
+    UseGuards,
 } from '@nestjs/common';
 import {
     ApiTags,
@@ -30,7 +31,9 @@ import {
     MetierResponseDto,
     MetierWithCategorieResponseDto,
 } from './dto';
-import { Public } from 'src/common/decorators';
+import { Public, Roles } from 'src/common/decorators';
+import { RolesGuard } from 'src/common/guards';
+import { Role } from 'src/generated/prisma';
 
 @ApiTags('Métiers')
 @Controller('metiers')
@@ -38,6 +41,8 @@ export class MetiersController {
     constructor(private readonly metiersService: MetiersService) {}
 
     @Post()
+    @Roles(Role.ADMIN)
+    @UseGuards(RolesGuard)
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.CREATED)
     @ApiOperation({
@@ -90,6 +95,28 @@ export class MetiersController {
         type: [MetierWithCategorieResponseDto],
     })
     findAll(
+        @Query('categorieId') categorieId?: string,
+        @Query('populaire') populaire?: string,
+        @Query('includeInactive') _includeInactive?: string,
+    ): Promise<MetierWithCategorieResponseDto[]> {
+        return this.metiersService.findAll({
+            categorieId,
+            populaire: populaire !== undefined ? populaire === 'true' : undefined,
+            // Route publique: ne jamais exposer les métiers inactifs.
+            includeInactive: false,
+        });
+    }
+
+    @Get('admin/all')
+    @Roles(Role.ADMIN)
+    @UseGuards(RolesGuard)
+    @ApiBearerAuth('access-token')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: '[Admin] Lister tous les métiers',
+        description: 'Inclut les métiers inactifs si demandé.',
+    })
+    findAllAdmin(
         @Query('categorieId') categorieId?: string,
         @Query('populaire') populaire?: string,
         @Query('includeInactive') includeInactive?: string,
@@ -198,6 +225,8 @@ export class MetiersController {
     }
 
     @Patch(':id')
+    @Roles(Role.ADMIN)
+    @UseGuards(RolesGuard)
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -227,6 +256,8 @@ export class MetiersController {
     }
 
     @Delete(':id')
+    @Roles(Role.ADMIN)
+    @UseGuards(RolesGuard)
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({

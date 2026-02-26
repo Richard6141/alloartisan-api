@@ -40,8 +40,11 @@ import {
     VerifyCertificationDto,
 } from './dto';
 import { GetCurrentUserId, Public } from 'src/common/decorators';
+import { Roles } from 'src/common/decorators';
 import { UploadService, ImageValidatorService } from 'src/upload';
 import { UploadThrottleGuard } from 'src/upload/guards/upload-throttle.guard';
+import { RolesGuard } from 'src/common/guards';
+import { Role } from 'src/generated/prisma';
 import * as fs from 'fs/promises';
 
 // Types MIME autorisés pour les documents de certification
@@ -363,6 +366,8 @@ export class CertificationsController {
     // TODO: Ajouter un guard Admin pour protéger ces routes
 
     @Get('admin/pending')
+    @Roles(Role.ADMIN)
+    @UseGuards(RolesGuard)
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -380,6 +385,8 @@ export class CertificationsController {
     }
 
     @Patch('admin/:id/verify')
+    @Roles(Role.ADMIN)
+    @UseGuards(RolesGuard)
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -407,6 +414,8 @@ export class CertificationsController {
     }
 
     @Delete('admin/:id')
+    @Roles(Role.ADMIN)
+    @UseGuards(RolesGuard)
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
