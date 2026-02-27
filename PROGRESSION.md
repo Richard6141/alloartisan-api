@@ -320,7 +320,7 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 
 ---
 
-## Sprint 10 — Sécurité avancée & Monitoring ✅ 90%
+## Sprint 10 — Sécurité avancée & Monitoring ✅ 95%
 
 | # | Tâche | Statut | Fichiers | Durée |
 |---|-------|--------|----------|-------|
@@ -329,12 +329,13 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 | 10.3 | LogActiviteService branché dans CommonModule | ✅ Terminé | `src/common/common.module.ts`, `src/common/services/*` | 30min |
 | 10.4 | Audit trail automatique (interceptor global mutating routes) | ✅ Terminé | `src/common/interceptors/audit-log.interceptor.ts`, `src/app.module.ts` | 1h |
 | 10.5 | Test unitaire interceptor audit | ✅ Terminé | `src/common/interceptors/audit-log.interceptor.spec.ts` | 30min |
-| 10.6 | Audit ownership global services | 🔄 En cours | `src/payment/payment.service.ts`, `src/{categories-metiers,metiers,certifications}/*.controller.ts` | 3h |
+| 10.6 | Audit ownership global services | ✅ Terminé | `src/payment/payment.service.ts`, `src/{categories-metiers,metiers,certifications}/*.controller.ts` | 3h |
 | 10.7 | `pnpm audit` + corrections HIGH/CRITICAL | 🔄 En cours | `package.json` overrides + `pnpm-lock.yaml` | 1h |
 | 10.8 | Tests unitaires ownership paiement | ✅ Terminé | `src/payment/payment.service.spec.ts` | 30min |
 | 10.9 | Inscription: gestion propre email déjà existant (`P2002` -> HTTP 409) | ✅ Terminé | `src/auth/auth.service.ts` | 20min |
 | 10.10 | Script admin CLI (`pnpm make:admin <email>`) | ✅ Terminé | `scripts/make-admin.js`, `package.json` | 20min |
 | 10.11 | Test unitaire register duplicate email | ✅ Terminé | `src/auth/auth.service.spec.ts` | 15min |
+| 10.12 | Triggers SQL versionnés sur chemin roadmap (`prisma/migrations/manual/triggers.sql`) | ✅ Terminé | `prisma/migrations/manual/triggers.sql` | 5min |
 
 ### Endpoints Monitoring implémentés
 
@@ -349,12 +350,11 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 - `pnpm exec jest src/payment/payment.service.spec.ts` ✅ (2 tests passants)
 - `pnpm exec jest src/auth/auth.service.spec.ts` ✅ (1 test passant)
 - `pnpm build` ✅
-- `pnpm audit --audit-level high` ✅ partiel : aucune `critical`, alertes `high` transitive résiduelles
+- `pnpm audit --audit-level high` ✅ partiel : 1 `high` transitive résiduelle (`html-minifier` via `mjml-cli`)
 
 ### ⚠️ ÉCART DÉTECTÉ : vulnérabilités résiduelles après durcissement
 - Restant après correctifs transitive overrides :
   - `html-minifier` (via `@nestjs-modules/mailer > mjml > mjml-cli`) — pas de version patch publiée
-  - `minimatch` signalé par `pnpm audit` sur chaînes transitive multiples (`eslint`, `nestjs/cli`, `mjml`) malgré résolution lock en `9.0.9` (`pnpm why minimatch`) — suspicion de faux positif/base advisory
 - Impact : dette sécurité transitive non bloquante runtime API immédiat, mais à traiter via upgrade/remplacement de dépendances amont
 
 ### ⚠️ ÉCART DÉTECTÉ : contrôle d'accès admin manquant sur routes sensibles (corrigé)
@@ -364,9 +364,8 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
   - `@Roles(Role.ADMIN)` + `@UseGuards(RolesGuard)` sur toutes les routes admin concernées
   - fermeture de l'exposition publique `includeInactive=true` sur endpoints publics (nouveaux endpoints admin dédiés)
 
-### ⚠️ ÉCART DÉTECTÉ : triggers SQL versionnés absents
-- `prisma/migrations/manual/triggers.sql` est référencé dans le suivi mais absent du repository
-- Impact : les triggers PostgreSQL annoncés ne sont pas traçables dans Git actuellement
+### ✅ ÉCART RÉSOLU : triggers SQL versionnés
+- Le fichier a été aligné avec la roadmap et versionné dans `prisma/migrations/manual/triggers.sql` (copie de référence depuis `prisma/sql/triggers.sql`)
 
 ---
 ## ðŸ”§ Commandes Ã  exÃ©cuter (ordre strict)

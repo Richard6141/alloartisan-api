@@ -363,7 +363,6 @@ export class CertificationsController {
     }
 
     // ==================== ADMIN ROUTES ====================
-    // TODO: Ajouter un guard Admin pour protéger ces routes
 
     @Get('admin/pending')
     @Roles(Role.ADMIN)
