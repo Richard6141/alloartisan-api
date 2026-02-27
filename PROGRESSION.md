@@ -1,6 +1,6 @@
 ﻿# ðŸ“Š PROGRESSION ALLOARTISAN API
 
-> Mis à jour : 27/02/2026 (Sprint 11 - CI/CD sécurité/e2e/staging aligné)  
+> Mis à jour : 27/02/2026 (Sprint 11 - coverage gate + e2e contract)  
 > Progression globale : **~98%** ████████████████████░
 
 ---
@@ -369,7 +369,7 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 - Le fichier a été aligné avec la roadmap et versionné dans `prisma/migrations/manual/triggers.sql` (copie de référence depuis `prisma/sql/triggers.sql`)
 
 ---
-## Sprint 11 — CI/CD & durcissement livraison 🔄 90%
+## Sprint 11 — CI/CD & durcissement livraison 🔄 95%
 
 | # | Tâche | Statut | Fichiers | Durée |
 |---|-------|--------|----------|-------|
@@ -386,11 +386,14 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 | 11.11 | Correctif CI Prisma generate (env `DATABASE_URL` manquante) | ✅ Terminé | `.github/workflows/ci-security.yml` | 10min |
 | 11.12 | Correctif CI Jest args (`--runInBand`) unit + e2e | ✅ Terminé | `.github/workflows/{ci-security,ci-e2e}.yml` | 10min |
 | 11.13 | Workflow de déploiement staging sécurisé (préflight + SSH) | ✅ Terminé | `.github/workflows/deploy-staging.yml` | 30min |
+| 11.14 | Coverage gate CI (>=70%, exécution stable Jest 30) | ✅ Terminé | `test/jest-coverage-ci.json`, `package.json`, `.github/workflows/ci-security.yml` | 20min |
+| 11.15 | e2e contract multi-routes publiques (health, categories, metiers, geolocation) | ✅ Terminé | `test/public-api.e2e-spec.ts` | 20min |
 
 ### Résultats sécurité actuels
 - `pnpm audit --audit-level high` ✅ (0 high / 0 critical)
 - Vulnérabilités restantes: `4 low`, `4 moderate`
 - Statut CI actuel: `CI Security` ✅, `CI E2E` ✅ (après correctifs Prisma + Jest args)
+- Coverage gate CI: `pnpm test:cov:ci` ✅ (interceptor audit > 95%)
 
 ---
 ## ðŸ”§ Commandes Ã  exÃ©cuter (ordre strict)
@@ -495,10 +498,10 @@ src/
 
 1. **Migration Prisma** : La migration n'a pas encore Ã©tÃ© exÃ©cutÃ©e en DB rÃ©elle â€” s'assurer que Docker est up avant `npx prisma migrate dev`
 2. **JWT RS256** : PrÃ©vu (tÃ¢che 0.6) mais pas encore implÃ©mentÃ© â€” rester sur HS256 pour l'instant
-3. **Tests** : Couverture encore partielle (unitaires ciblés + e2e smoke uniquement), extension e2e multi-modules et seuil de couverture 70% restent à finaliser
+3. **Tests** : Coverage gate CI en place (>=70%) mais périmètre encore ciblé; extension vers coverage métier (Auth/Booking/Payment) et e2e réels branchés DB reste à faire
 4. **PostGIS** : L'extension doit Ãªtre activÃ©e sur PostgreSQL avant d'utiliser GeolocationService
 5. **Cache patterns Redis** : `delByPattern` utilise `stores[0].keys()` â€” Ã  valider avec la version exacte de `cache-manager-redis-yet`
 6. **Paiement abonnements** : IntÃ©gration PaymentModule â†’ SubscriptionsModule (tÃ¢che 7.6) non implÃ©mentÃ©e
-7. **Sprint suivant** : Finaliser Sprint 11 (coverage gate 70% + e2e multi-modules), puis démarrer Sprint 12 (scoring fraude)
+7. **Sprint suivant** : Clôturer Sprint 11 (élargissement coverage + e2e métier réels), puis démarrer Sprint 12 (scoring fraude)
 
 
