@@ -8,6 +8,8 @@ const describeRealE2E = process.env.RUN_REAL_E2E === 'true' ? describe : describ
 
 describeRealE2E('AppModule public routes (real e2e)', () => {
     let app: INestApplication<App>;
+    const uniqueEmail = `e2e_${Date.now()}@alloartisan.dev`;
+    const strongPassword = 'StrongE2E!123';
 
     beforeAll(async () => {
         const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -62,5 +64,34 @@ describeRealE2E('AppModule public routes (real e2e)', () => {
             .post('/api/v1/auth/register')
             .send({ email: 'invalid-email', password: '123' })
             .expect(400);
+    });
+
+    it('POST /api/v1/auth/register then GET /api/v1/users/me with token works', async () => {
+        const registerResponse = await request(app.getHttpServer())
+            .post('/api/v1/auth/register')
+            .send({ email: uniqueEmail, password: strongPassword })
+            .expect(201);
+
+        const accessToken = registerResponse.body?.access_token as string | undefined;
+        expect(accessToken).toBeDefined();
+
+        const meResponse = await request(app.getHttpServer())
+            .get('/api/v1/users/me')
+            .set('Authorization', `Bearer ${accessToken}`)
+            .expect(200);
+
+        expect(meResponse.body).toEqual(
+            expect.objectContaining({
+                email: uniqueEmail,
+                id: expect.any(String),
+            }),
+        );
+    });
+
+    it('POST /api/v1/auth/register with duplicate email returns 409', async () => {
+        await request(app.getHttpServer())
+            .post('/api/v1/auth/register')
+            .send({ email: uniqueEmail, password: strongPassword })
+            .expect(409);
     });
 });
