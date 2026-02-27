@@ -1,0 +1,3 @@
+-- Manual migration placeholder.
+-- Real SQL scripts are kept in this folder and executed explicitly when needed:
+-- psql $DATABASE_URL -f prisma/migrations/manual/triggers.sql

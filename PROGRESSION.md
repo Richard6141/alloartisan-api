@@ -1,6 +1,6 @@
 ﻿# ðŸ“Š PROGRESSION ALLOARTISAN API
 
-> Mis à jour : 27/02/2026 (Sprint 11 - CI/CD sécurité renforcé)  
+> Mis à jour : 27/02/2026 (Sprint 11 - CI/CD sécurité + e2e stabilisé)  
 > Progression globale : **~97%** ████████████████████░
 
 ---
@@ -369,7 +369,7 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 - Le fichier a été aligné avec la roadmap et versionné dans `prisma/migrations/manual/triggers.sql` (copie de référence depuis `prisma/sql/triggers.sql`)
 
 ---
-## Sprint 11 — CI/CD & durcissement livraison 🔄 50%
+## Sprint 11 — CI/CD & durcissement livraison 🔄 80%
 
 | # | Tâche | Statut | Fichiers | Durée |
 |---|-------|--------|----------|-------|
@@ -380,6 +380,9 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 | 11.5 | Dependency Review PR (blocage vulnérabilités high+) | ✅ Terminé | `.github/workflows/dependency-review.yml` | 10min |
 | 11.6 | SAST CodeQL (push/PR + scan hebdo) | ✅ Terminé | `.github/workflows/codeql.yml` | 15min |
 | 11.7 | Durcissement workflow CI (permissions minimales + concurrency) | ✅ Terminé | `.github/workflows/ci-security.yml` | 5min |
+| 11.8 | Pipeline e2e avec services Postgres + Redis | ✅ Terminé | `.github/workflows/ci-e2e.yml` | 25min |
+| 11.9 | Stabilisation test e2e smoke (`/health`) + compat Jest | ✅ Terminé | `test/jest-e2e.json`, `test/mocks/*.ts`, `test/app.e2e-spec.ts` | 20min |
+| 11.10 | Correction compatibilité `prisma migrate deploy` avec dossier `manual` | ✅ Terminé | `prisma/migrations/manual/migration.sql` | 5min |
 
 ### Résultats sécurité actuels
 - `pnpm audit --audit-level high` ✅ (0 high / 0 critical)
