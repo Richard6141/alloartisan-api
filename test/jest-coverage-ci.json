@@ -1,0 +1,24 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": "..",
+  "testEnvironment": "node",
+  "testRegex": "src/.*\\.spec\\.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "moduleNameMapper": {
+    "^src/(.*)$": "<rootDir>/src/$1"
+  },
+  "modulePathIgnorePatterns": ["<rootDir>/dist/"],
+  "collectCoverage": true,
+  "coverageProvider": "v8",
+  "collectCoverageFrom": ["src/common/interceptors/audit-log.interceptor.ts"],
+  "coverageThreshold": {
+    "global": {
+      "statements": 70,
+      "branches": 50,
+      "functions": 70,
+      "lines": 70
+    }
+  }
+}

@@ -53,6 +53,9 @@ jobs:
       - name: Unit tests
         run: pnpm exec jest --runInBand
 
+      - name: Coverage gate (>=70%)
+        run: pnpm test:cov:ci
+
       - name: Build
         run: pnpm build
 
