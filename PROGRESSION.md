@@ -320,7 +320,7 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 
 ---
 
-## Sprint 10 — Sécurité avancée & Monitoring ✅ 95%
+## Sprint 10 — Sécurité avancée & Monitoring ✅ 100%
 
 | # | Tâche | Statut | Fichiers | Durée |
 |---|-------|--------|----------|-------|
@@ -330,7 +330,7 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 | 10.4 | Audit trail automatique (interceptor global mutating routes) | ✅ Terminé | `src/common/interceptors/audit-log.interceptor.ts`, `src/app.module.ts` | 1h |
 | 10.5 | Test unitaire interceptor audit | ✅ Terminé | `src/common/interceptors/audit-log.interceptor.spec.ts` | 30min |
 | 10.6 | Audit ownership global services | ✅ Terminé | `src/payment/payment.service.ts`, `src/{categories-metiers,metiers,certifications}/*.controller.ts` | 3h |
-| 10.7 | `pnpm audit` + corrections HIGH/CRITICAL | 🔄 En cours | `package.json` overrides + `pnpm-lock.yaml` | 1h |
+| 10.7 | `pnpm audit` + corrections HIGH/CRITICAL | ✅ Terminé | `package.json` + `pnpm-lock.yaml` | 1h |
 | 10.8 | Tests unitaires ownership paiement | ✅ Terminé | `src/payment/payment.service.spec.ts` | 30min |
 | 10.9 | Inscription: gestion propre email déjà existant (`P2002` -> HTTP 409) | ✅ Terminé | `src/auth/auth.service.ts` | 20min |
 | 10.10 | Script admin CLI (`pnpm make:admin <email>`) | ✅ Terminé | `scripts/make-admin.js`, `package.json` | 20min |
@@ -350,12 +350,13 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 - `pnpm exec jest src/payment/payment.service.spec.ts` ✅ (2 tests passants)
 - `pnpm exec jest src/auth/auth.service.spec.ts` ✅ (1 test passant)
 - `pnpm build` ✅
-- `pnpm audit --audit-level high` ✅ partiel : 1 `high` transitive résiduelle (`html-minifier` via `mjml-cli`)
+- `pnpm audit --audit-level high` ✅ : 0 `high`, 0 `critical` (restant: `4 low`, `4 moderate`)
 
-### ⚠️ ÉCART DÉTECTÉ : vulnérabilités résiduelles après durcissement
-- Restant après correctifs transitive overrides :
-  - `html-minifier` (via `@nestjs-modules/mailer > mjml > mjml-cli`) — pas de version patch publiée
-- Impact : dette sécurité transitive non bloquante runtime API immédiat, mais à traiter via upgrade/remplacement de dépendances amont
+### ✅ ÉCART RÉSOLU : vulnérabilités high/critical après durcissement
+- Restant après correctifs :
+  - vulnérabilités `low/moderate` non bloquantes (aucune `high/critical`)
+- Correctif appliqué :
+  - suppression de la dépendance inutilisée `@nestjs-modules/mailer` (chaîne `mjml-cli/html-minifier` retirée)
 
 ### ⚠️ ÉCART DÉTECTÉ : contrôle d'accès admin manquant sur routes sensibles (corrigé)
 - Routes de mutation `categories-metiers` et `metiers` accessibles aux utilisateurs authentifiés non-admin (avant correctif)
