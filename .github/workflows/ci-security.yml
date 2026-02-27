@@ -46,7 +46,7 @@ jobs:
         run: pnpm lint:check
 
       - name: Unit tests
-        run: pnpm test -- --runInBand
+        run: pnpm exec jest --runInBand
 
       - name: Build
         run: pnpm build
