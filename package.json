@@ -28,6 +28,7 @@
         "db:test:up": "docker compose up test-db -d",
         "db:test:restart": "pnpm run db:test:rm && pnpm run db:test:up && sleep 3 && pnpm run prisma:test:deploy",
         "db:restart": "pnpm run db:dev:restart && pnpm run db:test:restart",
+        "make:admin": "node scripts/make-admin.js",
         "docker:up": "docker compose up -d",
         "docker:up:admin": "docker compose --profile dev up -d",
         "docker:down": "docker compose down",
@@ -133,7 +134,8 @@
       "valibot": "^1.2.0",
       "jws": "^3.2.3",
       "qs": "^6.14.1",
-      "nodemailer": "^7.0.11"
+      "nodemailer": "^7.0.11",
+      "minimatch": "^9.0.7"
     },
         "ignoredBuiltDependencies": [
             "@firebase/util",
