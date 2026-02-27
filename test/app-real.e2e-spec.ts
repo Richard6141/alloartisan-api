@@ -52,4 +52,15 @@ describeRealE2E('AppModule public routes (real e2e)', () => {
         const response = await request(app.getHttpServer()).get('/api/v1/metiers').expect(200);
         expect(Array.isArray(response.body)).toBe(true);
     });
+
+    it('GET /api/v1/users/me without token returns 401', async () => {
+        await request(app.getHttpServer()).get('/api/v1/users/me').expect(401);
+    });
+
+    it('POST /api/v1/auth/register with invalid payload returns 400', async () => {
+        await request(app.getHttpServer())
+            .post('/api/v1/auth/register')
+            .send({ email: 'invalid-email', password: '123' })
+            .expect(400);
+    });
 });
