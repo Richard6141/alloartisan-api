@@ -71,7 +71,9 @@ describe('Public API contract (e2e)', () => {
     });
 
     it('GET /api/v1/categories-metiers returns an array', async () => {
-        const response = await request(app.getHttpServer()).get('/api/v1/categories-metiers').expect(200);
+        const response = await request(app.getHttpServer())
+            .get('/api/v1/categories-metiers')
+            .expect(200);
         expect(Array.isArray(response.body)).toBe(true);
     });
 
