@@ -13,6 +13,13 @@ on:
       - feature/**
       - fix/**
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-security-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality-and-security:
     runs-on: ubuntu-latest

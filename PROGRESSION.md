@@ -1,6 +1,6 @@
 ﻿# ðŸ“Š PROGRESSION ALLOARTISAN API
 
-> Mis à jour : 27/02/2026 (Sprint 11 - CI/CD sécurité démarré)  
+> Mis à jour : 27/02/2026 (Sprint 11 - CI/CD sécurité renforcé)  
 > Progression globale : **~97%** ████████████████████░
 
 ---
@@ -369,7 +369,7 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 - Le fichier a été aligné avec la roadmap et versionné dans `prisma/migrations/manual/triggers.sql` (copie de référence depuis `prisma/sql/triggers.sql`)
 
 ---
-## Sprint 11 — CI/CD & durcissement livraison 🔄 25%
+## Sprint 11 — CI/CD & durcissement livraison 🔄 50%
 
 | # | Tâche | Statut | Fichiers | Durée |
 |---|-------|--------|----------|-------|
@@ -377,6 +377,9 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 | 11.2 | Script `lint:check` dédié CI (sans auto-fix) | ✅ Terminé | `package.json` | 5min |
 | 11.3 | Suppression dépendance mailer inutilisée (surface d'attaque réduite) | ✅ Terminé | `package.json`, `pnpm-lock.yaml` | 20min |
 | 11.4 | Validation pipeline locale | ✅ Terminé | `pnpm lint:check`, `pnpm test`, `pnpm build`, `pnpm audit` | 10min |
+| 11.5 | Dependency Review PR (blocage vulnérabilités high+) | ✅ Terminé | `.github/workflows/dependency-review.yml` | 10min |
+| 11.6 | SAST CodeQL (push/PR + scan hebdo) | ✅ Terminé | `.github/workflows/codeql.yml` | 15min |
+| 11.7 | Durcissement workflow CI (permissions minimales + concurrency) | ✅ Terminé | `.github/workflows/ci-security.yml` | 5min |
 
 ### Résultats sécurité actuels
 - `pnpm audit --audit-level high` ✅ (0 high / 0 critical)
