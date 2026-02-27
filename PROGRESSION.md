@@ -1,7 +1,7 @@
 ﻿# ðŸ“Š PROGRESSION ALLOARTISAN API
 
-> Mis à jour : 27/02/2026 (Sprint 11 - CI/CD sécurité + e2e stabilisé)  
-> Progression globale : **~97%** ████████████████████░
+> Mis à jour : 27/02/2026 (Sprint 11 - CI/CD sécurité/e2e/staging aligné)  
+> Progression globale : **~98%** ████████████████████░
 
 ---
 
@@ -369,7 +369,7 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 - Le fichier a été aligné avec la roadmap et versionné dans `prisma/migrations/manual/triggers.sql` (copie de référence depuis `prisma/sql/triggers.sql`)
 
 ---
-## Sprint 11 — CI/CD & durcissement livraison 🔄 80%
+## Sprint 11 — CI/CD & durcissement livraison 🔄 90%
 
 | # | Tâche | Statut | Fichiers | Durée |
 |---|-------|--------|----------|-------|
@@ -383,10 +383,14 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 | 11.8 | Pipeline e2e avec services Postgres + Redis | ✅ Terminé | `.github/workflows/ci-e2e.yml` | 25min |
 | 11.9 | Stabilisation test e2e smoke (`/health`) + compat Jest | ✅ Terminé | `test/jest-e2e.json`, `test/mocks/*.ts`, `test/app.e2e-spec.ts` | 20min |
 | 11.10 | Correction compatibilité `prisma migrate deploy` avec dossier `manual` | ✅ Terminé | `prisma/migrations/manual/migration.sql` | 5min |
+| 11.11 | Correctif CI Prisma generate (env `DATABASE_URL` manquante) | ✅ Terminé | `.github/workflows/ci-security.yml` | 10min |
+| 11.12 | Correctif CI Jest args (`--runInBand`) unit + e2e | ✅ Terminé | `.github/workflows/{ci-security,ci-e2e}.yml` | 10min |
+| 11.13 | Workflow de déploiement staging sécurisé (préflight + SSH) | ✅ Terminé | `.github/workflows/deploy-staging.yml` | 30min |
 
 ### Résultats sécurité actuels
 - `pnpm audit --audit-level high` ✅ (0 high / 0 critical)
 - Vulnérabilités restantes: `4 low`, `4 moderate`
+- Statut CI actuel: `CI Security` ✅, `CI E2E` ✅ (après correctifs Prisma + Jest args)
 
 ---
 ## ðŸ”§ Commandes Ã  exÃ©cuter (ordre strict)
@@ -491,10 +495,10 @@ src/
 
 1. **Migration Prisma** : La migration n'a pas encore Ã©tÃ© exÃ©cutÃ©e en DB rÃ©elle â€” s'assurer que Docker est up avant `npx prisma migrate dev`
 2. **JWT RS256** : PrÃ©vu (tÃ¢che 0.6) mais pas encore implÃ©mentÃ© â€” rester sur HS256 pour l'instant
-3. **Tests** : Aucun test unitaire ou E2E â€” dette croissante sur 9 sprints (~30h de travail)
+3. **Tests** : Couverture encore partielle (unitaires ciblés + e2e smoke uniquement), extension e2e multi-modules et seuil de couverture 70% restent à finaliser
 4. **PostGIS** : L'extension doit Ãªtre activÃ©e sur PostgreSQL avant d'utiliser GeolocationService
 5. **Cache patterns Redis** : `delByPattern` utilise `stores[0].keys()` â€” Ã  valider avec la version exacte de `cache-manager-redis-yet`
 6. **Paiement abonnements** : IntÃ©gration PaymentModule â†’ SubscriptionsModule (tÃ¢che 7.6) non implÃ©mentÃ©e
-7. **Sprint suivant** : Sprint 10 (SÃ©curitÃ© avancÃ©e OWASP + Monitoring) ou Tests (Sprint 11)
+7. **Sprint suivant** : Finaliser Sprint 11 (coverage gate 70% + e2e multi-modules), puis démarrer Sprint 12 (scoring fraude)
 
 
