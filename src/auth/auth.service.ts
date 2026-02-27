@@ -4,11 +4,11 @@ import {
     Logger,
     BadRequestException,
     Inject,
+    ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AuthDto, ForgotPasswordDto, ResetPasswordDto, EnableMfaDto, VerifyMfaDto } from './dto';
 import * as argon from 'argon2';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import { Tokens, LoginResponse } from './types';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -29,6 +29,20 @@ interface DeviceInfo {
     deviceType?: string;
     ipAddress?: string;
     userAgent?: string;
+}
+
+function isPrismaUniqueEmailError(
+    error: unknown,
+): error is { code: string; meta?: { target?: unknown; constraint?: { fields?: string[] } } } {
+    if (!error || typeof error !== 'object') {
+        return false;
+    }
+
+    if (!('code' in error) || (error as { code?: unknown }).code !== 'P2002') {
+        return false;
+    }
+
+    return true;
 }
 
 @Injectable()
@@ -71,10 +85,8 @@ export class AuthService {
 
             return tokens;
         } catch (error) {
-            if (error instanceof PrismaClientKnownRequestError) {
-                if (error.code === 'P2002') {
-                    throw new ForbiddenException('Email already exists');
-                }
+            if (isPrismaUniqueEmailError(error)) {
+                throw new ConflictException('Email already exists');
             }
             throw error;
         }
