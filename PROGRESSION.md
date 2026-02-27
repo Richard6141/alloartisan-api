@@ -1,6 +1,6 @@
 ﻿# ðŸ“Š PROGRESSION ALLOARTISAN API
 
-> Mis à jour : 26/02/2026 (Sprint 10 - sécurité monitoring en cours)  
+> Mis à jour : 27/02/2026 (Sprint 10 - sécurité monitoring en cours)  
 > Progression globale : **~97%** ████████████████████░
 
 ---
@@ -332,6 +332,9 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 | 10.6 | Audit ownership global services | 🔄 En cours | `src/payment/payment.service.ts`, `src/{categories-metiers,metiers,certifications}/*.controller.ts` | 3h |
 | 10.7 | `pnpm audit` + corrections HIGH/CRITICAL | 🔄 En cours | `package.json` overrides + `pnpm-lock.yaml` | 1h |
 | 10.8 | Tests unitaires ownership paiement | ✅ Terminé | `src/payment/payment.service.spec.ts` | 30min |
+| 10.9 | Inscription: gestion propre email déjà existant (`P2002` -> HTTP 409) | ✅ Terminé | `src/auth/auth.service.ts` | 20min |
+| 10.10 | Script admin CLI (`pnpm make:admin <email>`) | ✅ Terminé | `scripts/make-admin.js`, `package.json` | 20min |
+| 10.11 | Test unitaire register duplicate email | ✅ Terminé | `src/auth/auth.service.spec.ts` | 15min |
 
 ### Endpoints Monitoring implémentés
 
@@ -344,12 +347,14 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 - `pnpm exec eslint ...` ✅
 - `pnpm exec jest src/common/interceptors/audit-log.interceptor.spec.ts` ✅ (2 tests passants)
 - `pnpm exec jest src/payment/payment.service.spec.ts` ✅ (2 tests passants)
-- `pnpm audit --audit-level high` ✅ partiel : `critical` supprimé, reste `5 high` résiduelles
+- `pnpm exec jest src/auth/auth.service.spec.ts` ✅ (1 test passant)
+- `pnpm build` ✅
+- `pnpm audit --audit-level high` ✅ partiel : aucune `critical`, alertes `high` transitive résiduelles
 
 ### ⚠️ ÉCART DÉTECTÉ : vulnérabilités résiduelles après durcissement
 - Restant après correctifs transitive overrides :
   - `html-minifier` (via `@nestjs-modules/mailer > mjml > mjml-cli`) — pas de version patch publiée
-  - `minimatch` sur chaînes transitive multiples (`eslint`, `nestjs/cli`, `mjml`)
+  - `minimatch` signalé par `pnpm audit` sur chaînes transitive multiples (`eslint`, `nestjs/cli`, `mjml`) malgré résolution lock en `9.0.9` (`pnpm why minimatch`) — suspicion de faux positif/base advisory
 - Impact : dette sécurité transitive non bloquante runtime API immédiat, mais à traiter via upgrade/remplacement de dépendances amont
 
 ### ⚠️ ÉCART DÉTECTÉ : contrôle d'accès admin manquant sur routes sensibles (corrigé)
