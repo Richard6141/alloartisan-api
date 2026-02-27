@@ -23,6 +23,8 @@ concurrency:
 jobs:
   quality-and-security:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/alloartisan_ci?schema=public
 
     steps:
       - name: Checkout
