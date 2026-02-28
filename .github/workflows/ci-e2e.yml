@@ -87,7 +87,7 @@ jobs:
         run: pnpm prisma:dev:deploy
 
       - name: Ensure schema exists for e2e (CI safety)
-        run: pnpm exec prisma db push --skip-generate
+        run: pnpm exec prisma db push
 
       - name: Run e2e tests
         run: pnpm exec jest --config ./test/jest-e2e.json --runInBand
