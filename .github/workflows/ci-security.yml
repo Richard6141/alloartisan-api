@@ -25,6 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/alloartisan_ci?schema=public
+      MFA_ENCRYPTION_KEY: test_mfa_encryption_key_32_chars_minimum
 
     steps:
       - name: Checkout

@@ -5,6 +5,7 @@ import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 
 const describeRealE2E = process.env.RUN_REAL_E2E === 'true' ? describe : describe.skip;
+process.env.MFA_ENCRYPTION_KEY ??= 'test_mfa_encryption_key_32_chars_minimum';
 
 describeRealE2E('AppModule public routes (real e2e)', () => {
     let app: INestApplication<App>;
@@ -31,7 +32,9 @@ describeRealE2E('AppModule public routes (real e2e)', () => {
     });
 
     afterAll(async () => {
-        await app.close();
+        if (app) {
+            await app.close();
+        }
     });
 
     it('GET /api/v1/health returns health payload', async () => {
