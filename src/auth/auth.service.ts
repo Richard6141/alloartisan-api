@@ -487,8 +487,10 @@ export class AuthService {
             ...deviceInfo,
         });
 
-        // Regénérer les tokens avec le sessionId
-        return this.getTokens(userId, sessionId);
+        const sessionTokens = await this.getTokens(userId, sessionId);
+        await this.sessionService.updateToken(userId, sessionId, sessionTokens.refresh_token);
+
+        return sessionTokens;
     }
 
     private async getTokens(userId: string, sessionId: string): Promise<Tokens> {
