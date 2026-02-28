@@ -16,7 +16,8 @@
     "src/common/interceptors/audit-log.interceptor.ts",
     "src/fraud/fraud.service.ts",
     "src/booking/booking.service.ts",
-    "src/admin/admin.service.ts"
+    "src/admin/admin.service.ts",
+    "src/search/search.service.ts"
   ],
   "coverageThreshold": {
     "global": {

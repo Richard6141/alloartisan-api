@@ -24,6 +24,7 @@ import { MessagingModule } from './messaging/messaging.module';
 import { AdminModule } from './admin/admin.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { FraudModule } from './fraud/fraud.module';
+import { SearchModule } from './search/search.module';
 import { AtGuard } from './common/guards';
 import { CommonModule } from './common/common.module';
 import { AuditLogInterceptor } from './common/interceptors';
@@ -100,6 +101,7 @@ import { HealthModule } from './health/health.module';
         SubscriptionsModule,
         AdminModule,
         FraudModule,
+        SearchModule,
         HealthModule,
     ],
     providers: [

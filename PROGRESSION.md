@@ -453,6 +453,23 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 
 ---
 
+## Sprint 13 -- Recherche Full-Text PostgreSQL (100%)
+
+| # | Tache | Statut | Fichiers | Duree |
+|---|-------|--------|----------|-------|
+| 13.1 | SearchService full-text ts_rank + tsvector | Termine | `src/search/search.service.ts` | 3h |
+| 13.2 | Tri hybride pertinence x bonus abonnement | Termine | `src/search/search.service.ts` | 30min |
+| 13.3 | Autocomplete Redis TTL 1h (metiers + entreprises + villes) | Termine | `src/search/search.service.ts` | 45min |
+| 13.4 | SearchController 2 endpoints publics | Termine | `src/search/search.controller.ts` | 20min |
+| 13.5 | SearchModule integre dans AppModule | Termine | `src/app.module.ts` | 5min |
+| 13.6 | Tests unitaires SearchService 12 tests 98.64% coverage | Termine | `src/search/search.service.spec.ts` | 1h30 |
+| 13.7 | Coverage gate etendu search.service.ts | Termine | `test/jest-coverage-ci.json` | 5min |
+
+Endpoints: GET /api/v1/search/artisans (public, cache 5min) + GET /api/v1/search/autocomplete (public, cache 1h)
+Coverage global: 56/56 tests | 77.15% statements | search.service.ts 98.64%
+
+---
+
 ## ðŸ”§ Commandes Ã  exÃ©cuter (ordre strict)
 
 ```bash
