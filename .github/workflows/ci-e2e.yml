@@ -83,6 +83,9 @@ jobs:
       - name: Generate Prisma client
         run: pnpm exec prisma generate
 
+      - name: Enable PostGIS extension
+        run: PGPASSWORD=postgres psql "postgresql://postgres:postgres@localhost:5432/alloartisan_ci" -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+
       - name: Apply database migrations
         run: pnpm prisma:dev:deploy
 
