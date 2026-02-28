@@ -391,6 +391,7 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 | 11.16 | e2e réel `AppModule` sur routes publiques (gaté par env CI) | ✅ Terminé | `test/app-real.e2e-spec.ts`, `.github/workflows/ci-e2e.yml` | 25min |
 | 11.17 | e2e sécurité réel (401 route protégée + 400 validation auth) | ✅ Terminé | `test/app-real.e2e-spec.ts` | 10min |
 | 11.18 | e2e authentifié réel (register -> /users/me) + duplicate email 409 | ✅ Terminé | `test/app-real.e2e-spec.ts` | 15min |
+| 11.19 | e2e refresh token réel (rotation RT -> nouvel accès protégé) | ✅ Terminé | `test/app-real.e2e-spec.ts` | 10min |
 
 ### Résultats sécurité actuels
 - `pnpm audit --audit-level high` ✅ (0 high / 0 critical)
@@ -400,6 +401,7 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 - E2E réel activé en CI: `RUN_REAL_E2E=true` (Postgres/Redis requis)
 - E2E sécurité réel: accès protégé sans JWT => `401`, payload auth invalide => `400`
 - E2E authentifié réel: inscription valide + accès `/users/me` avec JWT + conflit email `409`
+- E2E refresh réel: `/auth/refresh` valide la session Redis et retourne une nouvelle paire de tokens
 
 ---
 ## ðŸ”§ Commandes Ã  exÃ©cuter (ordre strict)

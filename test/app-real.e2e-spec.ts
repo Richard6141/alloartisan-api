@@ -10,6 +10,8 @@ describeRealE2E('AppModule public routes (real e2e)', () => {
     let app: INestApplication<App>;
     const uniqueEmail = `e2e_${Date.now()}@alloartisan.dev`;
     const strongPassword = 'StrongE2E!123';
+    let accessTokenFromRegister: string;
+    let refreshTokenFromRegister: string;
 
     beforeAll(async () => {
         const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -72,12 +74,14 @@ describeRealE2E('AppModule public routes (real e2e)', () => {
             .send({ email: uniqueEmail, password: strongPassword })
             .expect(201);
 
-        const accessToken = registerResponse.body?.access_token as string | undefined;
-        expect(accessToken).toBeDefined();
+        accessTokenFromRegister = registerResponse.body?.access_token as string;
+        refreshTokenFromRegister = registerResponse.body?.refresh_token as string;
+        expect(accessTokenFromRegister).toBeDefined();
+        expect(refreshTokenFromRegister).toBeDefined();
 
         const meResponse = await request(app.getHttpServer())
             .get('/api/v1/users/me')
-            .set('Authorization', `Bearer ${accessToken}`)
+            .set('Authorization', `Bearer ${accessTokenFromRegister}`)
             .expect(200);
 
         expect(meResponse.body).toEqual(
@@ -93,5 +97,30 @@ describeRealE2E('AppModule public routes (real e2e)', () => {
             .post('/api/v1/auth/register')
             .send({ email: uniqueEmail, password: strongPassword })
             .expect(409);
+    });
+
+    it('POST /api/v1/auth/refresh rotates tokens and keeps access to /users/me', async () => {
+        const refreshResponse = await request(app.getHttpServer())
+            .post('/api/v1/auth/refresh')
+            .set('Authorization', `Bearer ${refreshTokenFromRegister}`)
+            .expect(200);
+
+        const newAccessToken = refreshResponse.body?.access_token as string | undefined;
+        const newRefreshToken = refreshResponse.body?.refresh_token as string | undefined;
+
+        expect(newAccessToken).toBeDefined();
+        expect(newRefreshToken).toBeDefined();
+
+        const meResponse = await request(app.getHttpServer())
+            .get('/api/v1/users/me')
+            .set('Authorization', `Bearer ${newAccessToken}`)
+            .expect(200);
+
+        expect(meResponse.body).toEqual(
+            expect.objectContaining({
+                email: uniqueEmail,
+                id: expect.any(String),
+            }),
+        );
     });
 });
