@@ -7,7 +7,7 @@ import { FullTextSearchDto, AutocompleteDto } from './dto';
 @ApiTags('search')
 @Controller('search')
 export class SearchController {
-    constructor(private readonly searchService: SearchService) { }
+    constructor(private readonly searchService: SearchService) {}
 
     /**
      * GET /api/v1/search/artisans?q=plombier+cotonou&ville=Cotonou&metierSlug=plomberie&page=1&limit=20

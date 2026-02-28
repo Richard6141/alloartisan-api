@@ -1,7 +1,7 @@
 ﻿# ðŸ“Š PROGRESSION ALLOARTISAN API
 
-> Mis à jour : 28/02/2026 (Sprint 12 - Fraud Detection implémenté)  
-> Progression globale : **~100%** ████████████████████
+> Mis a jour : 28/02/2026 (Sprint 13 - Full-Text Search + autocomplete Redis)
+> Progression globale : **~100%** (Sprints 0-13 completes)
 
 ---
 
