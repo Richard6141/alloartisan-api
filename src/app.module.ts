@@ -23,6 +23,7 @@ import { AvisModule } from './avis/avis.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { AdminModule } from './admin/admin.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { FraudModule } from './fraud/fraud.module';
 import { AtGuard } from './common/guards';
 import { CommonModule } from './common/common.module';
 import { AuditLogInterceptor } from './common/interceptors';
@@ -98,6 +99,7 @@ import { HealthModule } from './health/health.module';
         MessagingModule,
         SubscriptionsModule,
         AdminModule,
+        FraudModule,
         HealthModule,
     ],
     providers: [
@@ -115,4 +117,4 @@ import { HealthModule } from './health/health.module';
         },
     ],
 })
-export class AppModule {}
+export class AppModule { }
