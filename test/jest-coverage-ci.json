@@ -12,7 +12,12 @@
   "modulePathIgnorePatterns": ["<rootDir>/dist/"],
   "collectCoverage": true,
   "coverageProvider": "v8",
-  "collectCoverageFrom": ["src/common/interceptors/audit-log.interceptor.ts"],
+  "collectCoverageFrom": [
+    "src/common/interceptors/audit-log.interceptor.ts",
+    "src/fraud/fraud.service.ts",
+    "src/booking/booking.service.ts",
+    "src/admin/admin.service.ts"
+  ],
   "coverageThreshold": {
     "global": {
       "statements": 70,

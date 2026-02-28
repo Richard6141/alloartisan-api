@@ -1,7 +1,7 @@
 ﻿# ðŸ“Š PROGRESSION ALLOARTISAN API
 
-> Mis à jour : 27/02/2026 (Sprint 11 - coverage gate + e2e contract)  
-> Progression globale : **~98%** ████████████████████░
+> Mis à jour : 28/02/2026 (Sprint 12 - Fraud Detection implémenté)  
+> Progression globale : **~100%** ████████████████████
 
 ---
 
@@ -404,6 +404,55 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 - E2E refresh réel: `/auth/refresh` valide la session Redis et retourne une nouvelle paire de tokens
 
 ---
+## Sprint 12 — Détection Fraude ✅ 100%
+
+| # | Tâche | Statut | Fichiers | Durée |
+|---|-------|--------|----------|-------|
+| 12.1 | FraudModule structure | ✅ Terminé | `src/fraud/fraud.module.ts` | 15min |
+| 12.2 | FraudService — scoring 5 signaux (0-100 pts) | ✅ Terminé | `src/fraud/fraud.service.ts` | 3h |
+| 12.3 | FraudTypes — FraudSignal, FraudScore, FraudNiveau, FraudAction | ✅ Terminé | `src/fraud/fraud.types.ts` | 30min |
+| 12.4 | FraudScheduler — scan quotidien 3h UTC | ✅ Terminé | `src/fraud/fraud.scheduler.ts` | 30min |
+| 12.5 | FraudController — endpoints ADMIN protégés | ✅ Terminé | `src/fraud/fraud.controller.ts` | 30min |
+| 12.6 | FraudModule intégré dans AppModule | ✅ Terminé | `src/app.module.ts` | 5min |
+| 12.7 | Tests unitaires FraudService (9 tests) | ✅ Terminé | `src/fraud/fraud.service.spec.ts` | 2h |
+| 12.8 | Tests unitaires BookingService (11 tests) | ✅ Terminé | `src/booking/booking.service.spec.ts` | 2h |
+| 12.9 | Tests unitaires AdminService (8 tests) | ✅ Terminé | `src/admin/admin.service.spec.ts` | 1h |
+| 12.10 | Coverage gate étendu (fraud + booking + admin) | ✅ Terminé | `test/jest-coverage-ci.json` | 10min |
+
+### Endpoints Fraud Detection implémentés
+
+| Méthode | Route | Accès | Statut |
+|---------|-------|-------|--------|
+| GET | `/api/v1/admin/fraud/artisans/:artisanId` | ADMIN | ✅ |
+| GET | `/api/v1/admin/fraud/high-risk?limit=20` | ADMIN | ✅ |
+| GET | `/api/v1/admin/fraud/scan` | ADMIN | ✅ |
+
+### Signaux de fraude implémentés
+
+| Signal | Seuil | Score max | Type |
+|--------|-------|-----------|------|
+| Taux annulation | > 50% | +30 pts | Proportionnel |
+| Mauvais avis répétés | ≥ 3 avis < 2★ | +20 pts | Proportionnel |
+| Nouveau compte + grosse TX | < 7j + > 200K FCFA | +25 pts | Binaire |
+| Flooding demandes | > 10 bookings/heure | +15 pts | Binaire |
+| Profil non vérifié actif | ≥ 5 bookings non vérifié | +10 pts | Proportionnel |
+
+### Niveaux de risque et actions automatiques
+
+| Score | Niveau | Action automatique |
+|-------|--------|-------------------|
+| 0-30 | NORMAL | Aucune |
+| 31-60 | SURVEILLANCE | Log renforcé |
+| 61-80 | VERIFICATION | Notification admin |
+| 81-100 | BLOQUE | Blocage temporaire (disponible=false) |
+
+### ⚠️ ÉCART RÉSOLU : Sprint 12 absent de PROGRESSION.md
+- Le code du module Fraud Detection était **entièrement implémenté** dans `src/fraud/` mais non documenté dans PROGRESSION.md
+- Corrigé le 28/02/2026 lors de l'audit pré-sprint
+- Code confirmé : 6 fichiers, FraudModule intégré dans AppModule, 9 tests unitaires passants
+
+---
+
 ## ðŸ”§ Commandes Ã  exÃ©cuter (ordre strict)
 
 ```bash
@@ -510,6 +559,7 @@ src/
 4. **PostGIS** : L'extension doit Ãªtre activÃ©e sur PostgreSQL avant d'utiliser GeolocationService
 5. **Cache patterns Redis** : `delByPattern` utilise `stores[0].keys()` â€” Ã  valider avec la version exacte de `cache-manager-redis-yet`
 6. **Paiement abonnements** : IntÃ©gration PaymentModule â†’ SubscriptionsModule (tÃ¢che 7.6) non implÃ©mentÃ©e
-7. **Sprint suivant** : Clôturer Sprint 11 (élargissement coverage + e2e métier réels), puis démarrer Sprint 12 (scoring fraude)
+7. **Sprint 12 complété** : Fraud Detection implémenté (FraudService, FraudScheduler, FraudController, 9 tests unitaires)
+8. **Sprints suivants possibles** : Sprint 13 — Recherche full-text PostgreSQL (TÂCHE 9.1) + Portfolio artisan enrichi (TÂCHE 9.2)
 
 
