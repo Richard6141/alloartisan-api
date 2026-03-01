@@ -39,7 +39,7 @@ export class PortfolioService {
         private readonly prisma: PrismaService,
         private readonly storageService: StorageService,
         private readonly cacheService: CacheService,
-    ) { }
+    ) {}
 
     /**
      * Récupère le portfolio d'un artisan.
