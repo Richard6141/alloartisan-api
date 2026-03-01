@@ -9,6 +9,7 @@ import {
     ParseUUIDPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { PaymentService } from './payment.service';
 import { InitiatePaymentDto } from './dto';
 import { AtGuard, RolesGuard } from 'src/common/guards';
@@ -42,6 +43,7 @@ export class PaymentController {
         description: 'Booking non payable (mauvais statut ou prix manquant)',
     })
     @ApiResponse({ status: 403, description: 'Accès interdit' })
+    @Throttle({ long: { limit: 10, ttl: 3600000 } }) // 10 req/heure/user (spec PROGRAMME §7.3)
     @Post('initiate/:bookingId')
     async initiatePayment(
         @Param('bookingId', ParseUUIDPipe) bookingId: string,
