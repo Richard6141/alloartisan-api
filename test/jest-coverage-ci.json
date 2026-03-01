@@ -17,7 +17,11 @@
     "src/fraud/fraud.service.ts",
     "src/booking/booking.service.ts",
     "src/admin/admin.service.ts",
-    "src/search/search.service.ts"
+    "src/search/search.service.ts",
+    "src/artisans/portfolio.service.ts",
+    "src/notification/notification.service.ts",
+    "src/avis/avis.service.ts",
+    "src/geolocation/geolocation.service.ts"
   ],
   "coverageThreshold": {
     "global": {
