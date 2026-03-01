@@ -1,7 +1,7 @@
 ﻿# ðŸ“Š PROGRESSION ALLOARTISAN API
 
-> Mis a jour : 28/02/2026 (Sprint 13 - Full-Text Search + autocomplete Redis)
-> Progression globale : **~100%** (Sprints 0-13 completes)
+> Mis à jour : 01/03/2026 (Sprint 14 commité — Portfolio Artisan + Tests AvisService/GeolocationService/NotificationService)
+> Progression globale : **~100%** (Sprints 0-14 complétés)
 
 ---
 
@@ -467,6 +467,61 @@ Sprint 9 Ã©tait absent de `PROGRESSION.md` mais le code est partiellement comm
 
 Endpoints: GET /api/v1/search/artisans (public, cache 5min) + GET /api/v1/search/autocomplete (public, cache 1h)
 Coverage global: 56/56 tests | 77.15% statements | search.service.ts 98.64%
+
+---
+
+## Sprint 14 -- Portfolio Artisan Enrichi (TÂCHE 9.2) ✅ 100%
+
+| # | Tâche | Statut | Fichiers | Durée |
+|---|-------|--------|----------|-------|
+| 14.1 | PortfolioService (getPortfolio, addPhoto, deleteItem, reorder) | ✅ Terminé | `src/artisans/portfolio.service.ts` | 3h |
+| 14.2 | PortfolioController (GET/POST/DELETE/PATCH) + ParseFilePipe | ✅ Terminé | `src/artisans/portfolio.controller.ts` | 1h |
+| 14.3 | DTOs portfolio (5 classes avec validation) | ✅ Terminé | `src/artisans/dto/portfolio.dto.ts` | 30min |
+| 14.4 | ArtisansModule étendu (UploadModule + Portfolio) | ✅ Terminé | `src/artisans/artisans.module.ts` | 10min |
+| 14.5 | Tests unitaires PortfolioService (15 tests) | ✅ Terminé | `src/artisans/portfolio.service.spec.ts` | 1h |
+| 14.6 | Coverage gate étendu (portfolio.service.ts) | ✅ Terminé | `test/jest-coverage-ci.json` | 5min |
+| 14.7 | Tests unitaires AvisService (20 tests) | ✅ Terminé | `src/avis/avis.service.spec.ts` | 2h |
+| 14.8 | Tests unitaires GeolocationService (12 tests) | ✅ Terminé | `src/geolocation/geolocation.service.spec.ts` | 1h |
+| 14.9 | Tests unitaires NotificationService (15 tests) | ✅ Terminé | `src/notification/notification.service.spec.ts` | 1h30 |
+| 14.10 | Coverage gate étendu (notification, avis, geolocation) | ✅ Terminé | `test/jest-coverage-ci.json` | 5min |
+| 14.11 | perf(payment): Throttle 10req/h sur initiatePayment | ✅ Terminé | `src/payment/payment.controller.ts` | 10min |
+
+Endpoints: GET /artisans/:id/portfolio (public) | POST .../photos (multipart 5MB) | DELETE .../items | PATCH .../reorder
+Branche: `sprint/14-portfolio-artisan`
+Pas de migration Prisma (portfolioUrls Json enrichi avec url/type/caption/bookingId/thumbnailUrl/uploadedAt)
+
+### ⚠️ ÉCART RÉSOLU : Sprint 14 code non commité (résolu 01/03/2026)
+- Code portfolio était présent en working tree mais NON commité sur la bonne branche
+- Branche `sprint/14-portfolio-artisan` créée + tous fichiers commités
+- Lint errors corrigées (unbound-method × 4, unused imports × 3, unused var × 1)
+
+---
+
+## Sprint 15 -- Système de Parrainage (TÂCHE 9.3) 🔄 PLANIFIÉ
+
+| # | Tâche | Statut | Fichiers | Durée |
+|---|-------|--------|----------|-------|
+| 15.1 | ReferralModule structure | 🔲 À faire | `src/referral/referral.module.ts` | 20min |
+| 15.2 | ReferralService (génération code unique, application, bonus) | 🔲 À faire | `src/referral/referral.service.ts` | 4h |
+| 15.3 | ReferralController (endpoints artisan) | 🔲 À faire | `src/referral/referral.controller.ts` | 1h |
+| 15.4 | Migration Prisma (table referrals + champ referralCode Artisan) | 🔲 À faire | `prisma/schema.prisma` | 1h |
+| 15.5 | DTOs validation | 🔲 À faire | `src/referral/dto/*.ts` | 30min |
+| 15.6 | Tests unitaires ReferralService | 🔲 À faire | `src/referral/referral.service.spec.ts` | 2h |
+
+### Endpoints Parrainage prévus
+
+| Méthode | Route | Accès | Statut |
+|---------|-------|-------|--------|
+| GET | `/api/v1/referral/my-code` | ARTISAN | 🔲 |
+| POST | `/api/v1/referral/use` | ARTISAN | 🔲 |
+| GET | `/api/v1/referral/stats` | ARTISAN | 🔲 |
+
+### Règles métier Sprint 15
+- Code parrainage unique par artisan (6 caractères alphanum, ex: `ART-X7K2`)
+- Filleul : bonus 1 mois STANDARD offert à l'inscription
+- Parrain : +1 mois d'abonnement actuel si filleul effectue ≥1 booking payé
+- Anti-abus : 1 code parrainage utilisable par artisan (filleul ne peut pas parrainer son parrain)
+- Expiration : code valide 30 jours après génération
 
 ---
 
