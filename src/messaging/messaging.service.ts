@@ -103,20 +103,22 @@ export class MessagingService {
             },
         });
 
-        // Enrichir avec le nombre de messages non lus
-        const enriched = await Promise.all(
-            conversations.map(async (conv) => {
-                const unreadCount = await this.prisma.message.count({
-                    where: {
-                        conversationId: conv.id,
-                        lu: false,
-                        // Ne pas compter ses propres messages comme non lus
-                        senderId: { not: userId },
-                    },
-                });
-                return { ...conv, unreadCount };
-            }),
-        );
+        // Enrichir avec le nombre de messages non lus — une seule requête groupBy
+        const conversationIds = conversations.map((c) => c.id);
+        const unreadGroups = await this.prisma.message.groupBy({
+            by: ['conversationId'],
+            where: {
+                conversationId: { in: conversationIds },
+                lu: false,
+                senderId: { not: userId },
+            },
+            _count: { id: true },
+        });
+        const unreadMap = new Map(unreadGroups.map((g) => [g.conversationId, g._count.id]));
+        const enriched = conversations.map((conv) => ({
+            ...conv,
+            unreadCount: unreadMap.get(conv.id) ?? 0,
+        }));
 
         return enriched;
     }

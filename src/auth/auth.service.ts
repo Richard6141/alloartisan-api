@@ -496,7 +496,7 @@ export class AuthService {
     private async getTokens(userId: string, sessionId: string): Promise<Tokens> {
         const [at, rt] = await Promise.all([
             this.jwtService.signAsync(
-                { sub: userId, sid: sessionId },
+                { sub: userId, sid: sessionId, tokenType: 'at' },
                 {
                     secret: this.config.getOrThrow('JWT_ACCESS_SECRET'),
                     expiresIn: 60 * 15, // 15 minutes

@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MulterModule } from '@nestjs/platform-express';
 import { BullModule } from '@nestjs/bull';
 import { UploadService } from './upload.service';
+import { StorageService } from './storage.service';
 import { ImageValidatorService } from './image-validator.service';
 import { MulterConfigService } from './multer.config';
 import { CloudinaryProvider } from './cloudinary.config';
@@ -45,10 +46,11 @@ import { PrismaModule } from 'src/prisma/prisma.module';
     providers: [
         CloudinaryProvider,
         UploadService,
+        StorageService,
         ImageValidatorService,
         MulterConfigService,
         UploadProcessor,
     ],
-    exports: [UploadService, ImageValidatorService, MulterModule, BullModule],
+    exports: [UploadService, StorageService, ImageValidatorService, MulterModule, BullModule],
 })
 export class UploadModule {}

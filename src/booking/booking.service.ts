@@ -7,11 +7,37 @@ import {
     ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Role, StatutBooking, TypeBooking } from 'src/generated/prisma';
+import { Prisma, Role, StatutBooking, TypeBooking } from 'src/generated/prisma';
 import { CreateBookingDto, SearchBookingDto, ProposePriceDto, CancelBookingDto } from './dto';
 import { ConfigService } from '@nestjs/config';
 import { NotificationService } from 'src/notification/notification.service';
 import { NotificationTemplates } from 'src/notification/notification.types';
+
+export interface BookingClientRelation {
+    id: string;
+    email?: string;
+    nom: string | null;
+    prenom: string | null;
+    telephone: string | null;
+    photoUrl?: string | null;
+}
+
+export interface BookingArtisanRelation {
+    id: string;
+    userId?: string;
+    nomEntreprise: string | null;
+    photoProfilUrl: string | null;
+    noteMoyenne?: Prisma.Decimal;
+    user?: { nom: string | null; prenom: string | null; telephone: string | null };
+}
+
+export interface BookingMetierRelation {
+    id: string;
+    nom: string;
+    slug?: string;
+    iconUrl?: string | null;
+    categorie?: { nom: string } | null;
+}
 
 export interface BookingWithRelations {
     id: string;
@@ -23,14 +49,14 @@ export interface BookingWithRelations {
     titre: string;
     description: string;
     adresseIntervention: string;
-    latitudeIntervention: any;
-    longitudeIntervention: any;
+    latitudeIntervention: Prisma.Decimal | null;
+    longitudeIntervention: Prisma.Decimal | null;
     datePreferee: Date | null;
     dateFin: Date | null;
-    dureeEstimeeHeures: any;
-    budgetClient: any;
-    prixPropose: any;
-    prixFinal: any;
+    dureeEstimeeHeures: Prisma.Decimal | null;
+    budgetClient: Prisma.Decimal | null;
+    prixPropose: Prisma.Decimal | null;
+    prixFinal: Prisma.Decimal | null;
     estUrgent: boolean;
     raisonAnnulation: string | null;
     accepteAt: Date | null;
@@ -38,11 +64,11 @@ export interface BookingWithRelations {
     finAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
-    client?: any;
-    artisan?: any;
-    metier?: any;
-    transaction?: any;
-    avis?: any;
+    client?: BookingClientRelation;
+    artisan?: BookingArtisanRelation;
+    metier?: BookingMetierRelation;
+    transaction?: Record<string, unknown>;
+    avis?: Record<string, unknown>;
 }
 
 @Injectable()

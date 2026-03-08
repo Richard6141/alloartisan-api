@@ -43,7 +43,7 @@ export class AuthController {
     // ==================== REGISTER / LOGIN / LOGOUT ====================
 
     @Public()
-    @Throttle({ short: { limit: 5, ttl: 60000 } })
+    @Throttle({ short: { limit: 5, ttl: 900000 } })
     @Post('register')
     @HttpCode(HttpStatus.CREATED)
     @ApiOperation({
@@ -61,7 +61,7 @@ export class AuthController {
     }
 
     @Public()
-    @Throttle({ short: { limit: 5, ttl: 60000 } })
+    @Throttle({ short: { limit: 5, ttl: 900000 } })
     @Post('login')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -85,7 +85,7 @@ export class AuthController {
     }
 
     @Public()
-    @Throttle({ short: { limit: 5, ttl: 60000 } })
+    @Throttle({ short: { limit: 5, ttl: 900000 } })
     @Post('login/mfa')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({

@@ -379,4 +379,13 @@ export class SearchService {
         this.logger.debug(`Autocomplete "${q}": ${suggestions.length} suggestions`);
         return suggestions;
     }
+
+    /**
+     * Invalide le cache de recherche.
+     * Doit être appelé après création/mise à jour d'un artisan.
+     */
+    async invalidateSearchCache(): Promise<void> {
+        await this.cacheService.delByPattern('search:fts:*');
+        this.logger.debug('Cache de recherche invalidé');
+    }
 }

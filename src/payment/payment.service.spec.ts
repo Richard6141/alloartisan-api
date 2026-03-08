@@ -12,7 +12,13 @@ describe('PaymentService ownership checks', () => {
     };
 
     const config = {
-        get: jest.fn((key: string, fallback?: string | number) => fallback),
+        get: jest.fn((key: string, fallback?: string | number) => {
+            const overrides: Record<string, string | number> = {
+                FEDAPAY_WEBHOOK_SECRET: 'test-fedapay-secret',
+                KKIAPAY_WEBHOOK_SECRET: 'test-kkiapay-secret',
+            };
+            return overrides[key] ?? fallback;
+        }),
     };
 
     const notificationService = {

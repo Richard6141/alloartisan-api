@@ -14,6 +14,7 @@ import { KkiaPayProvider } from './providers/kkiapay.provider';
 import { InitiatePaymentDto, PaymentProvider } from './dto';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { StatutBooking, StatutTransaction } from 'src/generated/prisma';
+import { COMMISSION_RATE } from 'src/config/constants';
 
 @Injectable()
 export class PaymentService {
@@ -29,9 +30,16 @@ export class PaymentService {
         private readonly fedaPay: FedaPayProvider,
         private readonly kkiaPay: KkiaPayProvider,
     ) {
-        this.commissionRate = config.get<number>('COMMISSION_RATE', 0.1); // 10%
+        this.commissionRate = config.get<number>('COMMISSION_RATE', COMMISSION_RATE);
         this.fedapayWebhookSecret = config.get<string>('FEDAPAY_WEBHOOK_SECRET', '');
         this.kkiapayWebhookSecret = config.get<string>('KKIAPAY_WEBHOOK_SECRET', '');
+
+        if (!this.fedapayWebhookSecret) {
+            this.logger.warn('FEDAPAY_WEBHOOK_SECRET manquant — webhooks FedaPay désactivés');
+        }
+        if (!this.kkiapayWebhookSecret) {
+            this.logger.warn('KKIAPAY_WEBHOOK_SECRET manquant — webhooks KkiaPay désactivés');
+        }
     }
 
     // ============================================================

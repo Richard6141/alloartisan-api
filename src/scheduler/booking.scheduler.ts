@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { Prisma } from 'src/generated/prisma';
 import { BookingService } from 'src/booking/booking.service';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { NotificationService } from 'src/notification/notification.service';
 
 @Injectable()
 export class BookingScheduler {
@@ -11,6 +12,7 @@ export class BookingScheduler {
     constructor(
         private readonly bookingService: BookingService,
         private readonly prisma: PrismaService,
+        private readonly notificationService: NotificationService,
     ) {}
 
     /**
@@ -52,11 +54,56 @@ export class BookingScheduler {
      * Envoie un résumé de la semaine : missions, revenus, avis
      */
     @Cron('0 9 * * 1')
-    sendWeeklyReports(): void {
+    async sendWeeklyReports(): Promise<void> {
         this.logger.log('Envoi des rapports hebdomadaires artisans...');
-        // TODO Sprint 2 : Implémenter via NotificationService
-        // Pour l'instant, simple log
-        this.logger.log('Rapports hebdomadaires programmés (NotificationModule requis - Sprint 2)');
+        try {
+            const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+            // Récupérer les artisans actifs ayant eu des bookings la semaine passée
+            const artisans = await this.prisma.artisan.findMany({
+                where: {
+                    statut: 'ACTIF',
+                    deletedAt: null,
+                    bookings: {
+                        some: {
+                            createdAt: { gte: oneWeekAgo },
+                        },
+                    },
+                },
+                select: {
+                    id: true,
+                    userId: true,
+                    nomEntreprise: true,
+                    _count: {
+                        select: {
+                            bookings: {
+                                where: { createdAt: { gte: oneWeekAgo } },
+                            },
+                        },
+                    },
+                },
+                take: 500, // Limit batch size
+            });
+
+            for (const artisan of artisans) {
+                const bookingsCount = artisan._count.bookings;
+                void this.notificationService.send({
+                    userId: artisan.userId,
+                    type: 'SYSTEME',
+                    titre: '📊 Votre rapport hebdomadaire',
+                    corps: `Bonjour ! Cette semaine, vous avez reçu ${bookingsCount} nouvelle(s) demande(s). Connectez-vous pour les gérer.`,
+                    data: {
+                        artisanId: artisan.id,
+                        bookingsCount,
+                        weekOf: oneWeekAgo.toISOString(),
+                    },
+                });
+            }
+
+            this.logger.log(`Rapports hebdomadaires envoyés à ${artisans.length} artisan(s)`);
+        } catch (error) {
+            this.logger.error('Erreur envoi rapports hebdomadaires', error);
+        }
     }
 
     /**

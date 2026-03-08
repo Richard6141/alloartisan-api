@@ -98,3 +98,21 @@ CAHIER*.jpg
 
 # Fichiers accidentels
 "tatus --short"
+
+# Claude Code sessions
+.claude/
+
+# Fichiers temporaires Microsoft Office
+~$*
+
+# Documents personnels / candidatures
+CANDIDATURE_*.html
+NOTE_TECHNIQUE_*.html
+MOBILE_PLAN*.md
+PLAN_DEVELOPPEMENT*.md
+merge_plans.ps1
+
+# Documents confidentiels
+*.pdf
+CAHIER*.png
+CAHIER*.jpg

@@ -1,27 +1,9 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PlanAbonnement } from './dto/upgrade-subscription.dto';
+import { PLAN_QUOTAS, PLAN_TARIFFS, PLAN_DURATIONS } from 'src/config/constants';
 
-// Durée des abonnements en jours
-const PLAN_DURATIONS: Record<PlanAbonnement, number> = {
-    [PlanAbonnement.GRATUIT]: 0, // Pas d'expiration
-    [PlanAbonnement.STANDARD]: 30, // 1 mois
-    [PlanAbonnement.PREMIUM]: 30, // 1 mois
-};
-
-// Quotas par plan (demandes/mois)
-export const PLAN_QUOTAS: Record<PlanAbonnement, number | null> = {
-    [PlanAbonnement.GRATUIT]: 5,
-    [PlanAbonnement.STANDARD]: 30,
-    [PlanAbonnement.PREMIUM]: null, // Illimité
-};
-
-// Tarifs en XOF (pour information — le paiement réel passe par PaymentModule)
-export const PLAN_TARIFFS = {
-    [PlanAbonnement.GRATUIT]: 0,
-    [PlanAbonnement.STANDARD]: 5000, // 5 000 FCFA/mois
-    [PlanAbonnement.PREMIUM]: 15000, // 15 000 FCFA/mois
-};
+export { PLAN_QUOTAS, PLAN_TARIFFS, PLAN_DURATIONS };
 
 @Injectable()
 export class SubscriptionsService {

@@ -57,13 +57,17 @@ export class StorageService implements OnModuleInit {
     private readonly logger = new Logger(StorageService.name);
     private supabase!: SupabaseClient;
     private readonly supabaseUrl: string;
+    private readonly isConfigured: boolean;
 
     constructor(private configService: ConfigService) {
         this.supabaseUrl = this.configService.get<string>('SUPABASE_URL', '');
         const supabaseKey = this.configService.get<string>('SUPABASE_SERVICE_KEY', '');
 
-        if (!this.supabaseUrl || !supabaseKey) {
-            this.logger.warn('Supabase credentials not configured');
+        this.isConfigured = !!(this.supabaseUrl && supabaseKey);
+
+        if (!this.isConfigured) {
+            this.logger.warn('Supabase credentials not configured — StorageService disabled');
+            return;
         }
 
         this.supabase = createClient(this.supabaseUrl, supabaseKey, {
@@ -72,7 +76,7 @@ export class StorageService implements OnModuleInit {
     }
 
     async onModuleInit() {
-        // Créer les buckets si ils n'existent pas
+        if (!this.isConfigured) return;
         await this.ensureBucketsExist();
     }
 
@@ -106,6 +110,11 @@ export class StorageService implements OnModuleInit {
      * L'image est compressée AVANT upload pour économiser la bande passante
      */
     async uploadImage(buffer: Buffer, bucket: string, folder: string): Promise<UploadResult> {
+        if (!this.isConfigured) {
+            throw new BadRequestException(
+                'Storage service not configured (missing Supabase credentials)',
+            );
+        }
         const publicId = uuidv4();
         const basePath = `${folder}/${publicId}`;
 
@@ -365,6 +374,7 @@ export class StorageService implements OnModuleInit {
      * Vérifie si Supabase Storage est accessible
      */
     async healthCheck(): Promise<boolean> {
+        if (!this.isConfigured) return false;
         try {
             const { error } = await this.supabase.storage.listBuckets();
             return !error;
