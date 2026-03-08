@@ -212,6 +212,7 @@ export class PortfolioService {
         }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
     private parsePortfolioUrls(raw: Prisma.JsonValue | null): PortfolioItem[] {
         if (!raw || !Array.isArray(raw)) return [];
         return raw as unknown as PortfolioItem[];
