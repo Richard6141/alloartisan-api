@@ -49,13 +49,19 @@ export interface BookingWithRelations {
     titre: string;
     description: string;
     adresseIntervention: string;
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
     latitudeIntervention: Prisma.Decimal | null;
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
     longitudeIntervention: Prisma.Decimal | null;
     datePreferee: Date | null;
     dateFin: Date | null;
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
     dureeEstimeeHeures: Prisma.Decimal | null;
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
     budgetClient: Prisma.Decimal | null;
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
     prixPropose: Prisma.Decimal | null;
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
     prixFinal: Prisma.Decimal | null;
     estUrgent: boolean;
     raisonAnnulation: string | null;

@@ -112,6 +112,14 @@ MOBILE_PLAN*.md
 PLAN_DEVELOPPEMENT*.md
 merge_plans.ps1
 
+# Documentation interne de développement
+AUTH_DEV_GUIDE.md
+Auth.md
+DOCKER-COMMANDS.md
+PROGRAMME_DEVELOPPEMENT.md
+PROGRESSION.md
+REDIS.md
+
 # Documents confidentiels
 *.pdf
 CAHIER*.png
