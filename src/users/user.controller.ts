@@ -29,10 +29,12 @@ import {
 import { InjectQueue } from '@nestjs/bull';
 import type { Queue } from 'bull';
 import { UserService } from './user.service';
-import { GetCurrentUser, GetCurrentUserId } from 'src/common/decorators';
+import { GetCurrentUser, GetCurrentUserId, Roles } from 'src/common/decorators';
 import { UpdateProfileDto, DeleteAccountDto, GetProfileResponseDto } from './dto';
 import { UploadService, ImageVariants, ImageValidatorService } from 'src/upload';
 import { UploadThrottleGuard, UploadSizeLimitGuard } from 'src/upload/guards/upload-throttle.guard';
+import { RolesGuard } from 'src/common/guards';
+import { Role } from 'src/generated/prisma';
 import * as fs from 'fs/promises';
 
 @ApiTags('Users')
@@ -47,10 +49,13 @@ export class UserController {
     ) {}
 
     @Get()
+    @Roles(Role.ADMIN)
+    @UseGuards(RolesGuard)
     @ApiOperation({
-        summary: 'Liste tous les utilisateurs',
+        summary: '[Admin] Liste tous les utilisateurs',
         description: 'Récupère la liste de tous les utilisateurs. Réservé aux administrateurs.',
     })
+    @ApiForbiddenResponse({ description: 'Accès réservé aux administrateurs' })
     getAllUsers() {
         return this.userService.getAllUsers();
     }

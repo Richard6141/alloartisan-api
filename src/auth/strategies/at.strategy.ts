@@ -9,6 +9,7 @@ import { Statut } from 'src/generated/prisma';
 type JwtPayload = {
     sub: string;
     sid: string;
+    tokenType?: string;
 };
 
 @Injectable()
@@ -28,6 +29,10 @@ export class AtStrategy extends PassportStrategy(Strategy, 'jwt') {
         // Vérifier que la session existe toujours dans Redis
         if (!payload.sid) {
             throw new UnauthorizedException('Access Denied');
+        }
+
+        if (payload.tokenType !== 'at') {
+            throw new UnauthorizedException('Invalid token type');
         }
 
         const sessionExists = await this.sessionService.exists(payload.sub, payload.sid);

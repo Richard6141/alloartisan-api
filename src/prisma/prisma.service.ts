@@ -14,10 +14,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
         // Configuration optimisée du pool de connexions
         this.pool = new Pool({
             connectionString: config.getOrThrow('DATABASE_URL'),
-            max: config.get('DB_POOL_MAX', 20), // Nombre max de connexions
-            idleTimeoutMillis: config.get('DB_POOL_IDLE_TIMEOUT', 30000), // Fermer connexions inactives après 30s
-            connectionTimeoutMillis: config.get('DB_POOL_CONNECTION_TIMEOUT', 5000), // Timeout d'acquisition 5s
-            allowExitOnIdle: true, // Permettre la fermeture propre en cas d'inactivité
+            max: config.get('DB_POOL_MAX', 20),
+            idleTimeoutMillis: config.get('DB_POOL_IDLE_TIMEOUT', 30000),
+            connectionTimeoutMillis: config.get('DB_POOL_CONNECTION_TIMEOUT', 5000),
+            allowExitOnIdle: true,
         });
 
         // Log des événements du pool pour le monitoring
@@ -42,6 +42,22 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
         await this.pool.end();
     }
 
+    // ===== TRANSACTIONS & RAW =====
+
+    get $transaction() {
+        return this.client.$transaction.bind(this.client);
+    }
+
+    get $queryRaw() {
+        return this.client.$queryRaw.bind(this.client);
+    }
+
+    get $executeRaw() {
+        return this.client.$executeRaw.bind(this.client);
+    }
+
+    // ===== MODÈLES EXISTANTS =====
+
     get user() {
         return this.client.user;
     }
@@ -60,5 +76,47 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
     get artisanMetier() {
         return this.client.artisanMetier;
+    }
+
+    get certification() {
+        return this.client.certification;
+    }
+
+    // ===== SPRINT 1 — NOUVEAUX MODÈLES =====
+
+    get booking() {
+        return this.client.booking;
+    }
+
+    get transaction() {
+        return this.client.transaction;
+    }
+
+    get avis() {
+        return this.client.avis;
+    }
+
+    get conversation() {
+        return this.client.conversation;
+    }
+
+    get message() {
+        return this.client.message;
+    }
+
+    get notification() {
+        return this.client.notification;
+    }
+
+    get fcmToken() {
+        return this.client.fcmToken;
+    }
+
+    get favori() {
+        return this.client.favori;
+    }
+
+    get logActivite() {
+        return this.client.logActivite;
     }
 }

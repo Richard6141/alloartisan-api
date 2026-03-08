@@ -10,6 +10,7 @@ import {
     HttpCode,
     HttpStatus,
     ParseUUIDPipe,
+    UseGuards,
 } from '@nestjs/common';
 import {
     ApiTags,
@@ -34,7 +35,9 @@ import {
     UpdateArtisanStatutDto,
     RejectArtisanDto,
 } from './dto';
-import { GetCurrentUserId, Public } from 'src/common/decorators';
+import { GetCurrentUserId, Public, Roles } from 'src/common/decorators';
+import { RolesGuard } from 'src/common/guards';
+import { Role } from 'src/generated/prisma';
 
 @ApiTags('Artisans')
 @Controller('artisans')
@@ -224,9 +227,10 @@ export class ArtisansController {
     }
 
     // ==================== ADMIN ROUTES ====================
-    // TODO: Ajouter un guard Admin pour protéger ces routes
 
     @Patch(':id/verify')
+    @Roles(Role.ADMIN)
+    @UseGuards(RolesGuard)
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -248,6 +252,7 @@ export class ArtisansController {
     @ApiConflictResponse({
         description: 'Artisan déjà vérifié',
     })
+    @ApiForbiddenResponse({ description: 'Accès réservé aux administrateurs' })
     verify(
         @Param('id', ParseUUIDPipe) id: string,
         @GetCurrentUserId() adminId: string,
@@ -256,6 +261,8 @@ export class ArtisansController {
     }
 
     @Patch(':id/reject')
+    @Roles(Role.ADMIN)
+    @UseGuards(RolesGuard)
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -285,6 +292,8 @@ export class ArtisansController {
     }
 
     @Patch(':id/statut')
+    @Roles(Role.ADMIN)
+    @UseGuards(RolesGuard)
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -315,6 +324,8 @@ export class ArtisansController {
     }
 
     @Delete(':id')
+    @Roles(Role.ADMIN)
+    @UseGuards(RolesGuard)
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({

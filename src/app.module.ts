@@ -1,19 +1,35 @@
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
 import { BullModule } from '@nestjs/bull';
 import { redisStore } from 'cache-manager-redis-yet';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './users/user.module';
 import { ArtisansModule } from './artisans/artisans.module';
 import { CategoriesMetiersModule } from './categories-metiers/categories-metiers.module';
 import { MetiersModule } from './metiers/metiers.module';
+import { CertificationsModule } from './certifications/certifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UploadModule } from './upload/upload.module';
+import { BookingModule } from './booking/booking.module';
+import { SchedulerModule } from './scheduler/scheduler.module';
+import { NotificationModule } from './notification/notification.module';
+import { GeolocationModule } from './geolocation/geolocation.module';
+import { FavorisModule } from './favoris/favoris.module';
+import { PaymentModule } from './payment/payment.module';
+import { AvisModule } from './avis/avis.module';
+import { MessagingModule } from './messaging/messaging.module';
+import { AdminModule } from './admin/admin.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { FraudModule } from './fraud/fraud.module';
+import { SearchModule } from './search/search.module';
 import { AtGuard } from './common/guards';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
 import { CommonModule } from './common/common.module';
+import { AuditLogInterceptor } from './common/interceptors';
+import { HealthModule } from './health/health.module';
+
 @Module({
     imports: [
         ConfigModule.forRoot({ isGlobal: true }),
@@ -54,7 +70,6 @@ import { CommonModule } from './common/common.module';
                 ],
             }),
         }),
-        // Bull Queue pour traitement asynchrone des uploads
         BullModule.forRootAsync({
             imports: [ConfigModule],
             inject: [ConfigService],
@@ -67,13 +82,27 @@ import { CommonModule } from './common/common.module';
             }),
         }),
         CommonModule,
+        PrismaModule,
         AuthModule,
         UserModule,
+        ArtisansModule,
         CategoriesMetiersModule,
         MetiersModule,
-        ArtisansModule,
-        PrismaModule,
+        CertificationsModule,
         UploadModule,
+        BookingModule,
+        SchedulerModule,
+        NotificationModule,
+        GeolocationModule,
+        FavorisModule,
+        PaymentModule,
+        AvisModule,
+        MessagingModule,
+        SubscriptionsModule,
+        AdminModule,
+        FraudModule,
+        SearchModule,
+        HealthModule,
     ],
     providers: [
         {
@@ -83,6 +112,10 @@ import { CommonModule } from './common/common.module';
         {
             provide: APP_GUARD,
             useClass: ThrottlerGuard,
+        },
+        {
+            provide: APP_INTERCEPTOR,
+            useClass: AuditLogInterceptor,
         },
     ],
 })

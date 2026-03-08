@@ -10,6 +10,7 @@ import {
     HttpCode,
     HttpStatus,
     ParseUUIDPipe,
+    UseGuards,
 } from '@nestjs/common';
 import {
     ApiTags,
@@ -29,7 +30,9 @@ import {
     CategorieMetierResponseDto,
     CategorieMetierWithMetiersResponseDto,
 } from './dto';
-import { Public } from 'src/common/decorators';
+import { Public, Roles } from 'src/common/decorators';
+import { RolesGuard } from 'src/common/guards';
+import { Role } from 'src/generated/prisma';
 
 @ApiTags('Catégories de métiers')
 @Controller('categories-metiers')
@@ -37,6 +40,8 @@ export class CategoriesMetiersController {
     constructor(private readonly categoriesMetiersService: CategoriesMetiersService) {}
 
     @Post()
+    @Roles(Role.ADMIN)
+    @UseGuards(RolesGuard)
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.CREATED)
     @ApiOperation({
@@ -75,6 +80,22 @@ export class CategoriesMetiersController {
         type: [CategorieMetierWithMetiersResponseDto],
     })
     findAll(
+        @Query('includeInactive') _includeInactive?: string,
+    ): Promise<CategorieMetierWithMetiersResponseDto[]> {
+        // Route publique: ne jamais exposer les catégories inactives.
+        return this.categoriesMetiersService.findAll(false);
+    }
+
+    @Get('admin/all')
+    @Roles(Role.ADMIN)
+    @UseGuards(RolesGuard)
+    @ApiBearerAuth('access-token')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: '[Admin] Lister toutes les catégories',
+        description: 'Inclut les catégories inactives si demandé.',
+    })
+    findAllAdmin(
         @Query('includeInactive') includeInactive?: string,
     ): Promise<CategorieMetierWithMetiersResponseDto[]> {
         return this.categoriesMetiersService.findAll(includeInactive === 'true');
@@ -131,6 +152,8 @@ export class CategoriesMetiersController {
     }
 
     @Patch(':id')
+    @Roles(Role.ADMIN)
+    @UseGuards(RolesGuard)
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -160,6 +183,8 @@ export class CategoriesMetiersController {
     }
 
     @Delete(':id')
+    @Roles(Role.ADMIN)
+    @UseGuards(RolesGuard)
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({

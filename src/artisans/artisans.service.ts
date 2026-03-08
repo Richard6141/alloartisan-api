@@ -4,8 +4,11 @@ import {
     ConflictException,
     BadRequestException,
     ForbiddenException,
+    Logger,
 } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { CacheService } from 'src/common/services/cache.service';
 import { StatutArtisan, Role, Statut, Prisma } from 'src/generated/prisma';
 import {
     CreateArtisanDto,
@@ -50,7 +53,12 @@ type ArtisanWithIncludes = Prisma.ArtisanGetPayload<{
 
 @Injectable()
 export class ArtisansService {
-    constructor(private prisma: PrismaService) {}
+    private readonly logger = new Logger(ArtisansService.name);
+
+    constructor(
+        private prisma: PrismaService,
+        private cacheService: CacheService,
+    ) {}
 
     async create(userId: string, dto: CreateArtisanDto): Promise<ArtisanDetailResponseDto> {
         // Vérifier que l'utilisateur existe et n'est pas déjà artisan
@@ -278,6 +286,14 @@ export class ArtisansService {
      * Utilisée pour les listes de résultats de recherche
      */
     async searchOptimized(dto: SearchArtisanDto): Promise<ArtisanSearchResponseDto> {
+        // Tenter de récupérer depuis le cache
+        const cacheKey = this.buildSearchCacheKey(dto);
+        const cached = await this.cacheService.get<ArtisanSearchResponseDto>(cacheKey);
+        if (cached) {
+            this.logger.debug(`Cache HIT search [${cacheKey}]`);
+            return cached;
+        }
+
         const page = dto.page ?? 1;
         const limit = dto.limit ?? 20;
         const skip = (page - 1) * limit;
@@ -409,7 +425,7 @@ export class ArtisansService {
             this.prisma.artisan.count({ where }),
         ]);
 
-        return {
+        const result: ArtisanSearchResponseDto = {
             data: artisans.map(
                 (a): ArtisanListItemDto => ({
                     id: a.id,
@@ -433,9 +449,22 @@ export class ArtisansService {
             limit,
             totalPages: Math.ceil(total / limit),
         };
+
+        // Mise en cache 10 minutes (invalide sur toute mutation d'artisan)
+        await this.cacheService.set(cacheKey, result, CacheService.TTL.SEARCH_RESULTS);
+        this.logger.debug(`Cache MISS → stored search results [${cacheKey}]`);
+        return result;
     }
 
     async findOne(id: string): Promise<ArtisanDetailResponseDto> {
+        // Cache-aside : retourne depuis Redis si disponible
+        const cacheKey = `${CacheService.PREFIX.ARTISAN}${id}`;
+        const cached = await this.cacheService.getArtisanProfile<ArtisanDetailResponseDto>(id);
+        if (cached) {
+            this.logger.debug(`Cache HIT artisan profile [${id}]`);
+            return cached;
+        }
+
         const artisan = await this.prisma.artisan.findUnique({
             where: { id },
             include: ARTISAN_INCLUDE,
@@ -445,7 +474,11 @@ export class ArtisansService {
             throw new NotFoundException('Artisan non trouvé');
         }
 
-        return this.formatArtisanResponse(artisan);
+        const response = this.formatArtisanResponse(artisan);
+        // Mise en cache 5 minutes
+        await this.cacheService.setArtisanProfile(id, response);
+        this.logger.debug(`Cache MISS → stored artisan profile [${id}] key=${cacheKey}`);
+        return response;
     }
 
     async findByUserId(userId: string): Promise<ArtisanDetailResponseDto> {
@@ -502,6 +535,12 @@ export class ArtisansService {
             },
             include: ARTISAN_INCLUDE,
         });
+
+        // Invalider le cache du profil modifié + les résultats de recherche
+        await Promise.all([
+            this.cacheService.invalidateArtisanProfile(id),
+            this.cacheService.delByPattern(`${CacheService.PREFIX.SEARCH}*`),
+        ]);
 
         return this.formatArtisanResponse(updated);
     }
@@ -564,6 +603,12 @@ export class ArtisansService {
             include: ARTISAN_INCLUDE,
         });
 
+        // Invalider le cache profil + recherche après changement de métiers
+        await Promise.all([
+            this.cacheService.invalidateArtisanProfile(id),
+            this.cacheService.delByPattern(`${CacheService.PREFIX.SEARCH}*`),
+        ]);
+
         return this.formatArtisanResponse(updated);
     }
 
@@ -585,6 +630,12 @@ export class ArtisansService {
             data: { disponible: !artisan.disponible },
             select: { disponible: true },
         });
+
+        // Invalider le cache (disponibilite affecte les résultats de recherche)
+        await Promise.all([
+            this.cacheService.invalidateArtisanProfile(id),
+            this.cacheService.delByPattern(`${CacheService.PREFIX.SEARCH}*`),
+        ]);
 
         return { disponible: updated.disponible };
     }
@@ -615,6 +666,12 @@ export class ArtisansService {
             include: ARTISAN_INCLUDE,
         });
 
+        // Invalider le cache — la vérification change le profil public
+        await Promise.all([
+            this.cacheService.invalidateArtisanProfile(id),
+            this.cacheService.delByPattern(`${CacheService.PREFIX.SEARCH}*`),
+        ]);
+
         return this.formatArtisanResponse(updated);
     }
 
@@ -639,6 +696,11 @@ export class ArtisansService {
             },
             include: ARTISAN_INCLUDE,
         });
+
+        await Promise.all([
+            this.cacheService.invalidateArtisanProfile(id),
+            this.cacheService.delByPattern(`${CacheService.PREFIX.SEARCH}*`),
+        ]);
 
         return this.formatArtisanResponse(updated);
     }
@@ -665,6 +727,11 @@ export class ArtisansService {
             },
             include: ARTISAN_INCLUDE,
         });
+
+        await Promise.all([
+            this.cacheService.invalidateArtisanProfile(id),
+            this.cacheService.delByPattern(`${CacheService.PREFIX.SEARCH}*`),
+        ]);
 
         return this.formatArtisanResponse(updated);
     }
@@ -701,6 +768,18 @@ export class ArtisansService {
             where: { id },
             data: { totalVuesProfil: { increment: 1 } },
         });
+        // Invalider le cache car totalVuesProfil est exposé dans le profil
+        await this.cacheService.invalidateArtisanProfile(id);
+    }
+
+    /**
+     * Génère une clé de cache déterministe pour un DTO de recherche.
+     * MD5 (collision-ok ici, besoin de vitesse, pas de crypto-sécurité).
+     */
+    private buildSearchCacheKey(dto: SearchArtisanDto): string {
+        const normalized = JSON.stringify(dto, Object.keys(dto).sort());
+        const hash = createHash('md5').update(normalized).digest('hex').slice(0, 16);
+        return `${CacheService.PREFIX.SEARCH}artisan:${hash}`;
     }
 
     private formatArtisanResponse(artisan: ArtisanWithIncludes): ArtisanDetailResponseDto {
