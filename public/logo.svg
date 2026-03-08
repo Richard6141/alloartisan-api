@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 50">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#FF6B35;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FF8C5A;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Icône maison/outil stylisée -->
+  <g transform="translate(5, 5)">
+    <!-- Maison -->
+    <path d="M20 18 L12 26 L12 38 L28 38 L28 26 Z" fill="url(#grad)" />
+    <!-- Toit -->
+    <path d="M20 10 L6 24 L10 24 L20 14 L30 24 L34 24 Z" fill="url(#grad)" />
+    <!-- Porte -->
+    <rect x="17" y="30" width="6" height="8" fill="#2D3436" rx="1" />
+    <!-- Clé à molette -->
+    <g transform="translate(24, 12) rotate(45)">
+      <rect x="0" y="0" width="4" height="16" fill="#2D3436" rx="1" />
+      <circle cx="2" cy="2" r="4" fill="none" stroke="#2D3436" stroke-width="2" />
+    </g>
+  </g>
+
+  <!-- Texte -->
+  <text x="50" y="32" font-family="'Segoe UI', Arial, sans-serif" font-size="22" font-weight="700" fill="#2D3436">
+    Allo
+    <tspan fill="url(#grad)">Artisan</tspan>
+  </text>
+
+  <!-- Badge API -->
+  <rect x="155" y="18" width="35" height="18" rx="4" fill="url(#grad)" />
+  <text x="172.5" y="31" font-family="'Segoe UI', Arial, sans-serif" font-size="10" font-weight="600" fill="white" text-anchor="middle">API</text>
+</svg>

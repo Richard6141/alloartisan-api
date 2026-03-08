@@ -83,4 +83,36 @@ prisma/migrations/**/migration.sql
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
+# Prisma generated client
 /generated/prisma
+src/generated/
+.env.test
+temp-uploads/
+
+# ========================================
+# Cahier de charges (fichiers PDF/images générés)
+# ========================================
+*.pdf
+CAHIER*.png
+CAHIER*.jpg
+
+# Fichiers accidentels
+"tatus --short"
+
+# Claude Code sessions
+.claude/
+
+# Fichiers temporaires Microsoft Office
+~$*
+
+# Documents personnels / candidatures
+CANDIDATURE_*.html
+NOTE_TECHNIQUE_*.html
+MOBILE_PLAN*.md
+PLAN_DEVELOPPEMENT*.md
+merge_plans.ps1
+
+# Documents confidentiels
+*.pdf
+CAHIER*.png
+CAHIER*.jpg

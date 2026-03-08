@@ -1,98 +1,164 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Allo Artisan — API REST
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Backend de la plateforme **Allo Artisan**, une application de mise en relation entre clients et artisans qualifiés (plombiers, électriciens, menuisiers, peintres, etc.).
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Construit avec **NestJS** (TypeScript), l'API expose une interface REST sécurisée, documentée et prête pour la production, couvrant l'authentification, la réservation, les paiements, la messagerie temps réel, les notifications push, la géolocalisation et bien d'autres domaines.
 
-## Description
+---
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Stack technique
 
-## Project setup
+| Couche | Technologie |
+|---|---|
+| Framework | NestJS 11 (TypeScript) |
+| Base de données | PostgreSQL + Prisma ORM 7 |
+| Cache distribué | Redis (cache-manager-redis-yet) |
+| File de messages | Bull + Redis |
+| Authentification | JWT (access + refresh token), Passport.js, Argon2 |
+| Temps réel | Socket.IO (WebSocket) |
+| Stockage fichiers | Cloudinary + Supabase Storage |
+| Notifications push | Firebase Admin SDK |
+| Email transactionnel | Resend + Nodemailer |
+| Sécurité HTTP | Helmet, CORS, @nestjs/throttler |
+| Documentation API | Swagger UI + Scalar |
+| Tests | Jest (unit + e2e), Pactum, couverture imposée en CI |
+| Conteneurisation | Docker + Docker Compose |
+| Qualité de code | ESLint, Prettier, Husky, Commitlint |
+
+---
+
+## Architecture
+
+L'API adopte une architecture **modulaire orientée domaine** (Domain-Driven Design).
+Chaque domaine métier est encapsulé dans un module NestJS indépendant avec sa propre logique, ses DTOs et ses interfaces. Les modules communiquent via injection de dépendances ou via des queues asynchrones (Bull/Redis).
+
+### Modules principaux
+
+| Module | Responsabilité |
+|---|---|
+| `auth` | Authentification JWT, refresh token, MFA (TOTP + QR Code), protection brute-force |
+| `users` | Profil utilisateur, gestion des rôles |
+| `artisans` | Profil artisan, portfolio avec galerie média |
+| `booking` | Réservations avec machine à états (pending → confirmed → completed) |
+| `payment` | Initiation de paiement, webhooks, remboursements |
+| `messaging` | Messagerie temps réel via WebSocket |
+| `notification` | Notifications push (Firebase), email, in-app |
+| `search` | Recherche full-text (ts_rank), autocomplétion, cache Redis |
+| `geolocation` | Recherche par proximité via PostGIS |
+| `subscriptions` | Plans d'abonnement (gratuit / standard / premium) |
+| `fraud` | Détection de comportements frauduleux et scoring |
+| `admin` | Administration, statistiques, modération |
+| `scheduler` | Tâches planifiées : rappels, expiration de réservations |
+| `upload` | Gestion des fichiers : validation MIME, optimisation image (Sharp) |
+| `health` | Endpoint de santé pour les load balancers |
+
+**Couche transversale :**
+- Guard JWT global (`AtGuard`) — toutes les routes sont protégées par défaut
+- Rate limiting multi-niveaux : 3 req/s · 20 req/10s · 100 req/min
+- Intercepteur d'audit global (`AuditLogInterceptor`)
+- Filtre d'exceptions HTTP global avec logging structuré
+
+---
+
+## Prérequis
+
+- Node.js ≥ 20
+- pnpm ≥ 9
+- Docker + Docker Compose
+
+---
+
+## Installation
 
 ```bash
-$ pnpm install
+pnpm install
 ```
 
-## Compile and run the project
+Copier le fichier d'environnement et renseigner les variables :
 
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+cp .env.example .env
 ```
 
-## Run tests
+---
+
+## Démarrage avec Docker
 
 ```bash
-# unit tests
-$ pnpm run test
+# Démarrer PostgreSQL + Redis
+pnpm run docker:up
 
-# e2e tests
-$ pnpm run test:e2e
+# Appliquer les migrations Prisma
+pnpm run prisma:dev:deploy
 
-# test coverage
-$ pnpm run test:cov
+# Démarrer l'API en mode développement
+pnpm run start:dev
 ```
 
-## Deployment
+L'API sera accessible sur `http://localhost:3001`.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+---
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Documentation interactive
+
+| Interface | URL |
+|---|---|
+| Swagger UI | `http://localhost:3001/docs` |
+| Scalar (moderne) | `http://localhost:3001/reference` |
+
+---
+
+## Tests
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+# Tests unitaires
+pnpm run test
+
+# Tests avec couverture
+pnpm run test:cov
+
+# Tests end-to-end
+pnpm run test:e2e
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+> La couverture de code est vérifiée automatiquement en CI — le build échoue en dessous du seuil configuré.
 
-## Resources
+---
 
-Check out a few resources that may come in handy when working with NestJS:
+## Variables d'environnement
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+Voir [`.env.example`](.env.example) pour la liste complète.
+Les variables requises incluent notamment les connexions PostgreSQL, Redis, les clés JWT, les credentials Firebase, Cloudinary, Supabase et la passerelle de paiement.
 
-## Support
+---
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## Structure du projet
 
-## Stay in touch
+```
+src/
+├── auth/               # Authentification & autorisation
+├── users/              # Profils utilisateurs
+├── artisans/           # Profils artisans & portfolio
+├── booking/            # Réservations
+├── payment/            # Paiements
+├── messaging/          # Messagerie temps réel (WebSocket)
+├── notification/       # Notifications push & email
+├── search/             # Recherche full-text
+├── geolocation/        # Géolocalisation (PostGIS)
+├── subscriptions/      # Abonnements
+├── fraud/              # Détection de fraude
+├── admin/              # Administration
+├── scheduler/          # Tâches planifiées
+├── upload/             # Gestion de fichiers
+├── health/             # Health checks
+├── common/             # Guards, intercepteurs, filtres, décorateurs partagés
+├── config/             # Constantes et configuration globale
+├── docs/               # Configuration Swagger/Scalar
+└── prisma/             # Service Prisma
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+---
 
-## License
+## Licence
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Projet privé — tous droits réservés.

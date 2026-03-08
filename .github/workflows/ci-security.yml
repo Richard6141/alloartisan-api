@@ -1,0 +1,64 @@
+name: CI Security
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+  push:
+    branches:
+      - main
+      - develop
+      - sprint/**
+      - feature/**
+      - fix/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-and-security:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/alloartisan_ci?schema=public
+      MFA_ENCRYPTION_KEY: test_mfa_encryption_key_32_chars_minimum
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate
+
+      - name: Lint
+        run: pnpm lint:check
+
+      - name: Unit tests
+        run: pnpm exec jest --runInBand
+
+      - name: Coverage gate (>=70%)
+        run: pnpm test:cov:ci
+
+      - name: Build
+        run: pnpm build
+
+      - name: Security audit (high/critical)
+        run: pnpm audit --audit-level high
