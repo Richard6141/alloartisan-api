@@ -43,7 +43,14 @@ export class EmailService {
     async sendVerificationEmail(to: string, otpCode: string): Promise<boolean> {
         const subject = 'Vérification de votre compte AlloArtisan';
         const html = this.getVerificationEmailHtml(otpCode);
-        return this.sendEmail(to, subject, html);
+        const sent = await this.sendEmail(to, subject, html);
+
+        // En développement, ne jamais bloquer les tests sur la délivrabilité :
+        // le code OTP est affiché dans les logs si l'envoi échoue.
+        if (!sent && process.env.NODE_ENV !== 'production') {
+            this.logger.warn(`[DEV] Code OTP pour ${to} : ${otpCode}`);
+        }
+        return sent;
     }
 
     async sendAccountStatusEmail(to: string, status: 'locked' | 'not_verified'): Promise<boolean> {

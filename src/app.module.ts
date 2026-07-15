@@ -21,6 +21,9 @@ import { FavorisModule } from './favoris/favoris.module';
 import { PaymentModule } from './payment/payment.module';
 import { AvisModule } from './avis/avis.module';
 import { MessagingModule } from './messaging/messaging.module';
+import { TravailleursModule } from './travailleurs/travailleurs.module';
+import { TrackingModule } from './tracking/tracking.module';
+import { PromoModule } from './promo/promo.module';
 import { AdminModule } from './admin/admin.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { FraudModule } from './fraud/fraud.module';
@@ -37,15 +40,34 @@ import { HealthModule } from './health/health.module';
             isGlobal: true,
             imports: [ConfigModule],
             inject: [ConfigService],
-            useFactory: async (config: ConfigService) => ({
-                store: await redisStore({
+            useFactory: async (config: ConfigService) => {
+                const store = await redisStore({
                     socket: {
                         host: config.get('REDIS_HOST', 'localhost'),
                         port: config.get('REDIS_PORT', 6379),
+                        // Windows/Docker coupe les connexions inactives :
+                        // keepAlive TCP + reconnexion progressive
+                        // (client v1.5 du cache : délai en ms, pas un booléen)
+                        keepAlive: 30000,
+                        reconnectStrategy: (retries: number) =>
+                            Math.min(retries * 200, 5000),
                     },
                     password: config.get('REDIS_PASSWORD'),
-                }),
-            }),
+                    // PING périodique : la connexion ne devient jamais inactive
+                    pingInterval: 60000,
+                });
+                // CRITIQUE : sans gestionnaire, un simple ECONNRESET sur CE
+                // client (le cache) faisait crasher tout le serveur —
+                // "Unhandled 'error' event". Le client se reconnecte seul.
+                (store as unknown as { client?: NodeJS.EventEmitter }).client?.on(
+                    'error',
+                    (err: Error) => {
+                        // eslint-disable-next-line no-console
+                        console.error(`[CacheRedis] ${err.message} (reconnexion automatique)`);
+                    },
+                );
+                return { store };
+            },
         }),
         ThrottlerModule.forRootAsync({
             imports: [ConfigModule],
@@ -98,6 +120,9 @@ import { HealthModule } from './health/health.module';
         PaymentModule,
         AvisModule,
         MessagingModule,
+        TravailleursModule,
+        TrackingModule,
+        PromoModule,
         SubscriptionsModule,
         AdminModule,
         FraudModule,

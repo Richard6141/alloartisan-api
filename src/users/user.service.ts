@@ -9,6 +9,7 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SessionService } from 'src/common/services/session.service';
 import { CryptoService } from 'src/common/services/crypto.service';
+import { CacheService } from 'src/common/services/cache.service';
 import { GetProfileResponseDto, UpdateProfileDto, DeleteAccountDto } from './dto';
 import { Statut } from 'src/generated/prisma';
 import * as argon from 'argon2';
@@ -24,6 +25,8 @@ const USER_PROFILE_SELECT = {
     dateNaissance: true,
     sexe: true,
     ville: true,
+    quartier: true,
+    adressePrincipale: true,
     photoUrl: true,
     role: true,
     statut: true,
@@ -41,6 +44,7 @@ export class UserService {
         private prisma: PrismaService,
         private sessionService: SessionService,
         private cryptoService: CryptoService,
+        private cacheService: CacheService,
     ) {}
 
     private async validateSession(userId: string, sessionId: string): Promise<void> {
@@ -83,9 +87,30 @@ export class UserService {
                 ville: dto.ville,
                 quartier: dto.quartier,
                 adressePrincipale: dto.adressePrincipale,
+                photoUrl: dto.photoUrl,
             },
             select: USER_PROFILE_SELECT,
         });
+
+        // Un ARTISAN qui change sa photo doit la voir changer PARTOUT :
+        // les cartes et fiches affichent artisan.photoProfilUrl en priorité,
+        // il faut donc la synchroniser (sinon l'ancienne photo reste figée).
+        if (dto.photoUrl) {
+            const artisan = await this.prisma.artisan.updateMany({
+                where: { userId },
+                data: { photoProfilUrl: dto.photoUrl },
+            });
+            if (artisan.count > 0) {
+                this.logger.log(`Photo artisan synchronisée pour user=${userId}`);
+                // Purger les caches concernés (fiche + résultats de recherche)
+                const profil = await this.prisma.artisan.findUnique({
+                    where: { userId },
+                    select: { id: true },
+                });
+                if (profil) await this.cacheService.invalidateArtisanProfile(profil.id);
+                await this.cacheService.delByPattern('cache:search:*');
+            }
+        }
 
         return user;
     }

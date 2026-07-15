@@ -22,6 +22,7 @@ import {
 import { AuthService } from './auth.service';
 import {
     AuthDto,
+    RegisterDto,
     ForgotPasswordDto,
     ResetPasswordDto,
     EnableMfaDto,
@@ -56,12 +57,15 @@ export class AuthController {
         type: Tokens,
     })
     @ApiForbiddenResponse({ description: 'Email déjà utilisé' })
-    register(@Body() dto: AuthDto, @Req() req: Request): Promise<Tokens> {
+    register(@Body() dto: RegisterDto, @Req() req: Request): Promise<Tokens> {
         return this.authService.register(dto, this.extractDeviceInfo(req));
     }
 
     @Public()
-    @Throttle({ short: { limit: 5, ttl: 900000 } })
+    // Limiteur par IP volontairement souple : la vraie protection anti-force-brute
+    // est le verrou PAR COMPTE (LoginAttemptService). 5 req/15min bloquait un
+    // utilisateur légitime qui changeait simplement de compte sur le même téléphone.
+    @Throttle({ short: { limit: 15, ttl: 300000 } })
     @Post('login')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({

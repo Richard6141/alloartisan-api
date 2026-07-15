@@ -3,6 +3,7 @@ import { UserService } from './user.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SessionService } from 'src/common/services/session.service';
 import { CryptoService } from 'src/common/services/crypto.service';
+import { CacheService } from 'src/common/services/cache.service';
 
 // Mock the upload module to avoid 'file-type' ESM resolution issues in Jest
 jest.mock('src/upload', () => ({
@@ -35,6 +36,14 @@ const mockSession = {
 const mockCrypto = {
     decrypt: jest.fn(),
     encrypt: jest.fn(),
+};
+
+const mockCache = {
+    get: jest.fn(),
+    set: jest.fn(),
+    del: jest.fn(),
+    delByPattern: jest.fn(),
+    invalidateArtisanProfile: jest.fn(),
 };
 
 jest.mock('argon2', () => ({
@@ -83,6 +92,7 @@ describe('UserService', () => {
                 { provide: PrismaService, useValue: mockPrisma },
                 { provide: SessionService, useValue: mockSession },
                 { provide: CryptoService, useValue: mockCrypto },
+                { provide: CacheService, useValue: mockCache },
             ],
         }).compile();
 

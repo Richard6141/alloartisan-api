@@ -12,6 +12,16 @@ export interface UploadJobData {
     artisanId?: string;
 }
 
+export interface CertificationJobData {
+    userId: string;
+    artisanId: string;
+    certificationId: string;
+    buffer: number[]; // Buffer sérialisé en array
+    originalName: string;
+    isPdf: boolean;
+    type: 'certification';
+}
+
 export interface UploadJobResult {
     success: boolean;
     variants?: ImageVariants;
@@ -78,6 +88,59 @@ export class UploadProcessor {
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             this.logger.error(`Failed to process profile photo: ${errorMessage}`);
+            return { success: false, error: errorMessage };
+        }
+    }
+
+    /**
+     * Documents de certification (pièce d'identité, diplômes).
+     * Le contrôleur queue ces jobs depuis POST /certifications/me et
+     * POST /certifications/me/:id/document — sans ce handler, les documents
+     * n'arrivaient JAMAIS sur le CDN (documentUrl restait vide).
+     */
+    @Process('certification-document')
+    async handleCertificationDocument(
+        job: Job<CertificationJobData>,
+    ): Promise<UploadJobResult> {
+        const { certificationId, artisanId, buffer: bufferArray, isPdf } = job.data;
+
+        try {
+            this.logger.log(`Processing certification document ${certificationId}`);
+            const original = Buffer.from(bufferArray);
+
+            // Les images sont sanitisées (métadonnées retirées, recompression) ;
+            // les PDF partent tels quels (sharp ne lit pas le PDF)
+            const buffer = isPdf
+                ? original
+                : await this.imageValidator.sanitizeImage(original, {
+                      maxWidth: 1920,
+                      maxHeight: 1920,
+                      quality: 85,
+                      format: 'webp',
+                      stripMetadata: true,
+                  });
+
+            const { url } = await this.uploadService.uploadCertificationDocument(buffer, isPdf);
+
+            await this.prisma.certification.update({
+                where: { id: certificationId },
+                data: { documentUrl: url },
+            });
+
+            // Resoumission : un dossier artisan rejeté repart en file d'examen
+            // dès que le document corrigé est réellement en ligne
+            await this.prisma.artisan.updateMany({
+                where: { id: artisanId, statut: 'REJETE' },
+                data: { statut: 'EN_ATTENTE', raisonSuspension: null },
+            });
+
+            this.logger.log(`Certification document ${certificationId} uploaded: ${url}`);
+            return { success: true };
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            this.logger.error(
+                `Failed to process certification document ${certificationId}: ${errorMessage}`,
+            );
             return { success: false, error: errorMessage };
         }
     }

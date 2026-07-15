@@ -1,4 +1,12 @@
-import { IsString, IsOptional, MaxLength, IsDateString, Matches, Length } from 'class-validator';
+import {
+    IsString,
+    IsOptional,
+    IsUrl,
+    MaxLength,
+    IsDateString,
+    Matches,
+    Length,
+} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateProfileDto {
@@ -82,4 +90,13 @@ export class UpdateProfileDto {
     @IsString()
     @MaxLength(255, { message: "L'adresse ne peut pas dépasser 255 caractères" })
     adressePrincipale?: string;
+
+    @ApiPropertyOptional({
+        description: 'URL de la photo de profil (obtenue via POST /upload/image)',
+        example: 'https://res.cloudinary.com/.../photo.jpg',
+    })
+    @IsOptional()
+    @IsString()
+    @IsUrl({}, { message: "L'URL de la photo n'est pas valide" })
+    photoUrl?: string;
 }

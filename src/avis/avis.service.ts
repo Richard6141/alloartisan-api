@@ -10,6 +10,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { NotificationService } from 'src/notification/notification.service';
 import { CreateAvisDto, RespondAvisDto, ReportAvisDto } from './dto';
 import { StatutBooking } from 'src/generated/prisma';
+import { nomLisible } from 'src/common/utils/nom.util';
 
 // Fenêtre de 14 jours pour laisser un avis après fin d'intervention
 const REVIEW_DELAY_DAYS = 14;
@@ -103,7 +104,7 @@ export class AvisService {
 
         // 8. Notifier l'artisan du nouvel avis (fire-and-forget)
         const clientData = (avis as any).client;
-        const nomClient = clientData ? `${clientData.prenom} ${clientData.nom}` : 'Un client';
+        const nomClient = nomLisible(clientData, 'Un client');
         void this.notificationService.send({
             userId: booking.artisan.userId,
             type: 'AVIS_NOUVEAU',

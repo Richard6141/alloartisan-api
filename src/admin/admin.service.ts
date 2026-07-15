@@ -282,9 +282,15 @@ export class AdminService {
                     select: {
                         id: true,
                         titre: true,
+                        organisme: true,
+                        dateObtention: true,
                         numeroCertification: true,
                         documentUrl: true,
                         verifie: true,
+                        type: true,
+                        metierId: true,
+                        statutVerification: true,
+                        raisonRejet: true,
                     },
                 },
                 metiers: {

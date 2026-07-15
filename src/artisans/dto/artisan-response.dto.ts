@@ -13,9 +13,6 @@ class UserMinimalDto {
 
     @ApiProperty({ example: 'jean.dupont@email.com' })
     email: string;
-
-    @ApiPropertyOptional({ example: '+229 97 00 00 00' })
-    telephone: string | null;
 }
 
 class MetierMinimalDto {
@@ -182,6 +179,18 @@ export class ArtisanResponseDto {
     })
     tauxReponseMoyen: number | null;
 
+    @ApiPropertyOptional({
+        description: 'Tarif horaire de base (FCFA)',
+        example: 3500,
+    })
+    tarifHoraire: number | null;
+
+    @ApiPropertyOptional({
+        description: 'Frais de déplacement (FCFA)',
+        example: 1000,
+    })
+    tarifDeplacement: number | null;
+
     @ApiProperty({
         description: 'Disponible',
         example: true,
@@ -326,6 +335,13 @@ export class ArtisanListItemDto {
     id: string;
 
     @ApiPropertyOptional({
+        description: 'Distance depuis la position du client (si fournie), en km',
+        example: 1.2,
+        nullable: true,
+    })
+    distanceKm?: number | null;
+
+    @ApiPropertyOptional({
         description: "Nom de l'entreprise",
         example: 'Plomberie Express',
     })
@@ -335,6 +351,17 @@ export class ArtisanListItemDto {
         description: 'URL photo de profil',
     })
     photoProfilUrl: string | null;
+
+    @ApiPropertyOptional({
+        description: 'URL photo de couverture (cartes visuelles)',
+    })
+    photoCouvertureUrl: string | null;
+
+    @ApiPropertyOptional({
+        description: 'Tarif horaire en FCFA',
+        example: 3500,
+    })
+    tarifHoraire: number | null;
 
     @ApiProperty({
         description: 'Note moyenne',

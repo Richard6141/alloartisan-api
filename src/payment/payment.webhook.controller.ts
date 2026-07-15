@@ -1,6 +1,7 @@
 import { Controller, Post, Headers, Body, HttpCode, HttpStatus, Logger, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
 import { PaymentService } from './payment.service';
+import { SubscriptionsService } from 'src/subscriptions/subscriptions.service';
 import { Public } from 'src/common/decorators';
 
 /**
@@ -17,7 +18,10 @@ import { Public } from 'src/common/decorators';
 export class PaymentWebhookController {
     private readonly logger = new Logger(PaymentWebhookController.name);
 
-    constructor(private readonly paymentService: PaymentService) {}
+    constructor(
+        private readonly paymentService: PaymentService,
+        private readonly subscriptionsService: SubscriptionsService,
+    ) {}
 
     // ------------------------------------------------------------------
     // POST /payments/webhook/fedapay — Webhook FedaPay
@@ -46,7 +50,7 @@ export class PaymentWebhookController {
                 : String(req.rawBody)
             : JSON.stringify(body);
 
-        if (signature && !this.paymentService.validateFedaPaySignature(rawBody, signature)) {
+        if (!this.paymentService.validateFedaPaySignature(rawBody, signature)) {
             this.logger.warn(`⚠️ Webhook FedaPay rejeté : signature HMAC invalide — IP: ${req.ip}`);
             return { received: false, reason: 'invalid_signature' };
         }
@@ -62,7 +66,21 @@ export class PaymentWebhookController {
 
         try {
             if (status === 'approved') {
-                await this.paymentService.processSuccessfulPayment(transactionId, 'fedapay', body);
+                // Un paiement d'ABONNEMENT artisan d'abord ; sinon paiement de mission
+                const estAbonnement = await this.subscriptionsService.confirmerViaWebhook(
+                    transactionId,
+                    body,
+                );
+                if (!estAbonnement) {
+                    const paidAmount =
+                        transaction?.amount !== undefined ? Number(transaction.amount) : undefined;
+                    await this.paymentService.processSuccessfulPayment(
+                        transactionId,
+                        'fedapay',
+                        body,
+                        Number.isFinite(paidAmount) ? paidAmount : undefined,
+                    );
+                }
             } else if (['declined', 'cancelled'].includes(status)) {
                 await this.paymentService.processFailedPayment(transactionId, 'fedapay', body);
             } else {
@@ -101,7 +119,7 @@ export class PaymentWebhookController {
                 : String(req.rawBody)
             : JSON.stringify(body);
 
-        if (signature && !this.paymentService.validateKkiaPaySignature(rawBody, signature)) {
+        if (!this.paymentService.validateKkiaPaySignature(rawBody, signature)) {
             this.logger.warn(`⚠️ Webhook KkiaPay rejeté : signature HMAC invalide — IP: ${req.ip}`);
             return { received: false, reason: 'invalid_signature' };
         }
@@ -113,7 +131,21 @@ export class PaymentWebhookController {
 
         try {
             if (status === 'SUCCESS') {
-                await this.paymentService.processSuccessfulPayment(transactionId, 'kkiapay', body);
+                // Un paiement d'ABONNEMENT artisan d'abord ; sinon paiement de mission
+                const estAbonnement = await this.subscriptionsService.confirmerViaWebhook(
+                    transactionId,
+                    body,
+                );
+                if (!estAbonnement) {
+                    const paidAmount =
+                        body?.amount !== undefined ? Number(body.amount) : undefined;
+                    await this.paymentService.processSuccessfulPayment(
+                        transactionId,
+                        'kkiapay',
+                        body,
+                        Number.isFinite(paidAmount) ? paidAmount : undefined,
+                    );
+                }
             } else if (['FAILED', 'CANCELLED'].includes(status)) {
                 await this.paymentService.processFailedPayment(transactionId, 'kkiapay', body);
             }

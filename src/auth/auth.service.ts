@@ -7,7 +7,14 @@ import {
     ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { AuthDto, ForgotPasswordDto, ResetPasswordDto, EnableMfaDto, VerifyMfaDto } from './dto';
+import {
+    AuthDto,
+    RegisterDto,
+    ForgotPasswordDto,
+    ResetPasswordDto,
+    EnableMfaDto,
+    VerifyMfaDto,
+} from './dto';
 import * as argon from 'argon2';
 import { Tokens, LoginResponse } from './types';
 import { JwtService } from '@nestjs/jwt';
@@ -64,29 +71,43 @@ export class AuthService {
     ) {}
 
     // ==================== REGISTER ====================
-    async register(dto: AuthDto, deviceInfo?: DeviceInfo): Promise<Tokens> {
+    async register(dto: RegisterDto, deviceInfo?: DeviceInfo): Promise<Tokens> {
         const hash = await argon.hash(dto.password);
+
+        // Mode test : activer automatiquement les comptes (contourne la
+        // vérification OTP par email). Piloté par AUTO_ACTIVATE_USERS — à
+        // remettre à false une fois l'envoi d'emails (Resend) opérationnel.
+        const autoActivate = this.config.get<string>('AUTO_ACTIVATE_USERS') === 'true';
 
         try {
             const user = await this.prisma.user.create({
                 data: {
                     email: dto.email,
                     passwordHash: hash,
+                    // Seuls CLIENT et ARTISAN sont acceptés par le DTO — jamais ADMIN
+                    role: dto.role === 'ARTISAN' ? Role.ARTISAN : Role.CLIENT,
+                    ...(autoActivate ? { emailVerified: true, statut: Statut.ACTIF } : {}),
                 },
             });
 
             const tokens = await this.createSession(user.id, deviceInfo);
 
-            setImmediate(() => {
-                this.sendVerificationEmail(user.id, user.email).catch((error) => {
-                    this.logger.error(`Failed to send verification email to ${user.email}`, error);
+            // Pas d'OTP à envoyer si le compte est déjà activé
+            if (!autoActivate) {
+                setImmediate(() => {
+                    this.sendVerificationEmail(user.id, user.email).catch((error) => {
+                        this.logger.error(
+                            `Failed to send verification email to ${user.email}`,
+                            error,
+                        );
+                    });
                 });
-            });
+            }
 
             return tokens;
         } catch (error) {
             if (isPrismaUniqueEmailError(error)) {
-                throw new ConflictException('Email already exists');
+                throw new ConflictException('Cet email est déjà utilisé. Connectez-vous plutôt.');
             }
             throw error;
         }
@@ -94,7 +115,7 @@ export class AuthService {
 
     // ==================== LOGIN ====================
     async login(dto: AuthDto, deviceInfo?: DeviceInfo): Promise<LoginResponse> {
-        const genericError = 'Email or password incorrect';
+        const genericError = 'Email ou mot de passe incorrect';
 
         const isLocked = await this.loginAttemptService.isLocked(dto.email);
         if (isLocked) {
@@ -434,23 +455,39 @@ export class AuthService {
             throw new ForbiddenException(genericError);
         }
 
+        // Mode test (auto-activation) : le compte est déjà actif et aucun OTP
+        // n'a été généré → on accepte la vérification sans code réel pour ne pas
+        // bloquer l'écran de saisie. À désactiver avec AUTO_ACTIVATE_USERS.
+        const autoActivate = this.config.get<string>('AUTO_ACTIVATE_USERS') === 'true';
+        if (autoActivate) {
+            if (!user.emailVerified || user.statut !== Statut.ACTIF) {
+                await this.prisma.user.update({
+                    where: { id: user.id },
+                    data: { emailVerified: true, statut: Statut.ACTIF },
+                });
+            }
+            return;
+        }
+
         const isValid = await this.otpService.verify(
             user.id,
             OtpType.EMAIL_VERIFICATION,
             String(dto.code),
         );
 
-        if (isValid && user.role === Role.CLIENT) {
-            await this.prisma.user.update({
-                where: { id: user.id },
-                data: {
-                    emailVerified: true,
-                    statut: Statut.ACTIF,
-                },
-            });
-        } else {
+        // La vérification d'email vaut pour TOUS les rôles (CLIENT comme ARTISAN) —
+        // l'ancien filtre role === CLIENT bloquait définitivement les artisans.
+        if (!isValid) {
             throw new ForbiddenException(genericError);
         }
+
+        await this.prisma.user.update({
+            where: { id: user.id },
+            data: {
+                emailVerified: true,
+                statut: Statut.ACTIF,
+            },
+        });
     }
 
     async newOtpCode(dto: NewOtpCodeDTO): Promise<string> {

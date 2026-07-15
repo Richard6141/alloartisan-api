@@ -14,6 +14,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { MessagingService } from './messaging.service';
+import { buildWsOriginValidator } from 'src/common/utils/cors.util';
 import { SendMessageDto } from './dto';
 
 /**
@@ -41,15 +42,8 @@ import { SendMessageDto } from './dto';
 @WebSocketGateway({
     namespace: '/chat',
     cors: {
-        // Accepter le frontend via variable d'env. Fallback localhost en développement.
-        origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
-            const allowed = process.env.ALLOWED_ORIGINS?.split(',') ?? ['http://localhost:3000'];
-            if (!origin || allowed.some((o) => origin.startsWith(o.trim()))) {
-                cb(null, true);
-            } else {
-                cb(new Error('CORS: origine non autorisée'));
-            }
-        },
+        // Comparaison stricte d'origine (pas de startsWith — bypass par sous-domaine)
+        origin: buildWsOriginValidator(),
         credentials: true,
     },
     transports: ['websocket', 'polling'],
@@ -159,6 +153,10 @@ export class MessagingGateway implements OnGatewayInit, OnGatewayConnection, OnG
             // Broadcaster à TOUS les membres de la conversation (y compris l'envoyeur)
             this.server.to(`conv:${conversationId}`).emit('message:new', message);
 
+            // Livraison type WhatsApp : prévenir le destinataire OÙ QU'IL SOIT
+            // dans l'app (bannière + badge), pas seulement dans la discussion
+            void this.notifyRecipient(conversationId, userId, message);
+
             return { success: true, messageId: message.id };
         } catch (err) {
             this.emitError(client, err);
@@ -167,12 +165,37 @@ export class MessagingGateway implements OnGatewayInit, OnGatewayConnection, OnG
     }
 
     /**
+     * Prévient le destinataire d'un nouveau message dans sa room personnelle
+     * (user:{id}) — il le reçoit sur N'IMPORTE QUEL écran de l'app.
+     */
+    async notifyRecipient(
+        conversationId: string,
+        senderId: string,
+        message: unknown,
+    ): Promise<void> {
+        try {
+            const info = await this.messagingService.getRecipientInfo(conversationId, senderId);
+            if (!info) return;
+            this.server.to(`user:${info.recipientUserId}`).emit('chat:incoming', {
+                conversationId,
+                senderNom: info.senderNom,
+                message,
+            });
+        } catch (err) {
+            this.logger.warn(
+                `notifyRecipient échoué [conv:${conversationId}]: ${err instanceof Error ? err.message : String(err)}`,
+            );
+        }
+    }
+
+    /**
      * Indicateur de saisie — diffuse aux autres membres de la conversation.
+     * `mode` distingue la frappe ('text') de l'enregistrement vocal ('audio').
      */
     @SubscribeMessage('typing_start')
     handleTypingStart(
         @ConnectedSocket() client: Socket,
-        @MessageBody() payload: { conversationId: string },
+        @MessageBody() payload: { conversationId: string; mode?: 'text' | 'audio' },
     ) {
         const userId = (client.data as { userId?: string }).userId;
         if (!userId) return;
@@ -181,6 +204,7 @@ export class MessagingGateway implements OnGatewayInit, OnGatewayConnection, OnG
         client.to(`conv:${payload.conversationId}`).emit('typing:start', {
             userId,
             conversationId: payload.conversationId,
+            mode: payload.mode ?? 'text',
         });
     }
 
@@ -271,7 +295,13 @@ export class MessagingGateway implements OnGatewayInit, OnGatewayConnection, OnG
 
     private emitError(client: Socket, err: unknown) {
         const message = err instanceof Error ? err.message : 'Erreur interne';
+        // Remonter le code métier (ex. paywall ABONNEMENT_REQUIS) si présent
+        const response = (err as { getResponse?: () => unknown })?.getResponse?.();
+        const code =
+            response && typeof response === 'object' && 'code' in response
+                ? (response as { code?: string }).code
+                : undefined;
         this.logger.error(`WebSocket error: ${message}`);
-        client.emit('error', { message });
+        client.emit('error', code ? { message, code } : { message });
     }
 }

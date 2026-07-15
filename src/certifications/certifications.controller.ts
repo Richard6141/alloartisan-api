@@ -409,7 +409,58 @@ export class CertificationsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() dto: VerifyCertificationDto,
     ): Promise<CertificationResponseDto> {
-        return this.certificationsService.verify(id, dto.verifie);
+        return this.certificationsService.verify(id, dto.verifie, dto.raison);
+    }
+
+    @Get('admin/artisan/:artisanId')
+    @Roles(Role.ADMIN)
+    @UseGuards(RolesGuard)
+    @ApiBearerAuth('access-token')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: '[Admin] Tous les documents d\'un artisan',
+        description:
+            'Récupère TOUS les documents d\'un artisan (identité comprise, validés ou non) pour le déverrouillage. Réservé aux administrateurs.',
+    })
+    @ApiParam({
+        name: 'artisanId',
+        description: 'Identifiant UUID de l\'artisan',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Liste complète des documents',
+        type: CertificationListResponseDto,
+    })
+    findAllByArtisanAdmin(
+        @Param('artisanId', ParseUUIDPipe) artisanId: string,
+    ): Promise<CertificationListResponseDto> {
+        return this.certificationsService.findByArtisanId(artisanId, true);
+    }
+
+    @Patch('admin/:id/unlock')
+    @Roles(Role.ADMIN)
+    @UseGuards(RolesGuard)
+    @ApiBearerAuth('access-token')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: '[Admin] Déverrouiller un document validé',
+        description:
+            'Rend un document validé de nouveau modifiable par l\'artisan (sur sa demande). Le document repasse en attente d\'examen.',
+    })
+    @ApiParam({
+        name: 'id',
+        description: 'Identifiant UUID de la certification',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Document déverrouillé',
+        type: CertificationResponseDto,
+    })
+    @ApiNotFoundResponse({
+        description: 'Certification non trouvée',
+    })
+    unlock(@Param('id', ParseUUIDPipe) id: string): Promise<CertificationResponseDto> {
+        return this.certificationsService.unlock(id);
     }
 
     @Delete('admin/:id')

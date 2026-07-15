@@ -5,9 +5,10 @@ import { PortfolioService } from './portfolio.service';
 import { PortfolioController } from './portfolio.controller';
 import { CommonModule } from 'src/common/common.module';
 import { UploadModule } from 'src/upload/upload.module';
+import { NotificationModule } from 'src/notification/notification.module';
 
 @Module({
-    imports: [CommonModule, UploadModule],
+    imports: [CommonModule, UploadModule, NotificationModule],
     controllers: [ArtisansController, PortfolioController],
     providers: [ArtisansService, PortfolioService],
     exports: [ArtisansService, PortfolioService],

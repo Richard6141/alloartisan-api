@@ -9,6 +9,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { NotificationService } from 'src/notification/notification.service';
+import { PromoService } from 'src/promo/promo.service';
+import { ReferralService } from 'src/promo/referral.service';
 import { FedaPayProvider } from './providers/fedapay.provider';
 import { KkiaPayProvider } from './providers/kkiapay.provider';
 import { InitiatePaymentDto, PaymentProvider } from './dto';
@@ -27,6 +29,8 @@ export class PaymentService {
         private readonly prisma: PrismaService,
         private readonly config: ConfigService,
         private readonly notificationService: NotificationService,
+        private readonly promoService: PromoService,
+        private readonly referralService: ReferralService,
         private readonly fedaPay: FedaPayProvider,
         private readonly kkiaPay: KkiaPayProvider,
     ) {
@@ -81,9 +85,26 @@ export class PaymentService {
             );
         }
 
-        const montant = Number(booking.prixFinal);
-        const commission = Math.round(montant * this.commissionRate * 100) / 100;
-        const montantArtisan = Math.round((montant - commission) * 100) / 100;
+        const prixConvenu = Number(booking.prixFinal);
+        let montant = prixConvenu;
+
+        // 4b. Code promo éventuel : validation + calcul de la réduction côté serveur.
+        let promoPreview: Awaited<ReturnType<PromoService['previewDiscount']>> | null = null;
+        if (dto.codePromo) {
+            promoPreview = await this.promoService.previewDiscount(
+                dto.codePromo,
+                clientId,
+                prixConvenu,
+            );
+            montant = promoPreview.montantFinal;
+        }
+
+        // La réduction est absorbée par la plateforme : l'artisan touche toujours
+        // sa part calculée sur le prix convenu. La commission peut devenir négative
+        // (coût d'acquisition marketing assumé par la plateforme).
+        const montantArtisan =
+            Math.round(prixConvenu * (1 - this.commissionRate) * 100) / 100;
+        const commission = Math.round((montant - montantArtisan) * 100) / 100;
         const description = `AlloArtisan - Booking #${bookingId.substring(0, 8)}`;
         const referenceInterne = bookingId;
 
@@ -165,8 +186,21 @@ export class PaymentService {
             },
         });
 
+        // 7. Consommer le code promo (atomique). En cas d'échec du paiement,
+        // processFailedPayment libérera l'utilisation.
+        if (promoPreview && promoPreview.montantReduction > 0) {
+            await this.promoService.redeemForBooking(
+                promoPreview.codePromoId,
+                clientId,
+                bookingId,
+                promoPreview.montantReduction,
+            );
+        }
+
         this.logger.log(
-            `Paiement initié: booking=${bookingId} | provider=${dto.provider} | montant=${montant} FCFA | transactionId=${paymentResult.transactionId}`,
+            `Paiement initié: booking=${bookingId} | provider=${dto.provider} | montant=${montant} FCFA` +
+                (promoPreview ? ` (réduction ${promoPreview.montantReduction} FCFA)` : '') +
+                ` | transactionId=${paymentResult.transactionId}`,
         );
 
         return {
@@ -174,6 +208,8 @@ export class PaymentService {
             providerTransactionId: paymentResult.transactionId,
             paymentUrl: paymentResult.paymentUrl,
             montant,
+            reduction: promoPreview?.montantReduction ?? 0,
+            codePromo: promoPreview?.code,
             commission,
             montantArtisan,
             provider: dto.provider,
@@ -264,11 +300,15 @@ export class PaymentService {
      * Valider la signature HMAC du webhook FedaPay
      * Critique : empêche les faux webhooks frauduleux
      */
-    validateFedaPaySignature(rawBody: string, signature: string): boolean {
+    validateFedaPaySignature(rawBody: string, signature: string | undefined): boolean {
         if (!this.fedapayWebhookSecret) {
             this.logger.warn('FEDAPAY_WEBHOOK_SECRET non configuré — validation HMAC ignorée');
             return true; // En dev uniquement
         }
+
+        // Secret configuré → une signature est OBLIGATOIRE.
+        // Sans ce contrôle, omettre le header suffirait à contourner la validation.
+        if (!signature) return false;
 
         try {
             const expected = createHmac('sha256', this.fedapayWebhookSecret)
@@ -290,11 +330,14 @@ export class PaymentService {
     /**
      * Valider la signature HMAC du webhook KkiaPay
      */
-    validateKkiaPaySignature(rawBody: string, signature: string): boolean {
+    validateKkiaPaySignature(rawBody: string, signature: string | undefined): boolean {
         if (!this.kkiapayWebhookSecret) {
             this.logger.warn('KKIAPAY_WEBHOOK_SECRET non configuré — validation HMAC ignorée');
             return true;
         }
+
+        // Secret configuré → une signature est OBLIGATOIRE (pas de bypass par omission du header)
+        if (!signature) return false;
 
         try {
             const expected = createHmac('sha256', this.kkiapayWebhookSecret)
@@ -319,6 +362,7 @@ export class PaymentService {
         providerTransactionId: string,
         provider: string,
         providerResponse: Record<string, unknown>,
+        paidAmount?: number,
     ): Promise<void> {
         // Idempotence : chercher la transaction par l'ID provider
         const transaction = await this.prisma.transaction.findFirst({
@@ -337,11 +381,39 @@ export class PaymentService {
             return;
         }
 
-        // Mettre à jour dans une transaction Prisma atomique
-        await this.prisma.$transaction(async (tx) => {
-            // 1. Marquer la transaction comme complétée
-            await tx.transaction.update({
-                where: { id: transaction.id },
+        // Anti-fraude : le montant payé doit correspondre au montant attendu.
+        // Un paiement partiel validé par webhook débloquerait l'intervention à prix réduit.
+        if (paidAmount !== undefined && Math.abs(paidAmount - Number(transaction.montant)) > 1) {
+            this.logger.error(
+                `⚠️ FRAUDE POSSIBLE — montant webhook (${paidAmount} FCFA) ≠ montant attendu ` +
+                    `(${transaction.montant} FCFA) pour transaction ${providerTransactionId}. Paiement NON validé.`,
+            );
+            await this.prisma.logActivite.create({
+                data: {
+                    userId: transaction.clientId,
+                    action: 'PAIEMENT_MONTANT_SUSPECT',
+                    entite: 'Transaction',
+                    entiteId: transaction.id,
+                    metadata: {
+                        montantAttendu: Number(transaction.montant),
+                        montantRecu: paidAmount,
+                        provider,
+                        providerTransactionId,
+                    },
+                },
+            });
+            return;
+        }
+
+        // Mettre à jour dans une transaction Prisma atomique.
+        // updateMany + garde sur le statut = protection contre deux webhooks concurrents :
+        // un seul des deux verra count === 1, l'autre abandonne.
+        const completed = await this.prisma.$transaction(async (tx) => {
+            const result = await tx.transaction.updateMany({
+                where: {
+                    id: transaction.id,
+                    statut: { not: StatutTransaction.COMPLETEE },
+                },
                 data: {
                     statut: StatutTransaction.COMPLETEE,
                     providerResponse: providerResponse as any,
@@ -349,7 +421,10 @@ export class PaymentService {
                 },
             });
 
-            // 2. Log audit
+            if (result.count === 0) {
+                return false; // Déjà traité par un webhook concurrent
+            }
+
             await tx.logActivite.create({
                 data: {
                     userId: transaction.clientId,
@@ -363,11 +438,23 @@ export class PaymentService {
                     },
                 },
             });
+            return true;
         });
+
+        if (!completed) {
+            this.logger.debug(
+                `Transaction ${providerTransactionId} déjà complétée par un webhook concurrent — ignorée`,
+            );
+            return;
+        }
 
         this.logger.log(
             `✅ Paiement confirmé: booking=${transaction.bookingId} | montant=${transaction.montant} FCFA | provider=${provider}`,
         );
+
+        // Parrainage : si c'est la 1ère intervention payée d'un filleul,
+        // verser les récompenses (fire-and-forget, jamais bloquant)
+        void this.referralService.onFirstPaidBooking(transaction.clientId);
 
         // 3. Notifier client et artisan (fire-and-forget)
         void this.notificationService.send({
@@ -423,6 +510,17 @@ export class PaymentService {
         this.logger.warn(
             `❌ Paiement échoué: booking=${transaction.bookingId} | provider=${provider}`,
         );
+
+        // Libérer le code promo éventuellement consommé à l'initiation :
+        // le client pourra le réutiliser sur sa prochaine tentative
+        try {
+            await this.promoService.releaseUsageForBooking(transaction.bookingId);
+        } catch (error) {
+            this.logger.error(
+                `Erreur libération code promo booking=${transaction.bookingId}`,
+                error,
+            );
+        }
 
         // Notifier le client de l'échec
         void this.notificationService.send({

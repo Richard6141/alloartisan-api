@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { apiReference } from '@scalar/nestjs-api-reference';
@@ -9,10 +9,34 @@ import helmet from 'helmet';
 import compression from 'compression';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { swaggerCustomCss, swaggerCustomJs } from './docs/swagger-ui.config';
+import { RedisIoAdapter } from './common/adapters/redis-io.adapter';
 
 async function bootstrap() {
+    // Filet de sécurité : un incident isolé (socket Redis coupé, promesse
+    // oubliée) ne doit JAMAIS tuer l'API entière. On loggue fort, on continue.
+    const processLogger = new Logger('Process');
+    process.on('unhandledRejection', (reason) => {
+        processLogger.error(
+            `Promesse rejetée non gérée : ${reason instanceof Error ? reason.stack : String(reason)}`,
+        );
+    });
+    process.on('uncaughtException', (err) => {
+        processLogger.error(`Exception non capturée : ${err.stack ?? err.message}`);
+    });
+
     const app = await NestFactory.create<NestExpressApplication>(AppModule);
     app.enableShutdownHooks();
+
+    // WebSockets scalables multi-instances (chat + tracking) via Redis pub/sub
+    const redisHost = process.env.REDIS_HOST ?? 'localhost';
+    const redisPort = process.env.REDIS_PORT ?? '6379';
+    const redisPassword = process.env.REDIS_PASSWORD;
+    const redisUrl = redisPassword
+        ? `redis://:${encodeURIComponent(redisPassword)}@${redisHost}:${redisPort}`
+        : `redis://${redisHost}:${redisPort}`;
+    const redisIoAdapter = new RedisIoAdapter(app);
+    await redisIoAdapter.connectToRedis(redisUrl);
+    app.useWebSocketAdapter(redisIoAdapter);
 
     // Servir les fichiers statiques (logo, favicon)
     app.useStaticAssets(join(__dirname, '..', 'public'));

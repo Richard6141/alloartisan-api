@@ -18,7 +18,7 @@ describe('AuthService.register', () => {
         const service = new AuthService(
             prisma as any,
             {} as any,
-            {} as any,
+            { get: jest.fn() } as any, // ConfigService (ex. AUTO_ACTIVATE_USERS)
             {} as any,
             {} as any,
             {} as any,

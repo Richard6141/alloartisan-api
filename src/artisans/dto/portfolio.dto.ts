@@ -9,6 +9,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { SansContact } from 'src/common/validators/sans-contact.validator';
 
 export class PortfolioItemDto {
     @ApiProperty({ description: 'URL Cloudinary de la photo/vidéo' })
@@ -24,6 +25,7 @@ export class PortfolioItemDto {
     @IsOptional()
     @IsString()
     @MaxLength(200)
+    @SansContact()
     caption?: string;
 
     @ApiPropertyOptional({ description: 'ID du booking associé (avant/après chantier)' })
@@ -49,6 +51,7 @@ export class AddPortfolioItemDto {
     @IsOptional()
     @IsString()
     @MaxLength(200)
+    @SansContact()
     caption?: string;
 
     @ApiPropertyOptional({ description: 'ID du booking associé (avant/après chantier)' })

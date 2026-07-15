@@ -6,7 +6,7 @@ import {
     Logger,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { StorageService } from 'src/upload/storage.service';
+import { UploadService } from 'src/upload/upload.service';
 import { CacheService } from 'src/common/services/cache.service';
 import { Prisma } from 'src/generated/prisma';
 import {
@@ -37,7 +37,7 @@ export class PortfolioService {
 
     constructor(
         private readonly prisma: PrismaService,
-        private readonly storageService: StorageService,
+        private readonly uploadService: UploadService,
         private readonly cacheService: CacheService,
     ) {}
 
@@ -87,8 +87,8 @@ export class PortfolioService {
             await this.validateBookingOwnership(dto.bookingId, artisanId);
         }
 
-        // Upload vers Supabase Storage (bucket portfolio)
-        const variants = await this.storageService.uploadPortfolioPhoto(buffer, artisanId);
+        // Upload vers Cloudinary (Supabase n'est pas configuré sur ce projet)
+        const variants = await this.uploadService.uploadPortfolioPhoto(buffer, artisanId);
         this.logger.log(`Portfolio photo uploadée pour artisan ${artisanId}: ${variants.medium}`);
 
         // Ajouter le nouvel item au tableau
@@ -132,15 +132,13 @@ export class PortfolioService {
             throw new NotFoundException(`Item portfolio non trouvé : ${url}`);
         }
 
-        // Supprimer du stockage (best-effort, ne bloque pas si erreur)
-        const publicId = this.storageService.extractPublicIdFromUrl(url);
+        // Supprimer du CDN (best-effort, ne bloque pas si erreur)
+        const publicId = this.uploadService.extractPublicIdFromUrl(url);
         if (publicId) {
-            await this.storageService
-                .deletePortfolioPhoto(artisanId, publicId)
-                .catch((err: unknown) => {
-                    const msg = err instanceof Error ? err.message : String(err);
-                    this.logger.warn(`Delete Supabase échoué (non bloquant): ${msg}`);
-                });
+            await this.uploadService.deleteImage(publicId).catch((err: unknown) => {
+                const msg = err instanceof Error ? err.message : String(err);
+                this.logger.warn(`Delete CDN échoué (non bloquant): ${msg}`);
+            });
         }
 
         const updatedItems = items.filter((i) => i.url !== url);
@@ -215,7 +213,18 @@ export class PortfolioService {
     // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
     private parsePortfolioUrls(raw: Prisma.JsonValue | null): PortfolioItem[] {
         if (!raw || !Array.isArray(raw)) return [];
-        return raw as unknown as PortfolioItem[];
+        // Tolère les deux formats historiques : ["url", ...] (seed) et [{url, ...}, ...]
+        return raw
+            .map((entry): PortfolioItem | null => {
+                if (typeof entry === 'string') {
+                    return { url: entry, type: 'photo', uploadedAt: '' };
+                }
+                if (entry && typeof entry === 'object' && 'url' in entry) {
+                    return entry as unknown as PortfolioItem;
+                }
+                return null;
+            })
+            .filter((i): i is PortfolioItem => i !== null);
     }
 
     private async persistPortfolio(artisanId: string, items: PortfolioItem[]): Promise<void> {

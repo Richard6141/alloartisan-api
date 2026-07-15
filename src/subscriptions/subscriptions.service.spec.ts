@@ -1,6 +1,17 @@
+// Mock des providers de paiement AVANT les imports (axios/ESM)
+jest.mock('src/payment/providers/kkiapay.provider', () => ({
+    KkiaPayProvider: class MockKkiaPayProvider {},
+}));
+jest.mock('src/payment/providers/fedapay.provider', () => ({
+    FedaPayProvider: class MockFedaPayProvider {},
+}));
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { SubscriptionsService } from './subscriptions.service';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { KkiaPayProvider } from 'src/payment/providers/kkiapay.provider';
+import { FedaPayProvider } from 'src/payment/providers/fedapay.provider';
+import { NotificationService } from 'src/notification/notification.service';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { PlanAbonnement } from './dto/upgrade-subscription.dto';
 
@@ -12,6 +23,27 @@ const mockPrisma = {
         update: jest.fn(),
         updateMany: jest.fn(),
     },
+    abonnementPaiement: {
+        create: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+        findUnique: jest.fn(),
+        findFirst: jest.fn(),
+    },
+};
+
+const mockKkiaPay = {
+    initiatePayment: jest.fn(),
+    getTransactionStatus: jest.fn(),
+};
+
+const mockFedaPay = {
+    initiateTransaction: jest.fn(),
+    getTransaction: jest.fn(),
+};
+
+const mockNotifications = {
+    send: jest.fn().mockResolvedValue(undefined),
 };
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -22,6 +54,7 @@ function buildArtisan(overrides = {}) {
         abonnementType: PlanAbonnement.GRATUIT,
         abonnementExpireAt: null,
         compteurDemandesMoisCourant: 0,
+        essaisGratuitsUtilises: 0,
         ...overrides,
     };
 }
@@ -33,7 +66,13 @@ describe('SubscriptionsService', () => {
 
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
-            providers: [SubscriptionsService, { provide: PrismaService, useValue: mockPrisma }],
+            providers: [
+                SubscriptionsService,
+                { provide: PrismaService, useValue: mockPrisma },
+                { provide: KkiaPayProvider, useValue: mockKkiaPay },
+                { provide: FedaPayProvider, useValue: mockFedaPay },
+                { provide: NotificationService, useValue: mockNotifications },
+            ],
         }).compile();
 
         service = module.get<SubscriptionsService>(SubscriptionsService);
@@ -43,22 +82,24 @@ describe('SubscriptionsService', () => {
     // ─── getPlans ─────────────────────────────────────────────────────────────
 
     describe('getPlans', () => {
-        it('should return all 3 plans', () => {
+        it('should return all 4 plans', () => {
             const plans = service.getPlans();
 
-            expect(plans).toHaveLength(3);
+            expect(plans).toHaveLength(4);
             expect(plans.map((p) => p.type)).toEqual([
                 PlanAbonnement.GRATUIT,
                 PlanAbonnement.STANDARD,
                 PlanAbonnement.PREMIUM,
+                PlanAbonnement.GOLD,
             ]);
         });
 
-        it('should return PREMIUM plan with null demandesMois (illimité)', () => {
+        it('should return GOLD plan with null demandesMois (illimité)', () => {
             const plans = service.getPlans();
-            const premium = plans.find((p) => p.type === PlanAbonnement.PREMIUM);
+            const gold = plans.find((p) => p.type === PlanAbonnement.GOLD);
 
-            expect(premium?.demandesMois).toBeNull();
+            expect(gold?.demandesMois).toBeNull();
+            expect(gold?.prix).toBe(25000);
         });
 
         it('should return correct tariffs', () => {
@@ -78,14 +119,16 @@ describe('SubscriptionsService', () => {
             const result = await service.getMySubscription('user-1');
 
             expect(result.plan).toBe(PlanAbonnement.GRATUIT);
-            expect(result.quotaMensuel).toBe(5);
+            // Paywall : GRATUIT n'a plus de quota mensuel (0), seuls les essais
+            // découverte à vie permettent de débloquer une conversation.
+            expect(result.quotaMensuel).toBe(0);
             expect(result.estActif).toBe(true);
         });
 
-        it('should return null demandesRestantes for PREMIUM (unlimited)', async () => {
+        it('should return null demandesRestantes for GOLD (unlimited)', async () => {
             mockPrisma.artisan.findUnique.mockResolvedValue(
                 buildArtisan({
-                    abonnementType: PlanAbonnement.PREMIUM,
+                    abonnementType: PlanAbonnement.GOLD,
                     abonnementExpireAt: new Date(Date.now() + 86400000),
                 }),
             );
@@ -173,9 +216,13 @@ describe('SubscriptionsService', () => {
     // ─── hasRemainingQuota ────────────────────────────────────────────────────
 
     describe('hasRemainingQuota', () => {
-        it('should return true when artisan has remaining quota on GRATUIT', async () => {
+        it('should return true when a paid plan still has remaining quota', async () => {
             mockPrisma.artisan.findUnique.mockResolvedValue(
-                buildArtisan({ compteurDemandesMoisCourant: 2 }),
+                buildArtisan({
+                    abonnementType: PlanAbonnement.STANDARD,
+                    abonnementExpireAt: new Date(Date.now() + 86400000),
+                    compteurDemandesMoisCourant: 1,
+                }),
             );
 
             const result = await service.hasRemainingQuota('artisan-1');
@@ -183,9 +230,9 @@ describe('SubscriptionsService', () => {
             expect(result).toBe(true);
         });
 
-        it('should return false when GRATUIT quota is exhausted', async () => {
+        it('should return false on GRATUIT (no monthly quota, lifetime trials only)', async () => {
             mockPrisma.artisan.findUnique.mockResolvedValue(
-                buildArtisan({ compteurDemandesMoisCourant: 5 }),
+                buildArtisan({ compteurDemandesMoisCourant: 0 }),
             );
 
             const result = await service.hasRemainingQuota('artisan-1');
@@ -193,10 +240,10 @@ describe('SubscriptionsService', () => {
             expect(result).toBe(false);
         });
 
-        it('should return true for PREMIUM (unlimited)', async () => {
+        it('should return true for GOLD (unlimited)', async () => {
             mockPrisma.artisan.findUnique.mockResolvedValue(
                 buildArtisan({
-                    abonnementType: PlanAbonnement.PREMIUM,
+                    abonnementType: PlanAbonnement.GOLD,
                     abonnementExpireAt: new Date(Date.now() + 86400000),
                     compteurDemandesMoisCourant: 9999,
                 }),

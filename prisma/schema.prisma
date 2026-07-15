@@ -36,6 +36,7 @@ enum AbonnementType {
   GRATUIT
   STANDARD
   PREMIUM
+  GOLD
 }
 
 enum StatutBooking {
@@ -87,6 +88,17 @@ enum CanalNotification {
   IN_APP
 }
 
+enum TypeReduction {
+  POURCENTAGE
+  MONTANT_FIXE
+}
+
+enum StatutParrainage {
+  EN_ATTENTE  // Le filleul s'est inscrit avec le code
+  RECOMPENSE  // Le filleul a payé sa 1ère intervention → récompenses versées
+  EXPIRE
+}
+
 // ==================== USER ====================
 
 model User {
@@ -129,6 +141,13 @@ model User {
   notificationSms   Boolean @default(false) @map("notification_sms")
   notificationPush  Boolean @default(true)  @map("notification_push")
 
+  // Anti-fuite : tentatives de partage de coordonnées bloquées (sanction graduée)
+  tentativesContactBloquees Int     @default(0)     @map("tentatives_contact_bloquees")
+  contactSignaleAdmin       Boolean @default(false) @map("contact_signale_admin")
+
+  // Parrainage — code personnel partageable (généré à la demande)
+  codeParrainage String? @unique @db.VarChar(20) @map("code_parrainage")
+
   // Métadonnées
   derniereConnexion DateTime? @db.Timestamptz @map("derniere_connexion")
   createdAt DateTime @default(now()) @db.Timestamptz @map("created_at")
@@ -151,6 +170,15 @@ model User {
   favoris          Favori[]       @relation("ClientFavoris")
   fcmTokens        FcmToken[]
   logsActivite     LogActivite[]
+  parrainagesEnvoyes Parrainage[] @relation("Parrain")
+  parrainageRecu     Parrainage?  @relation("Filleul")
+  utilisationsPromo  UtilisationCodePromo[]
+  // Main-d'œuvre
+  profilTravailleur  ProfilTravailleur?
+  patronEngagements  EngagementTravail[] @relation("PatronEngagements")
+  annoncesChantier   AnnonceChantier[]
+  noteCommePatron    Decimal @default(0) @map("note_comme_patron") @db.Decimal(3, 2)
+  nombreAvisPatron   Int     @default(0) @map("nombre_avis_patron")
 
   @@map("users")
 }
@@ -176,6 +204,46 @@ model CategorieMetier {
   @@map("categories_metiers")
 }
 
+// ==================== MAIN-D'OEUVRE (enums) ====================
+
+enum TypeTravailleur {
+  OUVRIER
+  AIDE
+}
+
+enum Disponibilite {
+  PONCTUEL
+  REGULIER
+}
+
+enum StatutEngagement {
+  EN_COURS
+  TERMINE
+  ANNULE
+}
+
+enum SensAvis {
+  PATRON_VERS_TRAVAILLEUR
+  TRAVAILLEUR_VERS_PATRON
+}
+
+enum ContexteConversation {
+  CLIENT
+  TRAVAIL
+}
+
+enum StatutAnnonce {
+  OUVERTE
+  POURVUE
+  CLOSE
+}
+
+enum PeriodeChantier {
+  UNE_JOURNEE
+  PLUSIEURS_JOURS
+  REGULIER
+}
+
 // ==================== METIERS ====================
 
 model Metier {
@@ -194,6 +262,9 @@ model Metier {
   categorie            CategorieMetier @relation(fields: [categorieId], references: [id])
   artisanMetiers       ArtisanMetier[]
   bookings             Booking[]
+  certifications       Certification[]
+  profilTravailleurMetiers ProfilTravailleurMetier[]
+  annonces             AnnonceChantier[]
 
   @@index([slug], name: "idx_metiers_slug")
   @@index([categorieId], name: "idx_metiers_categorie")
@@ -233,6 +304,8 @@ model Artisan {
   noteMoyenne       Decimal         @default(0) @db.Decimal(3, 2) @map("note_moyenne")
   nombreAvis        Int             @default(0) @map("nombre_avis")
   compteurDemandesMoisCourant Int   @default(0) @map("compteur_demandes_mois_courant")
+  // Déblocages gratuits « essai découverte » déjà utilisés (à vie, anti-fuite)
+  essaisGratuitsUtilises Int        @default(0) @map("essais_gratuits_utilises")
   nombreMissionsCompletees Int      @default(0) @map("nombre_missions_completees")
   tauxCompletion    Decimal         @default(0) @db.Decimal(5, 2) @map("taux_completion")
   tauxReponseMoyen  Int?            @map("taux_reponse_moyen")
@@ -279,6 +352,7 @@ model Artisan {
   bookings          Booking[]       @relation("ArtisanBookings")
   avis              Avis[]          @relation("ArtisanAvis")
   favoris           Favori[]        @relation("ArtisanFavoris")
+  abonnementPaiements AbonnementPaiement[]
 
   @@index([userId], name: "idx_artisans_user")
   @@index([villePrincipale], name: "idx_artisans_ville")
@@ -328,15 +402,47 @@ model Certification {
   numeroCertification String?   @db.VarChar(100) @map("numero_certification")
   documentUrl         String?   @db.Text @map("document_url")
   verifie             Boolean   @default(false)
+  // Deux familles de preuves : IDENTITE (pièce d'identité, jamais publique,
+  // une seule par artisan) et METIER (diplôme/attestation lié à un métier)
+  type                String    @default("METIER") @db.VarChar(20)
+  metierId            String?   @map("metier_id") @db.VarChar(36)
+  // Cycle d'examen : EN_ATTENTE | VALIDEE | REJETEE (avec motif lisible par l'artisan)
+  statutVerification  String    @default("EN_ATTENTE") @db.VarChar(20) @map("statut_verification")
+  raisonRejet         String?   @db.Text @map("raison_rejet")
   createdAt           DateTime  @default(now()) @db.Timestamptz @map("created_at")
 
   // Relations
   artisan             Artisan   @relation(fields: [artisanId], references: [id], onDelete: Cascade)
+  metier              Metier?   @relation(fields: [metierId], references: [id], onDelete: SetNull)
 
   @@index([artisanId], name: "idx_certifications_artisan")
   @@index([verifie, artisanId], name: "idx_certifications_verified")
 
   @@map("certifications")
+}
+
+// ==================== PAIEMENTS D'ABONNEMENT ====================
+
+// Paiement Mobile Money d'un abonnement artisan (la source de revenus de la
+// plateforme) : circuit séparé des Transactions (qui exigent un booking)
+model AbonnementPaiement {
+  id                    String            @id @default(uuid()) @db.VarChar(36)
+  artisanId             String            @map("artisan_id") @db.VarChar(36)
+  plan                  String            @db.VarChar(20)
+  montant               Decimal           @db.Decimal(10, 2)
+  statut                StatutTransaction @default(EN_ATTENTE)
+  provider              String            @default("kkiapay") @db.VarChar(50)
+  providerTransactionId String?           @unique @db.VarChar(200) @map("provider_transaction_id")
+  providerResponse      Json?             @map("provider_response")
+  createdAt             DateTime          @default(now()) @db.Timestamptz @map("created_at")
+  updatedAt             DateTime          @updatedAt @db.Timestamptz @map("updated_at")
+
+  artisan               Artisan           @relation(fields: [artisanId], references: [id], onDelete: Cascade)
+
+  @@index([artisanId], name: "idx_abonnement_paiements_artisan")
+  @@index([statut], name: "idx_abonnement_paiements_statut")
+
+  @@map("abonnement_paiements")
 }
 
 // ==================== BOOKINGS ====================
@@ -468,6 +574,12 @@ model Conversation {
   artisanId     String    @map("artisan_id") @db.VarChar(36)
   bookingId     String?   @map("booking_id") @db.VarChar(36)
   lastMessageAt DateTime? @db.Timestamptz @map("last_message_at")
+  // Paywall : l'artisan doit débloquer (essai gratuit ou abonnement) pour
+  // lire/répondre. Le client, lui, écrit librement.
+  debloque      Boolean   @default(false)
+  debloqueAt    DateTime? @db.Timestamptz @map("debloque_at")
+  // Contexte : CLIENT (soumis au paywall) ou TRAVAIL (main-d'œuvre, gratuit)
+  contexte      ContexteConversation @default(CLIENT)
   createdAt     DateTime  @default(now()) @db.Timestamptz @map("created_at")
 
   // Relations
@@ -493,10 +605,20 @@ model Message {
   longitude       Decimal?     @db.Decimal(11, 8)
   lu              Boolean      @default(false)
   luAt            DateTime?    @db.Timestamptz @map("lu_at")
+
+  // Actions type WhatsApp : répondre / modifier / supprimer
+  replyToId       String?      @map("reply_to_id") @db.VarChar(36)
+  modifieAt       DateTime?    @db.Timestamptz @map("modifie_at")
+  supprime        Boolean      @default(false)
+  /// Forme d'onde des vocaux : niveaux 0..1 capturés à l'enregistrement
+  waveform        Json?
+
   createdAt       DateTime     @default(now()) @db.Timestamptz @map("created_at")
 
   // Relations
   conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  replyTo         Message?     @relation("MessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies         Message[]    @relation("MessageReply")
 
   @@index([conversationId, createdAt], name: "idx_messages_conv")
   @@index([senderId], name: "idx_messages_sender")
@@ -564,6 +686,77 @@ model Favori {
   @@map("favoris")
 }
 
+// ==================== CODES PROMO ====================
+
+model CodePromo {
+  id             String        @id @default(uuid()) @db.VarChar(36)
+  code           String        @unique @db.VarChar(50)
+  description    String?       @db.Text
+  typeReduction  TypeReduction @default(POURCENTAGE) @map("type_reduction")
+  /// Pourcentage (0-100) ou montant fixe en FCFA selon typeReduction
+  valeur         Decimal       @db.Decimal(10, 2)
+  /// Plafond de réduction en FCFA (pour les codes en pourcentage)
+  reductionMax   Decimal?      @db.Decimal(10, 2) @map("reduction_max")
+  /// Montant minimum de la commande pour utiliser le code
+  montantMinimum Decimal?      @db.Decimal(10, 2) @map("montant_minimum")
+
+  utilisationsMax            Int? @map("utilisations_max")
+  utilisationsParUtilisateur Int  @default(1) @map("utilisations_par_utilisateur")
+  utilisationsTotal          Int  @default(0) @map("utilisations_total")
+
+  /// Code personnel réservé à un utilisateur (récompenses de parrainage)
+  reserveUserId String? @db.VarChar(36) @map("reserve_user_id")
+
+  actif      Boolean   @default(true)
+  validFrom  DateTime? @db.Timestamptz @map("valid_from")
+  validUntil DateTime? @db.Timestamptz @map("valid_until")
+  createdAt  DateTime  @default(now()) @db.Timestamptz @map("created_at")
+  updatedAt  DateTime  @updatedAt @db.Timestamptz @map("updated_at")
+
+  utilisations UtilisationCodePromo[]
+
+  @@index([actif, validUntil], name: "idx_codes_promo_actifs")
+  @@index([reserveUserId], name: "idx_codes_promo_reserve")
+  @@map("codes_promo")
+}
+
+model UtilisationCodePromo {
+  id              String   @id @default(uuid()) @db.VarChar(36)
+  codePromoId     String   @map("code_promo_id") @db.VarChar(36)
+  userId          String   @map("user_id") @db.VarChar(36)
+  bookingId       String?  @map("booking_id") @db.VarChar(36)
+  montantReduction Decimal @db.Decimal(10, 2) @map("montant_reduction")
+  createdAt       DateTime @default(now()) @db.Timestamptz @map("created_at")
+
+  codePromo CodePromo @relation(fields: [codePromoId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([codePromoId, userId], name: "idx_utilisations_promo_user")
+  @@index([bookingId], name: "idx_utilisations_promo_booking")
+  @@map("utilisations_codes_promo")
+}
+
+// ==================== PARRAINAGE ====================
+
+model Parrainage {
+  id          String           @id @default(uuid()) @db.VarChar(36)
+  parrainId   String           @map("parrain_id") @db.VarChar(36)
+  filleulId   String           @unique @map("filleul_id") @db.VarChar(36)
+  codeUtilise String           @db.VarChar(20) @map("code_utilise")
+  statut      StatutParrainage @default(EN_ATTENTE)
+  /// Montants effectivement versés (FCFA, sous forme de codes promo personnels)
+  recompenseParrain Decimal?   @db.Decimal(10, 2) @map("recompense_parrain")
+  recompenseFilleul Decimal?   @db.Decimal(10, 2) @map("recompense_filleul")
+  recompenseAt      DateTime?  @db.Timestamptz @map("recompense_at")
+  createdAt   DateTime         @default(now()) @db.Timestamptz @map("created_at")
+
+  parrain User @relation("Parrain", fields: [parrainId], references: [id], onDelete: Cascade)
+  filleul User @relation("Filleul", fields: [filleulId], references: [id], onDelete: Cascade)
+
+  @@index([parrainId, statut], name: "idx_parrainages_parrain")
+  @@map("parrainages")
+}
+
 // ==================== LOGS ACTIVITE ====================
 
 model LogActivite {
@@ -586,4 +779,123 @@ model LogActivite {
   @@index([createdAt], name: "idx_logs_created")
 
   @@map("logs_activites")
+}
+
+// ==================== MAIN-D'OEUVRE (aides & ouvriers) ====================
+
+model ProfilTravailleur {
+  id                   String          @id @default(uuid()) @db.VarChar(36)
+  userId               String          @unique @map("user_id") @db.VarChar(36)
+  type                 TypeTravailleur
+  actif                Boolean         @default(false)
+  polyvalent           Boolean         @default(false)
+  description          String?         @db.Text
+  anneesExperience     Int?            @map("annees_experience")
+  latitude             Float
+  longitude            Float
+  villePrincipale      String          @map("ville_principale") @db.VarChar(80)
+  zoneInterventionKm   Int             @default(10) @map("zone_intervention_km")
+  disponibilite        Disponibilite   @default(PONCTUEL)
+  disponibleMaintenant Boolean         @default(false) @map("disponible_maintenant")
+  tarifJournalier      Int?            @map("tarif_journalier")
+  identiteVerifiee     Boolean         @default(false) @map("identite_verifiee")
+  noteMoyenne          Decimal         @default(0) @map("note_moyenne") @db.Decimal(3, 2)
+  nombreAvis           Int             @default(0) @map("nombre_avis")
+  createdAt            DateTime        @default(now()) @db.Timestamptz @map("created_at")
+  updatedAt            DateTime        @updatedAt @db.Timestamptz @map("updated_at")
+
+  user           User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  metiers        ProfilTravailleurMetier[]
+  engagements    EngagementTravail[]
+  manifestations ManifestationInteret[]
+
+  @@index([type, actif], name: "idx_travailleur_type_actif")
+  @@map("profils_travailleur")
+}
+
+model ProfilTravailleurMetier {
+  id                  String  @id @default(uuid()) @db.VarChar(36)
+  profilTravailleurId String  @map("profil_travailleur_id") @db.VarChar(36)
+  metierId            String  @map("metier_id") @db.VarChar(36)
+  estPrincipal        Boolean @default(false) @map("est_principal")
+
+  profil ProfilTravailleur @relation(fields: [profilTravailleurId], references: [id], onDelete: Cascade)
+  metier Metier            @relation(fields: [metierId], references: [id])
+
+  @@unique([profilTravailleurId, metierId])
+  @@map("profil_travailleur_metiers")
+}
+
+model EngagementTravail {
+  id                  String           @id @default(uuid()) @db.VarChar(36)
+  patronUserId        String           @map("patron_user_id") @db.VarChar(36)
+  profilTravailleurId String           @map("profil_travailleur_id") @db.VarChar(36)
+  conversationId      String?          @map("conversation_id") @db.VarChar(36)
+  statut              StatutEngagement @default(EN_COURS)
+  createdAt           DateTime         @default(now()) @db.Timestamptz @map("created_at")
+  termineAt           DateTime?        @db.Timestamptz @map("termine_at")
+
+  patron User              @relation("PatronEngagements", fields: [patronUserId], references: [id])
+  profil ProfilTravailleur @relation(fields: [profilTravailleurId], references: [id])
+  avis   AvisTravail[]
+
+  @@index([patronUserId], name: "idx_engagement_patron")
+  @@index([profilTravailleurId], name: "idx_engagement_travailleur")
+  @@map("engagements_travail")
+}
+
+model AvisTravail {
+  id           String   @id @default(uuid()) @db.VarChar(36)
+  engagementId String   @map("engagement_id") @db.VarChar(36)
+  auteurUserId String   @map("auteur_user_id") @db.VarChar(36)
+  cibleUserId  String   @map("cible_user_id") @db.VarChar(36)
+  sens         SensAvis
+  note         Int
+  commentaire  String?  @db.Text
+  createdAt    DateTime @default(now()) @db.Timestamptz @map("created_at")
+
+  engagement EngagementTravail @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+
+  @@unique([engagementId, sens])
+  @@map("avis_travail")
+}
+
+model AnnonceChantier {
+  id              String          @id @default(uuid()) @db.VarChar(36)
+  patronUserId    String          @map("patron_user_id") @db.VarChar(36)
+  type            TypeTravailleur
+  metierId        String?         @map("metier_id") @db.VarChar(36)
+  nombrePersonnes Int             @default(1) @map("nombre_personnes")
+  latitude        Float
+  longitude       Float
+  ville           String          @db.VarChar(80)
+  periode         PeriodeChantier @default(UNE_JOURNEE)
+  tarifJournalier Int?            @map("tarif_journalier")
+  description     String          @db.Text
+  statut          StatutAnnonce   @default(OUVERTE)
+  createdAt       DateTime        @default(now()) @db.Timestamptz @map("created_at")
+  updatedAt       DateTime        @updatedAt @db.Timestamptz @map("updated_at")
+
+  patron   User                   @relation(fields: [patronUserId], references: [id], onDelete: Cascade)
+  metier   Metier?                @relation(fields: [metierId], references: [id])
+  interets ManifestationInteret[]
+
+  @@index([statut, type], name: "idx_annonce_statut_type")
+  @@index([patronUserId], name: "idx_annonce_patron")
+  @@map("annonces_chantier")
+}
+
+model ManifestationInteret {
+  id                  String   @id @default(uuid()) @db.VarChar(36)
+  annonceId           String   @map("annonce_id") @db.VarChar(36)
+  profilTravailleurId String   @map("profil_travailleur_id") @db.VarChar(36)
+  message             String?  @db.Text
+  createdAt           DateTime @default(now()) @db.Timestamptz @map("created_at")
+
+  annonce AnnonceChantier   @relation(fields: [annonceId], references: [id], onDelete: Cascade)
+  profil  ProfilTravailleur @relation(fields: [profilTravailleurId], references: [id], onDelete: Cascade)
+
+  @@unique([annonceId, profilTravailleurId])
+  @@index([annonceId], name: "idx_interet_annonce")
+  @@map("manifestations_interet")
 }

@@ -49,6 +49,8 @@ export class GeolocationService {
                         a.abonnement_type,
                         a.ville_principale,
                         a.disponible,
+                        a.latitude,
+                        a.longitude,
                         u.nom,
                         u.prenom,
                         u.photo_url AS user_photo_url,
@@ -68,10 +70,11 @@ export class GeolocationService {
                         AND a.deleted_at IS NULL
                         AND a.location IS NOT NULL
                         AND u.statut = 'ACTIF'
+                        -- Dans le rayon du client ET dans la zone d'intervention déclarée par l'artisan
                         AND ST_DWithin(
                             a.location,
                             ST_SetSRID(ST_MakePoint(${lng}::float, ${lat}::float), 4326)::geography,
-                            ${radiusMeters}::float
+                            LEAST(${radiusMeters}::float, a.zone_intervention_km::float * 1000)
                         )
                         AND EXISTS (
                             SELECT 1 FROM artisan_metiers am
@@ -79,8 +82,9 @@ export class GeolocationService {
                             AND am.metier_id = ${metierId}
                         )
                     ORDER BY
-                        -- Priorité abonnement puis distance
+                        -- Priorité abonnement (GOLD > PREMIUM > STANDARD) puis distance
                         CASE a.abonnement_type
+                            WHEN 'GOLD' THEN 0
                             WHEN 'PREMIUM' THEN 1
                             WHEN 'STANDARD' THEN 2
                             ELSE 3
@@ -101,6 +105,8 @@ export class GeolocationService {
                         a.abonnement_type,
                         a.ville_principale,
                         a.disponible,
+                        a.latitude,
+                        a.longitude,
                         u.nom,
                         u.prenom,
                         u.photo_url AS user_photo_url,
@@ -120,13 +126,15 @@ export class GeolocationService {
                         AND a.deleted_at IS NULL
                         AND a.location IS NOT NULL
                         AND u.statut = 'ACTIF'
+                        -- Dans le rayon du client ET dans la zone d'intervention déclarée par l'artisan
                         AND ST_DWithin(
                             a.location,
                             ST_SetSRID(ST_MakePoint(${lng}::float, ${lat}::float), 4326)::geography,
-                            ${radiusMeters}::float
+                            LEAST(${radiusMeters}::float, a.zone_intervention_km::float * 1000)
                         )
                     ORDER BY
                         CASE a.abonnement_type
+                            WHEN 'GOLD' THEN 0
                             WHEN 'PREMIUM' THEN 1
                             WHEN 'STANDARD' THEN 2
                             ELSE 3
@@ -314,6 +322,11 @@ export class GeolocationService {
                 photoUrl: raw.user_photo_url,
             },
             distanceKm: raw.distance_km ? Number(raw.distance_km) : null,
+            // CONFIDENTIALITÉ : position arrondie à ~100 m pour la carte —
+            // assez précise pour situer l'artisan, jamais son domicile exact
+            latitude: raw.latitude != null ? Math.round(Number(raw.latitude) * 1000) / 1000 : null,
+            longitude:
+                raw.longitude != null ? Math.round(Number(raw.longitude) * 1000) / 1000 : null,
         };
     };
 

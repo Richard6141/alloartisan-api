@@ -1,14 +1,22 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { MessagingService } from './messaging.service';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { PushService } from 'src/push/push.service';
+import {
+    NotFoundException,
+    BadRequestException,
+    ForbiddenException,
+    HttpException,
+} from '@nestjs/common';
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
 const mockPrisma = {
-    artisan: { findUnique: jest.fn() },
+    artisan: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn() },
+    user: { findMany: jest.fn(), update: jest.fn(), findUnique: jest.fn() },
     conversation: {
         findFirst: jest.fn(),
+        findUnique: jest.fn(),
         create: jest.fn(),
         findMany: jest.fn(),
         update: jest.fn(),
@@ -25,6 +33,19 @@ const mockPrisma = {
     $transaction: jest.fn(),
 };
 
+/** Fixture artisan complet pour le calcul du verrou paywall */
+function buildArtisanGate(overrides = {}) {
+    return {
+        id: 'artisan-1',
+        userId: 'user-artisan',
+        abonnementType: 'GRATUIT',
+        abonnementExpireAt: null,
+        compteurDemandesMoisCourant: 0,
+        essaisGratuitsUtilises: 0,
+        ...overrides,
+    };
+}
+
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 function buildConversation(overrides = {}) {
@@ -33,6 +54,9 @@ function buildConversation(overrides = {}) {
         clientId: 'client-1',
         artisanId: 'artisan-1',
         bookingId: null,
+        debloque: true,
+        debloqueAt: new Date(),
+        contexte: 'CLIENT',
         lastMessageAt: new Date(),
         createdAt: new Date(),
         messages: [],
@@ -65,7 +89,11 @@ describe('MessagingService', () => {
 
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
-            providers: [MessagingService, { provide: PrismaService, useValue: mockPrisma }],
+            providers: [
+                MessagingService,
+                { provide: PrismaService, useValue: mockPrisma },
+                { provide: PushService, useValue: { sendToUser: jest.fn() } },
+            ],
         }).compile();
 
         service = module.get<MessagingService>(MessagingService);
@@ -126,11 +154,49 @@ describe('MessagingService', () => {
                 service.getOrCreateConversation('client-1', { artisanId: 'artisan-1' }),
             ).rejects.toThrow(BadRequestException);
         });
+
+        // MAIN-D'ŒUVRE : chat patron↔travailleur (contexte TRAVAIL)
+        it('crée un chat TRAVAIL (artisanId = userId du travailleur)', async () => {
+            mockPrisma.user.findUnique.mockResolvedValue({ id: 'w1' });
+            mockPrisma.conversation.findFirst.mockResolvedValue(null);
+            mockPrisma.conversation.create.mockResolvedValue({ id: 'conv-t', contexte: 'TRAVAIL' });
+
+            const res = await service.getOrCreateConversation('patron1', {
+                contexte: 'TRAVAIL',
+                travailleurUserId: 'w1',
+            } as never);
+
+            expect(res.contexte).toBe('TRAVAIL');
+            expect(mockPrisma.conversation.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        clientId: 'patron1',
+                        artisanId: 'w1',
+                        contexte: 'TRAVAIL',
+                    }),
+                }),
+            );
+        });
+
+        it('chat TRAVAIL : refuse de se contacter soi-même', async () => {
+            await expect(
+                service.getOrCreateConversation('patron1', {
+                    contexte: 'TRAVAIL',
+                    travailleurUserId: 'patron1',
+                } as never),
+            ).rejects.toThrow(BadRequestException);
+        });
     });
 
     // ─── getMyConversations ───────────────────────────────────────────────────
 
     describe('getMyConversations', () => {
+        beforeEach(() => {
+            // Enrichissement des identités client/artisan (deux requêtes groupées)
+            mockPrisma.user.findMany.mockResolvedValue([]);
+            mockPrisma.artisan.findMany.mockResolvedValue([]);
+        });
+
         it('should return conversations with unreadCount using groupBy', async () => {
             const conv = buildConversation({ id: 'conv-1' });
             mockPrisma.artisan.findUnique.mockResolvedValue(null);
@@ -182,8 +248,8 @@ describe('MessagingService', () => {
     describe('getMessages', () => {
         it('should return paginated messages', async () => {
             const messages = [buildMessage({ id: 'msg-1' }), buildMessage({ id: 'msg-2' })];
+            mockPrisma.conversation.findUnique.mockResolvedValue(buildConversation());
             mockPrisma.artisan.findUnique.mockResolvedValue(null);
-            mockPrisma.conversation.findFirst.mockResolvedValue(buildConversation());
             mockPrisma.message.findMany.mockResolvedValue(messages);
             mockPrisma.message.updateMany.mockResolvedValue({ count: 0 });
 
@@ -195,8 +261,8 @@ describe('MessagingService', () => {
 
         it('should mark unread received messages as read', async () => {
             const unreadMsg = buildMessage({ id: 'msg-unread', lu: false, senderId: 'other-user' });
+            mockPrisma.conversation.findUnique.mockResolvedValue(buildConversation());
             mockPrisma.artisan.findUnique.mockResolvedValue(null);
-            mockPrisma.conversation.findFirst.mockResolvedValue(buildConversation());
             mockPrisma.message.findMany.mockResolvedValue([unreadMsg]);
             mockPrisma.message.updateMany.mockResolvedValue({ count: 1 });
 
@@ -208,12 +274,67 @@ describe('MessagingService', () => {
         });
 
         it('should throw ForbiddenException if user has no access', async () => {
+            mockPrisma.conversation.findUnique.mockResolvedValue(buildConversation());
             mockPrisma.artisan.findUnique.mockResolvedValue(null);
-            mockPrisma.conversation.findFirst.mockResolvedValue(null);
 
             await expect(service.getMessages('conv-1', 'stranger', { limit: 30 })).rejects.toThrow(
                 ForbiddenException,
             );
+        });
+
+        it('should throw NotFoundException if conversation does not exist', async () => {
+            mockPrisma.conversation.findUnique.mockResolvedValue(null);
+
+            await expect(service.getMessages('conv-x', 'client-1', { limit: 30 })).rejects.toThrow(
+                NotFoundException,
+            );
+        });
+
+        // PAYWALL : l'artisan non débloqué reçoit un aperçu masqué, pas les messages
+        it('should return a locked preview when artisan has not unlocked', async () => {
+            mockPrisma.conversation.findUnique.mockResolvedValue(
+                buildConversation({ debloque: false, debloqueAt: null }),
+            );
+            mockPrisma.artisan.findUnique.mockResolvedValue(buildArtisanGate());
+            mockPrisma.message.count.mockResolvedValue(4);
+
+            const result = await service.getMessages('conv-1', 'user-artisan', { limit: 30 });
+
+            expect(result.verrouille).toBe(true);
+            expect(result.data).toHaveLength(0);
+            expect(result.gate?.essaisRestants).toBe(3);
+            expect(result.apercu?.nbMessages).toBe(4);
+            expect(mockPrisma.message.findMany).not.toHaveBeenCalled();
+        });
+
+        // MAIN-D'ŒUVRE : contexte TRAVAIL → jamais verrouillé (artisanId = userId du travailleur)
+        it('ne verrouille jamais une conversation de contexte TRAVAIL', async () => {
+            mockPrisma.conversation.findUnique.mockResolvedValue(
+                buildConversation({
+                    debloque: false,
+                    debloqueAt: null,
+                    contexte: 'TRAVAIL',
+                    artisanId: 'user-travailleur',
+                }),
+            );
+            mockPrisma.message.findMany.mockResolvedValue([]);
+            mockPrisma.message.updateMany.mockResolvedValue({ count: 0 });
+
+            // Le travailleur (artisanId = son userId) accède sans verrou
+            const result = await service.getMessages('conv-1', 'user-travailleur', { limit: 30 });
+            expect(result.verrouille).toBe(false);
+        });
+
+        // MAIN-D'ŒUVRE : le patron (clientId) accède aussi
+        it('contexte TRAVAIL : le patron accède sans verrou', async () => {
+            mockPrisma.conversation.findUnique.mockResolvedValue(
+                buildConversation({ contexte: 'TRAVAIL', artisanId: 'user-travailleur' }),
+            );
+            mockPrisma.message.findMany.mockResolvedValue([]);
+            mockPrisma.message.updateMany.mockResolvedValue({ count: 0 });
+
+            const result = await service.getMessages('conv-1', 'client-1', { limit: 30 });
+            expect(result.verrouille).toBe(false);
         });
     });
 
@@ -222,18 +343,39 @@ describe('MessagingService', () => {
     describe('sendMessage', () => {
         it('should send a text message successfully', async () => {
             const msg = buildMessage();
+            mockPrisma.conversation.findUnique.mockResolvedValue(buildConversation());
             mockPrisma.artisan.findUnique.mockResolvedValue(null);
-            mockPrisma.conversation.findFirst.mockResolvedValue(buildConversation());
             mockPrisma.$transaction.mockResolvedValue([msg, {}]);
 
-            const result = await service.sendMessage('conv-1', 'client-1', { contenu: 'Bonjour' });
+            const result = await service.sendMessage('conv-1', 'client-1', {
+                contenu: 'Bonjour',
+            } as any);
 
             expect(result).toEqual(msg);
         });
 
-        it('should throw BadRequestException if no content and no media', async () => {
+        // ANTI-FUITE : un message contenant des coordonnées est BLOQUÉ (pas envoyé)
+        it('should BLOCK a message containing contact details', async () => {
+            mockPrisma.conversation.findUnique.mockResolvedValue(buildConversation());
             mockPrisma.artisan.findUnique.mockResolvedValue(null);
-            mockPrisma.conversation.findFirst.mockResolvedValue(buildConversation());
+            mockPrisma.user.update.mockResolvedValue({
+                tentativesContactBloquees: 1,
+                contactSignaleAdmin: false,
+            });
+
+            await expect(
+                service.sendMessage('conv-1', 'client-1', {
+                    contenu: 'Appelle-moi au 97 00 12 34',
+                } as any),
+            ).rejects.toThrow(HttpException);
+
+            expect(mockPrisma.message.create).not.toHaveBeenCalled();
+            expect(mockPrisma.user.update).toHaveBeenCalled(); // tentative enregistrée
+        });
+
+        it('should throw BadRequestException if no content and no media', async () => {
+            mockPrisma.conversation.findUnique.mockResolvedValue(buildConversation());
+            mockPrisma.artisan.findUnique.mockResolvedValue(null);
 
             await expect(service.sendMessage('conv-1', 'client-1', {} as any)).rejects.toThrow(
                 BadRequestException,
@@ -241,11 +383,106 @@ describe('MessagingService', () => {
         });
 
         it('should throw ForbiddenException if user has no access', async () => {
+            mockPrisma.conversation.findUnique.mockResolvedValue(buildConversation());
             mockPrisma.artisan.findUnique.mockResolvedValue(null);
-            mockPrisma.conversation.findFirst.mockResolvedValue(null);
 
             await expect(
-                service.sendMessage('conv-1', 'stranger', { contenu: 'Hi' }),
+                service.sendMessage('conv-1', 'stranger', { contenu: 'Hi' } as any),
+            ).rejects.toThrow(ForbiddenException);
+        });
+
+        // PAYWALL : un artisan non débloqué ne peut pas répondre (402)
+        it('should block a locked artisan from replying (402)', async () => {
+            mockPrisma.conversation.findUnique.mockResolvedValue(
+                buildConversation({ debloque: false, debloqueAt: null }),
+            );
+            mockPrisma.artisan.findUnique.mockResolvedValue(buildArtisanGate());
+
+            await expect(
+                service.sendMessage('conv-1', 'user-artisan', { contenu: 'Salut' } as any),
+            ).rejects.toThrow(HttpException);
+        });
+    });
+
+    // ─── debloquerConversation (paywall) ──────────────────────────────────────
+
+    describe('debloquerConversation', () => {
+        it('should unlock via a free trial and consume one', async () => {
+            mockPrisma.conversation.findUnique.mockResolvedValue(
+                buildConversation({ debloque: false, debloqueAt: null }),
+            );
+            mockPrisma.artisan.findUnique.mockResolvedValue(
+                buildArtisanGate({ essaisGratuitsUtilises: 1 }),
+            );
+            mockPrisma.$transaction.mockResolvedValue([{}, {}]);
+
+            const result = await service.debloquerConversation('conv-1', 'user-artisan');
+
+            expect(result.verrouille).toBe(false);
+            expect(result.source).toBe('essai');
+            expect(result.gate.essaisRestants).toBe(1); // 3 - (1+1)
+            expect(mockPrisma.artisan.update).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: { essaisGratuitsUtilises: { increment: 1 } },
+                }),
+            );
+        });
+
+        it('should unlock via subscription quota once trials are exhausted', async () => {
+            mockPrisma.conversation.findUnique.mockResolvedValue(
+                buildConversation({ debloque: false, debloqueAt: null }),
+            );
+            mockPrisma.artisan.findUnique.mockResolvedValue(
+                buildArtisanGate({
+                    essaisGratuitsUtilises: 3,
+                    abonnementType: 'STANDARD',
+                    abonnementExpireAt: new Date(Date.now() + 86400000),
+                    compteurDemandesMoisCourant: 2,
+                }),
+            );
+            mockPrisma.$transaction.mockResolvedValue([{}, {}]);
+
+            const result = await service.debloquerConversation('conv-1', 'user-artisan');
+
+            expect(result.source).toBe('abonnement');
+            expect(mockPrisma.artisan.update).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: { compteurDemandesMoisCourant: { increment: 1 } },
+                }),
+            );
+        });
+
+        it('should throw 402 when no trial and no active subscription', async () => {
+            mockPrisma.conversation.findUnique.mockResolvedValue(
+                buildConversation({ debloque: false, debloqueAt: null }),
+            );
+            mockPrisma.artisan.findUnique.mockResolvedValue(
+                buildArtisanGate({ essaisGratuitsUtilises: 3 }),
+            );
+
+            await expect(
+                service.debloquerConversation('conv-1', 'user-artisan'),
+            ).rejects.toThrow(HttpException);
+        });
+
+        it('should be idempotent when already unlocked', async () => {
+            mockPrisma.conversation.findUnique.mockResolvedValue(buildConversation());
+            mockPrisma.artisan.findUnique.mockResolvedValue(buildArtisanGate());
+
+            const result = await service.debloquerConversation('conv-1', 'user-artisan');
+
+            expect(result.dejaDebloque).toBe(true);
+            expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+        });
+
+        it('should forbid the client from unlocking', async () => {
+            mockPrisma.conversation.findUnique.mockResolvedValue(
+                buildConversation({ debloque: false, debloqueAt: null }),
+            );
+            mockPrisma.artisan.findUnique.mockResolvedValue(buildArtisanGate());
+
+            await expect(
+                service.debloquerConversation('conv-1', 'client-1'),
             ).rejects.toThrow(ForbiddenException);
         });
     });

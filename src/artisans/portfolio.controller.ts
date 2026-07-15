@@ -8,11 +8,9 @@ import {
     Body,
     UseInterceptors,
     UploadedFile,
-    ParseFilePipe,
-    MaxFileSizeValidator,
-    FileTypeValidator,
     HttpCode,
     HttpStatus,
+    BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -23,7 +21,9 @@ import {
     ApiConsumes,
     ApiBody,
 } from '@nestjs/swagger';
+import * as fs from 'fs/promises';
 import { GetCurrentUserId } from 'src/common/decorators';
+import { ImageValidatorService } from 'src/upload';
 import { PortfolioService } from './portfolio.service';
 import {
     AddPortfolioItemDto,
@@ -34,12 +34,59 @@ import {
 
 /** 5 MB maximum par photo */
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 @ApiTags('portfolio')
 @ApiBearerAuth()
 @Controller('artisans/:artisanId/portfolio')
 export class PortfolioController {
-    constructor(private readonly portfolioService: PortfolioService) {}
+    constructor(
+        private readonly portfolioService: PortfolioService,
+        private readonly imageValidator: ImageValidatorService,
+    ) {}
+
+    /**
+     * Multer stocke les uploads SUR DISQUE (pas de file.buffer) : on lit le
+     * fichier temporaire, on valide type + taille + signature binaire, puis
+     * on nettoie. Ne pas utiliser ParseFilePipe/FileTypeValidator ici : ils
+     * attendent un buffer et rejettent des JPEG parfaitement valides.
+     */
+    private async readAndValidatePhoto(file: Express.Multer.File): Promise<Buffer> {
+        try {
+            if (!ALLOWED_PHOTO_TYPES.includes(file.mimetype)) {
+                throw new BadRequestException(
+                    `Type de fichier non autorisé: ${file.mimetype}. Autorisés: JPEG, PNG, WebP`,
+                );
+            }
+
+            let buffer: Buffer;
+            if (file.buffer) {
+                buffer = file.buffer;
+            } else if (file.path) {
+                buffer = await fs.readFile(file.path);
+            } else {
+                throw new BadRequestException('Fichier invalide');
+            }
+
+            if (buffer.length > MAX_PHOTO_SIZE) {
+                throw new BadRequestException(
+                    `La photo dépasse la taille maximale de ${MAX_PHOTO_SIZE / (1024 * 1024)} Mo`,
+                );
+            }
+
+            // Signature binaire (magic bytes) : bloque les fichiers déguisés
+            const validation = await this.imageValidator.validateImage(buffer, MAX_PHOTO_SIZE);
+            if (!validation.isValid) {
+                throw new BadRequestException(validation.error);
+            }
+
+            return buffer;
+        } finally {
+            if (file?.path) {
+                await fs.unlink(file.path).catch(() => {});
+            }
+        }
+    }
 
     /**
      * GET /api/v1/artisans/:artisanId/portfolio
@@ -81,18 +128,14 @@ export class PortfolioController {
     async addPhoto(
         @Param('artisanId') artisanId: string,
         @GetCurrentUserId() userId: string,
-        @UploadedFile(
-            new ParseFilePipe({
-                validators: [
-                    new MaxFileSizeValidator({ maxSize: MAX_PHOTO_SIZE }),
-                    new FileTypeValidator({ fileType: /image\/(jpeg|png|webp)/ }),
-                ],
-            }),
-        )
-        file: Express.Multer.File,
+        @UploadedFile() file: Express.Multer.File,
         @Body() dto: AddPortfolioItemDto,
     ): Promise<PortfolioResponseDto> {
-        return this.portfolioService.addPhoto(artisanId, userId, file.buffer, dto);
+        if (!file) {
+            throw new BadRequestException('Aucun fichier fourni');
+        }
+        const buffer = await this.readAndValidatePhoto(file);
+        return this.portfolioService.addPhoto(artisanId, userId, buffer, dto);
     }
 
     /**

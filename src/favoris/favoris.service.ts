@@ -76,7 +76,8 @@ export class FavorisService {
                         abonnementType: true,
                         tarifHoraire: true,
                         user: {
-                            select: { nom: true, prenom: true, telephone: true },
+                            // Anti-fuite : pas de téléphone dans les favoris
+                            select: { nom: true, prenom: true },
                         },
                         metiers: {
                             include: {

@@ -52,6 +52,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
         return this.client.$queryRaw.bind(this.client);
     }
 
+    get $queryRawUnsafe() {
+        return this.client.$queryRawUnsafe.bind(this.client);
+    }
+
     get $executeRaw() {
         return this.client.$executeRaw.bind(this.client);
     }
@@ -92,6 +96,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
         return this.client.transaction;
     }
 
+    get abonnementPaiement() {
+        return this.client.abonnementPaiement;
+    }
+
     get avis() {
         return this.client.avis;
     }
@@ -102,6 +110,31 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
     get message() {
         return this.client.message;
+    }
+
+    // Main-d'œuvre
+    get profilTravailleur() {
+        return this.client.profilTravailleur;
+    }
+
+    get profilTravailleurMetier() {
+        return this.client.profilTravailleurMetier;
+    }
+
+    get engagementTravail() {
+        return this.client.engagementTravail;
+    }
+
+    get avisTravail() {
+        return this.client.avisTravail;
+    }
+
+    get annonceChantier() {
+        return this.client.annonceChantier;
+    }
+
+    get manifestationInteret() {
+        return this.client.manifestationInteret;
     }
 
     get notification() {
@@ -118,5 +151,19 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
     get logActivite() {
         return this.client.logActivite;
+    }
+
+    // ===== CROISSANCE — PROMO & PARRAINAGE =====
+
+    get codePromo() {
+        return this.client.codePromo;
+    }
+
+    get utilisationCodePromo() {
+        return this.client.utilisationCodePromo;
+    }
+
+    get parrainage() {
+        return this.client.parrainage;
     }
 }

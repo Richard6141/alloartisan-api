@@ -20,7 +20,9 @@ jest.mock('resend', () => ({
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { NotificationService } from './notification.service';
+import { MessagingGateway } from 'src/messaging/messaging.gateway';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { PushService } from 'src/push/push.service';
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -39,6 +41,8 @@ const mockPrisma = {
     },
     $transaction: jest.fn(),
 };
+
+const mockPush = { sendToUser: jest.fn() };
 
 const mockConfig = {
     get: jest.fn((key: string, defaultValue?: unknown) => {
@@ -83,6 +87,8 @@ describe('NotificationService', () => {
                 NotificationService,
                 { provide: PrismaService, useValue: mockPrisma },
                 { provide: ConfigService, useValue: mockConfig },
+                { provide: MessagingGateway, useValue: { emitToUser: jest.fn() } },
+                { provide: PushService, useValue: mockPush },
             ],
         }).compile();
 
@@ -108,11 +114,15 @@ describe('NotificationService', () => {
             );
         });
 
-        it('should NOT push via FCM when Firebase is not configured', async () => {
-            // Firebase désactivé (credentials invalides)
+        it('should delegate the push to PushService', async () => {
             await service.send(notifPayload);
 
-            expect(mockPrisma.fcmToken.findMany).not.toHaveBeenCalled();
+            expect(mockPush.sendToUser).toHaveBeenCalledWith(
+                USER_ID,
+                'Nouvelle demande',
+                'Un client a demandé votre service',
+                notifPayload.data,
+            );
         });
 
         it('should never throw — always fire-and-forget', async () => {

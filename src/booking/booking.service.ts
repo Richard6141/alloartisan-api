@@ -12,13 +12,16 @@ import { CreateBookingDto, SearchBookingDto, ProposePriceDto, CancelBookingDto }
 import { ConfigService } from '@nestjs/config';
 import { NotificationService } from 'src/notification/notification.service';
 import { NotificationTemplates } from 'src/notification/notification.types';
+import { nomLisible } from 'src/common/utils/nom.util';
+import { PLAN_QUOTAS, PlanAbonnement } from 'src/config/constants';
 
 export interface BookingClientRelation {
     id: string;
     email?: string;
     nom: string | null;
     prenom: string | null;
-    telephone: string | null;
+    // Anti-fuite : le téléphone n'est plus exposé dans les réservations
+    telephone?: string | null;
     photoUrl?: string | null;
 }
 
@@ -28,7 +31,7 @@ export interface BookingArtisanRelation {
     nomEntreprise: string | null;
     photoProfilUrl: string | null;
     noteMoyenne?: Prisma.Decimal;
-    user?: { nom: string | null; prenom: string | null; telephone: string | null };
+    user?: { nom: string | null; prenom: string | null; telephone?: string | null };
 }
 
 export interface BookingMetierRelation {
@@ -152,14 +155,10 @@ export class BookingService {
             );
         }
 
-        // 4. Vérifier quota artisan selon abonnement
-        const limites: Record<string, number> = { GRATUIT: 5, STANDARD: 30, PREMIUM: 9999 };
-        const limite = limites[artisan.abonnementType] ?? 5;
-        if (artisan.compteurDemandesMoisCourant >= limite) {
-            throw new BadRequestException(
-                'Cet artisan a atteint son quota mensuel de demandes. Réessayez le mois prochain.',
-            );
-        }
+        // 4. (Paywall) Le quota n'est PLUS consommé ici : la « mise en relation »
+        // se joue au déblocage de la conversation (essai découverte ou
+        // abonnement). Une demande de réservation reste donc toujours possible ;
+        // c'est à l'artisan de payer pour y répondre. Voir MessagingService.debloquerConversation.
 
         // 5. Vérifier cohérence urgence / disponibilité
         if (dto.estUrgent && !artisan.accepteUrgences) {
@@ -188,11 +187,8 @@ export class BookingService {
                 include: this.bookingInclude(),
             });
 
-            // Incrémenter le compteur mensuel de l'artisan
-            await tx.artisan.update({
-                where: { id: dto.artisanId },
-                data: { compteurDemandesMoisCourant: { increment: 1 } },
-            });
+            // Le compteur de mises en relation n'est plus incrémenté ici
+            // (consommé au déblocage de la conversation — voir paywall).
 
             return newBooking;
         });
@@ -203,7 +199,7 @@ export class BookingService {
 
         // Notifier l'artisan de la nouvelle demande (fire-and-forget)
         const client = booking.client;
-        const clientNom = client ? `${client.prenom} ${client.nom}` : 'Un client';
+        const clientNom = nomLisible(client, 'Un client');
         const template = NotificationTemplates.bookingNouveauArtisan(clientNom, dto.titre);
 
         // Récupérer l'userId de l'artisan
@@ -315,7 +311,7 @@ export class BookingService {
 
         // Notifier le client
         const artisanUser = (updated as any).artisan?.user;
-        const artisanNom = artisanUser ? `${artisanUser.prenom} ${artisanUser.nom}` : "L'artisan";
+        const artisanNom = nomLisible(artisanUser, "L'artisan");
         const tpl = NotificationTemplates.bookingAccepteClient(artisanNom);
         void this.notificationService.send({
             userId: (updated as any).clientId,
@@ -359,7 +355,7 @@ export class BookingService {
 
         // Notifier le client du devis
         const artU = (updated as any).artisan?.user;
-        const artNom = artU ? `${artU.prenom} ${artU.nom}` : "L'artisan";
+        const artNom = nomLisible(artU, "L'artisan");
         const tplPrix = NotificationTemplates.prixProposeClient(artNom, Number(dto.prixPropose));
         void this.notificationService.send({
             userId: (updated as any).clientId,
@@ -373,32 +369,36 @@ export class BookingService {
     }
 
     // ============================================================
-    // CONFIRMER LE PRIX — Client accepte le devis artisan
+    // CONFIRMER — Client confirme le rendez-vous
+    // PIVOT PROXIMITÉ : le prix se discute directement entre client et
+    // artisan (contexte béninois) — on confirme donc dès ACCEPTEE, sans
+    // devis. L'ancien chemin avec devis (PRIX_PROPOSE) reste accepté.
     // ============================================================
 
     async confirmPrice(bookingId: string, clientId: string): Promise<BookingWithRelations> {
         const booking = await this.findBookingForClient(bookingId, clientId);
 
-        if (booking.statut !== StatutBooking.PRIX_PROPOSE) {
+        const confirmables: StatutBooking[] = [
+            StatutBooking.ACCEPTEE,
+            StatutBooking.PRIX_PROPOSE,
+        ];
+        if (!confirmables.includes(booking.statut)) {
             throw new BadRequestException(
                 `Impossible de confirmer : statut actuel "${booking.statut}"`,
             );
-        }
-
-        if (!booking.prixPropose) {
-            throw new BadRequestException('Aucun prix proposé à confirmer');
         }
 
         const updated = await this.prisma.booking.update({
             where: { id: bookingId },
             data: {
                 statut: StatutBooking.CONFIRMEE,
-                prixFinal: booking.prixPropose,
+                // Legacy : si un devis avait été proposé, il devient le prix final
+                prixFinal: booking.prixPropose ?? undefined,
             },
             include: this.bookingInclude(),
         });
 
-        this.logger.log(`Prix confirmé: ${bookingId} | Montant final: ${booking.prixPropose} FCFA`);
+        this.logger.log(`Rendez-vous confirmé: ${bookingId}`);
 
         // Notifier l'artisan
         const artisanForNotif = await this.prisma.artisan.findUnique({
@@ -406,18 +406,14 @@ export class BookingService {
             select: { userId: true },
         });
         const clientU = (updated as any).client;
-        const clientNomConfirm = clientU ? `${clientU.prenom} ${clientU.nom}` : 'Le client';
-        const tplConfirm = NotificationTemplates.prixConfirmeArtisan(
-            clientNomConfirm,
-            Number(booking.prixPropose),
-        );
+        const clientNomConfirm = nomLisible(clientU, 'Le client');
         if (artisanForNotif) {
             void this.notificationService.send({
                 userId: artisanForNotif.userId,
                 type: 'BOOKING_ACCEPTE',
-                titre: tplConfirm.titre,
-                corps: tplConfirm.corps,
-                data: { bookingId, prixFinal: String(booking.prixPropose) },
+                titre: 'Rendez-vous confirmé ✅',
+                corps: `${clientNomConfirm} a confirmé le rendez-vous. Convenez du prix directement avec lui dans la discussion.`,
+                data: { bookingId },
             });
         }
 
@@ -450,7 +446,7 @@ export class BookingService {
 
         // Notifier le client
         const artU2 = (updated as any).artisan?.user;
-        const artNom2 = artU2 ? `${artU2.prenom} ${artU2.nom}` : "L'artisan";
+        const artNom2 = nomLisible(artU2, "L'artisan");
         const tplStart = NotificationTemplates.interventionDemarree(artNom2);
         void this.notificationService.send({
             userId: (updated as any).clientId,
@@ -489,7 +485,7 @@ export class BookingService {
 
         // Notifier le client (invitation à laisser un avis)
         const artU3 = (updated as any).artisan?.user;
-        const artNom3 = artU3 ? `${artU3.prenom} ${artU3.nom}` : "L'artisan";
+        const artNom3 = nomLisible(artU3, "L'artisan");
         const tplComplete = NotificationTemplates.interventionTerminee(artNom3);
         void this.notificationService.send({
             userId: (updated as any).clientId,
@@ -554,13 +550,8 @@ export class BookingService {
                 include: this.bookingInclude(),
             });
 
-            // Décrémenter le compteur artisan si annulé rapidement (booking SOUMISE)
-            if (booking.statut === StatutBooking.SOUMISE) {
-                await tx.artisan.update({
-                    where: { id: booking.artisanId },
-                    data: { compteurDemandesMoisCourant: { decrement: 1 } },
-                });
-            }
+            // Plus de décrément : le quota n'est pas consommé à la création
+            // d'une réservation (voir paywall / déblocage de conversation).
 
             return result;
         });
@@ -751,21 +742,21 @@ export class BookingService {
         }
     }
 
-    private getQuotaRestant(artisan: any): number {
-        const limites: Record<string, number> = { GRATUIT: 5, STANDARD: 30, PREMIUM: 9999 };
-        const limite = limites[artisan.abonnementType] ?? 5;
-        return Math.max(0, limite - artisan.compteurDemandesMoisCourant);
+    private getQuotaRestant(artisan: any): number | null {
+        const quotaPlan = PLAN_QUOTAS[artisan.abonnementType as PlanAbonnement] ?? 2;
+        if (quotaPlan === null) return null; // GOLD : illimité
+        return Math.max(0, quotaPlan - artisan.compteurDemandesMoisCourant);
     }
 
     private bookingInclude() {
         return {
             client: {
+                // Anti-fuite : pas de téléphone (contact hors plateforme bloqué)
                 select: {
                     id: true,
                     nom: true,
                     prenom: true,
                     photoUrl: true,
-                    telephone: true,
                 },
             },
             artisan: {
@@ -775,7 +766,7 @@ export class BookingService {
                     photoProfilUrl: true,
                     noteMoyenne: true,
                     user: {
-                        select: { nom: true, prenom: true, telephone: true },
+                        select: { nom: true, prenom: true },
                     },
                 },
             },

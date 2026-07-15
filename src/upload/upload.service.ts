@@ -92,6 +92,141 @@ export class UploadService {
     }
 
     /**
+     * Upload un fichier AUDIO (messages vocaux du chat).
+     * Cloudinary traite l'audio via resource_type "video".
+     */
+    async uploadAudioBuffer(
+        buffer: Buffer,
+        folder: string = 'alloartisan/audio',
+    ): Promise<{ url: string; publicId: string }> {
+        return new Promise((resolve, reject) => {
+            const uploadStream = cloudinary.uploader.upload_stream(
+                {
+                    folder,
+                    resource_type: 'video',
+                    timeout: 60000,
+                },
+                (error, result) => {
+                    if (error) {
+                        reject(
+                            new BadRequestException(`Upload audio impossible: ${error.message}`),
+                        );
+                    } else if (result) {
+                        resolve({ url: result.secure_url, publicId: result.public_id });
+                    } else {
+                        reject(new BadRequestException('Upload audio: réponse vide'));
+                    }
+                },
+            );
+            uploadStream.end(buffer);
+        });
+    }
+
+    /**
+     * Upload un DOCUMENT DE CERTIFICATION (image sanitisée ou PDF).
+     * Les PDF sont stockés en resource_type "image" (support natif Cloudinary),
+     * ce qui permet de les supprimer avec deleteImage comme les autres.
+     * Le dossier "certifications" n'est PAS purgé par le job de rétention.
+     */
+    async uploadCertificationDocument(
+        buffer: Buffer,
+        isPdf: boolean,
+    ): Promise<{ url: string; publicId: string }> {
+        return new Promise((resolve, reject) => {
+            const uploadStream = cloudinary.uploader.upload_stream(
+                {
+                    folder: 'alloartisan/certifications',
+                    resource_type: 'image',
+                    ...(isPdf ? { format: 'pdf' } : {}),
+                    timeout: 60000,
+                },
+                (error, result) => {
+                    if (error) {
+                        reject(
+                            new BadRequestException(
+                                `Upload document impossible: ${error.message}`,
+                            ),
+                        );
+                    } else if (result) {
+                        resolve({ url: result.secure_url, publicId: result.public_id });
+                    } else {
+                        reject(new BadRequestException('Upload document: réponse vide'));
+                    }
+                },
+            );
+            uploadStream.end(buffer);
+        });
+    }
+
+    /**
+     * Upload une VIDÉO (chat : filmer une panne).
+     * Retourne une URL de LIVRAISON COMPRESSÉE : Cloudinary transcode à la
+     * volée (720p max, codec/qualité auto) — le destinataire télécharge un
+     * fichier bien plus léger que l'original, quel que soit le téléphone
+     * qui a filmé. L'original est purgé par le job de rétention.
+     */
+    async uploadVideoBuffer(
+        buffer: Buffer,
+        folder: string = 'alloartisan/videos',
+    ): Promise<{ url: string; publicId: string }> {
+        return new Promise((resolve, reject) => {
+            const uploadStream = cloudinary.uploader.upload_stream(
+                {
+                    folder,
+                    resource_type: 'video',
+                    timeout: 180000,
+                    // Transcodage PENDANT l'upload (synchrone) : l'URL renvoyée
+                    // est lisible immédiatement. Une transformation « à la
+                    // volée » renverrait 423 (en cours) à la première lecture.
+                    eager: [
+                        {
+                            width: 720,
+                            crop: 'limit',
+                            quality: 'auto:eco',
+                            video_codec: 'auto',
+                            format: 'mp4',
+                        },
+                    ],
+                    eager_async: false,
+                },
+                (error, result) => {
+                    if (error) {
+                        reject(
+                            new BadRequestException(`Upload vidéo impossible: ${error.message}`),
+                        );
+                    } else if (result) {
+                        const eager = (
+                            result.eager as { secure_url?: string }[] | undefined
+                        )?.[0];
+                        resolve({
+                            // Version compressée prête ; repli : l'originale
+                            url: eager?.secure_url ?? result.secure_url,
+                            publicId: result.public_id,
+                        });
+                    } else {
+                        reject(new BadRequestException('Upload vidéo: réponse vide'));
+                    }
+                },
+            );
+            uploadStream.end(buffer);
+        });
+    }
+
+    /**
+     * Supprime un média (image OU audio/vidéo) — utilisé par le job de
+     * rétention des médias de chat.
+     */
+    async deleteMedia(publicId: string, resourceType: 'image' | 'video'): Promise<void> {
+        try {
+            await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+        } catch (error) {
+            this.logger.warn(
+                `Suppression média échouée [${resourceType}:${publicId}]: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+    }
+
+    /**
      * Effectue l'upload réel vers Cloudinary
      */
     private async performUpload(buffer: Buffer, folder: string): Promise<UploadResult> {

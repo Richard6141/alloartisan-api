@@ -1,14 +1,14 @@
-// Mock StorageService BEFORE imports — uuid v13 & sharp are ESM-only,
+// Mock UploadService BEFORE imports — uuid v13 & sharp are ESM-only,
 // incompatible with Jest's CommonJS transform. The factory short-circuits parsing.
-jest.mock('src/upload/storage.service', () => ({
-    StorageService: class MockStorageService {},
+jest.mock('src/upload/upload.service', () => ({
+    UploadService: class MockUploadService {},
 }));
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PortfolioService } from './portfolio.service';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { StorageService } from 'src/upload/storage.service';
+import { UploadService } from 'src/upload/upload.service';
 import { CacheService } from 'src/common/services/cache.service';
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
@@ -23,9 +23,9 @@ const mockPrisma = {
     },
 };
 
-const mockStorageService = {
+const mockUploadService = {
     uploadPortfolioPhoto: jest.fn(),
-    deletePortfolioPhoto: jest.fn(),
+    deleteImage: jest.fn(),
     extractPublicIdFromUrl: jest.fn(),
 };
 
@@ -74,7 +74,7 @@ describe('PortfolioService', () => {
             providers: [
                 PortfolioService,
                 { provide: PrismaService, useValue: mockPrisma },
-                { provide: StorageService, useValue: mockStorageService },
+                { provide: UploadService, useValue: mockUploadService },
                 { provide: CacheService, useValue: mockCacheService },
             ],
         }).compile();
@@ -95,6 +95,19 @@ describe('PortfolioService', () => {
             expect(result.total).toBe(1);
             expect(result.maxAllowed).toBe(20);
             expect(result.items[0].url).toBe(existingItem.url);
+        });
+
+        it('should tolerate legacy string[] format (seed data)', async () => {
+            mockPrisma.artisan.findUnique.mockResolvedValue({
+                ...artisanBase,
+                portfolioUrls: ['https://cdn.example.com/legacy-1.jpg'],
+            });
+
+            const result = await service.getPortfolio(ARTISAN_ID);
+
+            expect(result.items).toHaveLength(1);
+            expect(result.items[0].url).toBe('https://cdn.example.com/legacy-1.jpg');
+            expect(result.items[0].type).toBe('photo');
         });
 
         it('should return empty portfolio when portfolioUrls is null', async () => {
@@ -124,11 +137,11 @@ describe('PortfolioService', () => {
 
         it('should add a photo and return updated portfolio', async () => {
             mockPrisma.artisan.findUnique.mockResolvedValue(artisanBase);
-            mockStorageService.uploadPortfolioPhoto.mockResolvedValue(uploadedVariants);
+            mockUploadService.uploadPortfolioPhoto.mockResolvedValue(uploadedVariants);
 
             const result = await service.addPhoto(ARTISAN_ID, USER_ID, buffer, dto);
 
-            expect(mockStorageService.uploadPortfolioPhoto).toHaveBeenCalledWith(
+            expect(mockUploadService.uploadPortfolioPhoto).toHaveBeenCalledWith(
                 buffer,
                 ARTISAN_ID,
             );
@@ -176,7 +189,7 @@ describe('PortfolioService', () => {
         it('should accept valid bookingId', async () => {
             mockPrisma.artisan.findUnique.mockResolvedValue(artisanBase);
             mockPrisma.booking.findFirst.mockResolvedValue({ id: 'booking-1' });
-            mockStorageService.uploadPortfolioPhoto.mockResolvedValue(uploadedVariants);
+            mockUploadService.uploadPortfolioPhoto.mockResolvedValue(uploadedVariants);
 
             const result = await service.addPhoto(ARTISAN_ID, USER_ID, buffer, {
                 bookingId: 'booking-1',
@@ -191,17 +204,14 @@ describe('PortfolioService', () => {
     describe('deleteItem', () => {
         it('should delete item and return updated portfolio', async () => {
             mockPrisma.artisan.findUnique.mockResolvedValue(artisanBase);
-            mockStorageService.extractPublicIdFromUrl.mockReturnValue('img-1-uuid');
-            mockStorageService.deletePortfolioPhoto.mockResolvedValue(undefined);
+            mockUploadService.extractPublicIdFromUrl.mockReturnValue('img-1-uuid');
+            mockUploadService.deleteImage.mockResolvedValue(undefined);
 
             const result = await service.deleteItem(ARTISAN_ID, USER_ID, existingItem.url);
 
             expect(result.items).toHaveLength(0);
             expect(result.total).toBe(0);
-            expect(mockStorageService.deletePortfolioPhoto).toHaveBeenCalledWith(
-                ARTISAN_ID,
-                'img-1-uuid',
-            );
+            expect(mockUploadService.deleteImage).toHaveBeenCalledWith('img-1-uuid');
         });
 
         it('should throw NotFoundException when url not found in portfolio', async () => {
@@ -212,10 +222,10 @@ describe('PortfolioService', () => {
             ).rejects.toThrow(NotFoundException);
         });
 
-        it('should not throw if Supabase delete fails (best-effort)', async () => {
+        it('should not throw if CDN delete fails (best-effort)', async () => {
             mockPrisma.artisan.findUnique.mockResolvedValue(artisanBase);
-            mockStorageService.extractPublicIdFromUrl.mockReturnValue('img-1-uuid');
-            mockStorageService.deletePortfolioPhoto.mockRejectedValue(new Error('Supabase down'));
+            mockUploadService.extractPublicIdFromUrl.mockReturnValue('img-1-uuid');
+            mockUploadService.deleteImage.mockRejectedValue(new Error('CDN down'));
 
             // Ne doit PAS throw
             const result = await service.deleteItem(ARTISAN_ID, USER_ID, existingItem.url);

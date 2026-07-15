@@ -1,37 +1,34 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { MessagingGateway } from 'src/messaging/messaging.gateway';
 import { CanalNotification, Prisma } from 'src/generated/prisma';
 import { SendNotificationPayload } from './notification.types';
 import { Resend } from 'resend';
-import * as admin from 'firebase-admin';
+import { PushService } from 'src/push/push.service';
 import { GetNotificationsDto } from './dto';
 
 @Injectable()
 export class NotificationService implements OnModuleInit {
     private readonly logger = new Logger(NotificationService.name);
     private resend: Resend;
-    private firebaseInitialized = false;
     private readonly notificationExpiryDays: number;
-    private readonly pushRateLimit: number;
-    private readonly pushRateWindow: number; // secondes
 
     constructor(
         private readonly prisma: PrismaService,
         private readonly config: ConfigService,
+        private readonly messagingGateway: MessagingGateway,
+        private readonly push: PushService,
     ) {
         this.notificationExpiryDays = config.get<number>('NOTIFICATION_EXPIRY_DAYS', 30);
-        this.pushRateLimit = config.get<number>('NOTIFICATION_PUSH_RATE_LIMIT', 10);
-        this.pushRateWindow = config.get<number>('NOTIFICATION_PUSH_RATE_WINDOW', 3600); // 1h
     }
 
     // ============================================================
-    // INITIALISATION — Firebase Admin SDK (lazy + safe)
+    // INITIALISATION — Resend (email). Le push FCM vit dans PushService.
     // ============================================================
 
     onModuleInit() {
         this.initResend();
-        this.initFirebase();
     }
 
     private initResend(): void {
@@ -42,34 +39,6 @@ export class NotificationService implements OnModuleInit {
         }
         this.resend = new Resend(apiKey);
         this.logger.log('✅ Resend initialisé');
-    }
-
-    private initFirebase(): void {
-        const projectId = this.config.get<string>('FIREBASE_PROJECT_ID');
-        const clientEmail = this.config.get<string>('FIREBASE_CLIENT_EMAIL');
-        const privateKey = this.config.get<string>('FIREBASE_PRIVATE_KEY');
-
-        if (!projectId || projectId === 'your-firebase-project-id' || !clientEmail || !privateKey) {
-            this.logger.warn(
-                'Firebase non configuré — notifications push désactivées. Configurez FIREBASE_* dans .env',
-            );
-            return;
-        }
-
-        // Initialiser seulement si pas déjà fait (éviter double init en dev hot-reload)
-        if (admin.apps.length === 0) {
-            admin.initializeApp({
-                credential: admin.credential.cert({
-                    projectId,
-                    clientEmail,
-                    // Les "\n" sont stockés comme "\n" dans .env, faut les convertir
-                    privateKey: privateKey.replace(/\\n/g, '\n'),
-                }),
-            });
-        }
-
-        this.firebaseInitialized = true;
-        this.logger.log('✅ Firebase Admin SDK initialisé');
     }
 
     // ============================================================
@@ -88,7 +57,7 @@ export class NotificationService implements OnModuleInit {
                 new Date(Date.now() + this.notificationExpiryDays * 24 * 60 * 60 * 1000);
 
             // 2. Persister en BDD (in-app notification)
-            await this.prisma.notification.create({
+            const notification = await this.prisma.notification.create({
                 data: {
                     userId: payload.userId,
                     type: payload.type,
@@ -100,15 +69,29 @@ export class NotificationService implements OnModuleInit {
                 },
             });
 
-            // 3. Tenter l'envoi push FCM (si Firebase configuré + tokens disponibles)
-            if (this.firebaseInitialized) {
-                await this.sendPushNotification(
-                    payload.userId,
-                    payload.titre,
-                    payload.corps,
-                    payload.data,
-                );
+            // 2b. Pousser en TEMPS RÉEL au destinataire connecté (WebSocket) :
+            // badges, listes et écrans se mettent à jour instantanément
+            try {
+                this.messagingGateway.emitToUser(payload.userId, 'notification:new', {
+                    id: notification.id,
+                    type: notification.type,
+                    titre: notification.titre,
+                    corps: notification.corps,
+                    data: notification.data,
+                    lu: false,
+                    createdAt: notification.createdAt,
+                });
+            } catch {
+                // Gateway pas encore initialisée (tests) : non bloquant
             }
+
+            // 3. Tenter l'envoi push FCM (PushService no-op si non configuré)
+            await this.push.sendToUser(
+                payload.userId,
+                payload.titre,
+                payload.corps,
+                payload.data,
+            );
         } catch (error) {
             // Ne jamais bloquer le flux métier pour une notif ratée
             this.logger.error(
@@ -117,82 +100,19 @@ export class NotificationService implements OnModuleInit {
         }
     }
 
-    // ============================================================
-    // FCM PUSH — Envoi Firebase Cloud Messaging
-    // ============================================================
-
-    private async sendPushNotification(
+    /**
+     * Envoie UNIQUEMENT un push (sans créer de notification in-app en BDD).
+     * Pensé pour la messagerie : on veut faire sonner le téléphone quand un
+     * message arrive app fermée, mais SANS polluer la cloche de notifications
+     * (le chat a déjà son propre badge « non lus »).
+     */
+    async pushOnly(
         userId: string,
         title: string,
         body: string,
         data?: Record<string, unknown>,
     ): Promise<void> {
-        // Récupérer tous les tokens actifs de l'utilisateur
-        const tokens = await this.prisma.fcmToken.findMany({
-            where: { userId, actif: true },
-            select: { token: true, id: true },
-        });
-
-        if (tokens.length === 0) return;
-
-        const tokenStrings = tokens.map((t) => t.token);
-
-        // Convertir data en Record<string, string> (requis par FCM)
-        const fcmData: Record<string, string> = {};
-        if (data) {
-            for (const [key, value] of Object.entries(data)) {
-                fcmData[key] = String(value);
-            }
-        }
-
-        try {
-            const response = await admin.messaging().sendEachForMulticast({
-                tokens: tokenStrings,
-                notification: { title, body },
-                data: fcmData,
-                android: {
-                    priority: 'high',
-                    notification: {
-                        sound: 'default',
-                        channelId: 'alloartisan-notifications',
-                    },
-                },
-                apns: {
-                    payload: {
-                        aps: { sound: 'default', badge: 1 },
-                    },
-                },
-            });
-
-            // Désactiver les tokens invalides (expired, not registered)
-            const invalidTokenIds: string[] = [];
-            response.responses.forEach((resp, idx) => {
-                if (
-                    !resp.success &&
-                    (resp.error?.code === 'messaging/registration-token-not-registered' ||
-                        resp.error?.code === 'messaging/invalid-registration-token')
-                ) {
-                    invalidTokenIds.push(tokens[idx].id);
-                }
-            });
-
-            if (invalidTokenIds.length > 0) {
-                await this.prisma.fcmToken.updateMany({
-                    where: { id: { in: invalidTokenIds } },
-                    data: { actif: false },
-                });
-                this.logger.log(`${invalidTokenIds.length} token(s) FCM invalide(s) désactivés`);
-            }
-
-            const successCount = response.responses.filter((r) => r.success).length;
-            this.logger.debug(
-                `Push envoyé: ${successCount}/${tokenStrings.length} succès | userId=${userId}`,
-            );
-        } catch (error) {
-            this.logger.error(
-                `Erreur FCM multicast userId=${userId}: ${error instanceof Error ? error.message : String(error)}`,
-            );
-        }
+        await this.push.sendToUser(userId, title, body, data);
     }
 
     // ============================================================

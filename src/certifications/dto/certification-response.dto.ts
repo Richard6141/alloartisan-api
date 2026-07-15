@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CertificationResponseDto {
     @ApiProperty({
@@ -54,6 +54,32 @@ export class CertificationResponseDto {
         example: false,
     })
     verifie: boolean;
+
+    @ApiProperty({
+        description: "Famille de preuve : IDENTITE (pièce d'identité) ou METIER",
+        enum: ['IDENTITE', 'METIER'],
+        example: 'METIER',
+    })
+    type: 'IDENTITE' | 'METIER';
+
+    @ApiPropertyOptional({
+        description: 'Métier prouvé par ce document',
+        nullable: true,
+    })
+    metierId: string | null;
+
+    @ApiProperty({
+        description: "Cycle d'examen du document",
+        enum: ['EN_ATTENTE', 'VALIDEE', 'REJETEE'],
+        example: 'EN_ATTENTE',
+    })
+    statutVerification: 'EN_ATTENTE' | 'VALIDEE' | 'REJETEE';
+
+    @ApiPropertyOptional({
+        description: 'Motif du rejet, lisible par l\'artisan pour corriger et resoumettre',
+        nullable: true,
+    })
+    raisonRejet: string | null;
 
     @ApiProperty({
         description: 'Date de création',
@@ -117,4 +143,13 @@ export class VerifyCertificationDto {
     })
     @IsBoolean()
     verifie: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Motif du rejet (obligatoire pour aider l\'artisan à corriger)',
+        maxLength: 500,
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(500)
+    raison?: string;
 }

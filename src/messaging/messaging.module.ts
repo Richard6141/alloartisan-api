@@ -5,6 +5,7 @@ import { MessagingGateway } from './messaging.gateway';
 import { MessagingService } from './messaging.service';
 import { MessagingController } from './messaging.controller';
 import { PrismaModule } from 'src/prisma/prisma.module';
+import { PushModule } from 'src/push/push.module';
 
 /**
  * MessagingModule — Messagerie temps réel (Sprint 5)
@@ -20,6 +21,9 @@ import { PrismaModule } from 'src/prisma/prisma.module';
 @Module({
     imports: [
         PrismaModule,
+        // PushModule : envoi FCM pour faire sonner un message app fermée
+        // (partagé avec NotificationModule, sans dépendance circulaire).
+        PushModule,
         // JwtModule nécessaire pour vérifier le token JWT sur la connexion WebSocket
         JwtModule.registerAsync({
             imports: [ConfigModule],

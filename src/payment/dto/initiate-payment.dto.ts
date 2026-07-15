@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUrl } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUrl, Length, Matches } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum PaymentProvider {
@@ -40,4 +40,14 @@ export class InitiatePaymentDto {
     @IsString()
     @IsOptional()
     phoneNumber?: string;
+
+    @ApiPropertyOptional({
+        description: 'Code promo à appliquer sur le montant (validé côté serveur)',
+        example: 'BIENVENUE10',
+    })
+    @IsString()
+    @IsOptional()
+    @Length(3, 50)
+    @Matches(/^[A-Z0-9-]+$/i, { message: 'Format de code promo invalide' })
+    codePromo?: string;
 }

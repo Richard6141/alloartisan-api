@@ -1,5 +1,14 @@
-import { IsEmail, IsNotEmpty, IsString, Matches, MinLength, MaxLength } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import {
+    IsEmail,
+    IsNotEmpty,
+    IsString,
+    IsIn,
+    IsOptional,
+    Matches,
+    MinLength,
+    MaxLength,
+} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class AuthDto {
     @ApiProperty({
@@ -25,4 +34,15 @@ export class AuthDto {
             'Le mot de passe doit contenir au moins une majuscule, une minuscule, un chiffre et un caractère spécial',
     })
     password: string;
+}
+
+export class RegisterDto extends AuthDto {
+    @ApiPropertyOptional({
+        description: "Type de compte à créer (CLIENT par défaut). ADMIN n'est jamais accepté ici.",
+        enum: ['CLIENT', 'ARTISAN'],
+        default: 'CLIENT',
+    })
+    @IsOptional()
+    @IsIn(['CLIENT', 'ARTISAN'], { message: 'Le type de compte doit être CLIENT ou ARTISAN' })
+    role?: 'CLIENT' | 'ARTISAN';
 }

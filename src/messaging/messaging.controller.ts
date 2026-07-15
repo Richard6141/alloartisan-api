@@ -3,6 +3,7 @@ import {
     Get,
     Post,
     Patch,
+    Delete,
     Body,
     Param,
     Query,
@@ -11,7 +12,8 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { MessagingService } from './messaging.service';
-import { CreateConversationDto, SendMessageDto, GetMessagesDto } from './dto';
+import { MessagingGateway } from './messaging.gateway';
+import { CreateConversationDto, SendMessageDto, EditMessageDto, GetMessagesDto } from './dto';
 import { AtGuard } from 'src/common/guards';
 import { GetCurrentUser } from 'src/common/decorators';
 
@@ -20,7 +22,10 @@ import { GetCurrentUser } from 'src/common/decorators';
 @UseGuards(AtGuard)
 @Controller('messages')
 export class MessagingController {
-    constructor(private readonly messagingService: MessagingService) {}
+    constructor(
+        private readonly messagingService: MessagingService,
+        private readonly messagingGateway: MessagingGateway,
+    ) {}
 
     // ─── Conversations ──────────────────────────────────────────────────────
 
@@ -45,6 +50,20 @@ export class MessagingController {
     @Get('conversations')
     getMyConversations(@GetCurrentUser('sub') userId: string) {
         return this.messagingService.getMyConversations(userId);
+    }
+
+    @ApiOperation({
+        summary: 'Débloquer une conversation (artisan)',
+        description:
+            "Consomme un essai découverte gratuit (à vie) puis, une fois épuisés, le quota de l'abonnement. Renvoie 402 (ABONNEMENT_REQUIS / QUOTA_EPUISE) si aucun crédit disponible.",
+    })
+    @ApiParam({ name: 'conversationId', description: 'UUID de la conversation' })
+    @Post('conversations/:conversationId/debloquer')
+    debloquerConversation(
+        @GetCurrentUser('sub') userId: string,
+        @Param('conversationId', ParseUUIDPipe) conversationId: string,
+    ) {
+        return this.messagingService.debloquerConversation(conversationId, userId);
     }
 
     // ─── Messages ───────────────────────────────────────────────────────────
@@ -81,12 +100,52 @@ export class MessagingController {
     })
     @ApiParam({ name: 'conversationId', description: 'UUID de la conversation' })
     @Post('conversations/:conversationId')
-    sendMessage(
+    async sendMessage(
         @GetCurrentUser('sub') userId: string,
         @Param('conversationId', ParseUUIDPipe) conversationId: string,
         @Body() dto: SendMessageDto,
     ) {
-        return this.messagingService.sendMessage(conversationId, userId, dto);
+        const message = await this.messagingService.sendMessage(conversationId, userId, dto);
+        // Diffusion temps réel identique au chemin WebSocket : le destinataire
+        // connecté reçoit le message instantanément
+        this.messagingGateway.server?.to(`conv:${conversationId}`).emit('message:new', message);
+        // + bannière/badge où qu'il soit dans l'app (room personnelle)
+        void this.messagingGateway.notifyRecipient(conversationId, userId, message);
+        return message;
+    }
+
+    @ApiOperation({
+        summary: 'Modifier un message (auteur uniquement, texte, sous 15 minutes)',
+    })
+    @ApiParam({ name: 'messageId', description: 'UUID du message' })
+    @Patch(':messageId')
+    async editMessage(
+        @GetCurrentUser('sub') userId: string,
+        @Param('messageId', ParseUUIDPipe) messageId: string,
+        @Body() dto: EditMessageDto,
+    ) {
+        const message = await this.messagingService.editMessage(messageId, userId, dto.contenu);
+        // Les deux parties voient la modification en direct
+        this.messagingGateway.server
+            ?.to(`conv:${message.conversationId}`)
+            .emit('message:updated', message);
+        return message;
+    }
+
+    @ApiOperation({
+        summary: 'Supprimer un message pour tous (auteur uniquement, sous 1 heure)',
+    })
+    @ApiParam({ name: 'messageId', description: 'UUID du message' })
+    @Delete(':messageId')
+    async deleteMessage(
+        @GetCurrentUser('sub') userId: string,
+        @Param('messageId', ParseUUIDPipe) messageId: string,
+    ) {
+        const message = await this.messagingService.deleteMessage(messageId, userId);
+        this.messagingGateway.server
+            ?.to(`conv:${message.conversationId}`)
+            .emit('message:deleted', message);
+        return message;
     }
 
     // ─── Lu / Non-lu ────────────────────────────────────────────────────────

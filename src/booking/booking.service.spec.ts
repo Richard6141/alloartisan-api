@@ -184,17 +184,8 @@ describe('BookingService', () => {
             await expect(service.create('client-1', createDto)).rejects.toThrow(ConflictException);
         });
 
-        it('should throw BadRequestException when artisan quota exceeded', async () => {
-            mockPrisma.artisan.findFirst.mockResolvedValue(
-                buildArtisan({ abonnementType: 'GRATUIT', compteurDemandesMoisCourant: 5 }),
-            );
-            mockPrisma.artisanMetier.findFirst.mockResolvedValue({ id: 'am-1' });
-            mockPrisma.booking.findFirst.mockResolvedValue(null);
-
-            await expect(service.create('client-1', createDto)).rejects.toThrow(
-                BadRequestException,
-            );
-        });
+        // Paywall : le quota n'est plus consommé/bloqué à la réservation
+        // (il l'est au déblocage de conversation), donc plus de test « quota ».
 
         it('should throw BadRequestException for urgent booking on non-urgent artisan', async () => {
             mockPrisma.artisan.findFirst.mockResolvedValue(

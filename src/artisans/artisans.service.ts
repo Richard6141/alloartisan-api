@@ -9,6 +9,7 @@ import {
 import { createHash } from 'crypto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CacheService } from 'src/common/services/cache.service';
+import { NotificationService } from 'src/notification/notification.service';
 import { StatutArtisan, Role, Statut, Prisma } from 'src/generated/prisma';
 import {
     CreateArtisanDto,
@@ -26,12 +27,12 @@ import {
 
 const ARTISAN_INCLUDE = {
     user: {
+        // Anti-fuite : téléphone jamais exposé sur les fiches artisan
         select: {
             id: true,
             prenom: true,
             nom: true,
             email: true,
-            telephone: true,
         },
     },
     metiers: {
@@ -58,9 +59,77 @@ export class ArtisansService {
     constructor(
         private prisma: PrismaService,
         private cacheService: CacheService,
+        private notificationService: NotificationService,
     ) {}
 
+    /**
+     * ANTI-FRAUDE : la position d'un artisan doit se trouver dans la zone de
+     * service (Bénin, avec une marge frontalière). Bloque l'injection par API
+     * d'une position fantaisiste pour apparaître dans d'autres villes.
+     */
+    private assertPositionZoneService(latitude?: number, longitude?: number): void {
+        if (latitude == null || longitude == null) return;
+        const auBenin =
+            latitude >= 6.0 && latitude <= 12.6 && longitude >= 0.5 && longitude <= 4.1;
+        if (!auBenin) {
+            throw new BadRequestException(
+                'Position hors de la zone de service (Bénin). Activez votre GPS et réessayez.',
+            );
+        }
+    }
+
+    /**
+     * Norme des métiers : UN métier principal obligatoire + deux métiers
+     * secondaires maximum. La preuve (diplôme/attestation) est exigée pour le
+     * principal ; les secondaires sont jugés par l'admin au cas par cas.
+     */
+    private assertMetiersNorme(metiers: { estPrincipal?: boolean }[]): void {
+        if (metiers.length > 3) {
+            throw new BadRequestException(
+                'Un métier principal et deux métiers secondaires maximum',
+            );
+        }
+        const principaux = metiers.filter((m) => m.estPrincipal);
+        if (principaux.length === 0) {
+            throw new BadRequestException('Désignez votre métier principal');
+        }
+        if (principaux.length > 1) {
+            throw new BadRequestException("Il ne peut y avoir qu'un seul métier principal");
+        }
+    }
+
+    /**
+     * SÉCURITÉ : les photos de profil, couverture et portfolio doivent être
+     * hébergées sur NOTRE CDN (même règle que la messagerie). Refuse toute
+     * URL externe qui permettrait d'afficher du contenu non contrôlé.
+     */
+    private assertCdnUrls(dto: UpdateArtisanDto | CreateArtisanDto): void {
+        const urls = [
+            dto.photoProfilUrl,
+            dto.photoCouvertureUrl,
+            ...(dto.portfolioUrls ?? []),
+        ].filter((u): u is string => typeof u === 'string' && u.length > 0);
+
+        for (const raw of urls) {
+            let allowed = false;
+            try {
+                const url = new URL(raw);
+                allowed = url.protocol === 'https:' && url.hostname === 'res.cloudinary.com';
+            } catch {
+                allowed = false;
+            }
+            if (!allowed) {
+                throw new BadRequestException(
+                    "Les photos doivent être envoyées via l'application (hébergement externe refusé)",
+                );
+            }
+        }
+    }
+
     async create(userId: string, dto: CreateArtisanDto): Promise<ArtisanDetailResponseDto> {
+        this.assertCdnUrls(dto);
+        this.assertPositionZoneService(dto.latitude, dto.longitude);
+
         // Vérifier que l'utilisateur existe et n'est pas déjà artisan
         const user = await this.prisma.user.findUnique({
             where: { id: userId },
@@ -82,6 +151,8 @@ export class ArtisansService {
             );
         }
 
+        this.assertMetiersNorme(dto.metiers);
+
         // Vérifier que tous les métiers existent ET sont actifs
         const metierIds = dto.metiers.map((m) => m.metierId);
         const metiers = await this.prisma.metier.findMany({
@@ -93,12 +164,6 @@ export class ArtisansService {
 
         if (metiers.length !== metierIds.length) {
             throw new BadRequestException('Un ou plusieurs métiers sont invalides ou inactifs');
-        }
-
-        // Vérifier qu'il n'y a qu'un seul métier principal
-        const principaux = dto.metiers.filter((m) => m.estPrincipal);
-        if (principaux.length > 1) {
-            throw new BadRequestException("Il ne peut y avoir qu'un seul métier principal");
         }
 
         // Créer l'artisan avec ses métiers
@@ -138,10 +203,11 @@ export class ArtisansService {
             include: ARTISAN_INCLUDE,
         });
 
-        // Mettre à jour le rôle de l'utilisateur
+        // Mettre à jour le rôle + ASSAINISSEMENT : la ville du compte suit la
+        // ville professionnelle (une seule source, jamais demandée deux fois)
         await this.prisma.user.update({
             where: { id: userId },
-            data: { role: Role.ARTISAN },
+            data: { role: Role.ARTISAN, ville: dto.villePrincipale },
         });
 
         return this.formatArtisanResponse(artisan);
@@ -152,19 +218,17 @@ export class ArtisansService {
         const limit = dto.limit ?? 20;
         const skip = (page - 1) * limit;
 
-        // Construire les conditions de recherche
+        // Construire les conditions de recherche.
+        // Route publique : seuls les artisans validés (ACTIF) sont visibles,
+        // jamais ceux en attente, rejetés ou suspendus.
         const where: Prisma.ArtisanWhereInput = {
             deletedAt: null,
+            statut: StatutArtisan.ACTIF,
         };
 
         // Filtrer par disponibilité si demandé
         if (dto.disponibleOnly === true) {
             where.disponible = true;
-        }
-
-        // Filtrer par statut ACTIF uniquement si demandé
-        if (dto.activeOnly === true) {
-            where.statut = StatutArtisan.ACTIF;
         }
 
         if (dto.verifiedOnly) {
@@ -298,14 +362,15 @@ export class ArtisansService {
         const limit = dto.limit ?? 20;
         const skip = (page - 1) * limit;
 
-        // Construire les conditions de recherche
+        // Construire les conditions de recherche.
+        // Route publique : seuls les artisans validés (ACTIF) sont visibles.
         const where: Prisma.ArtisanWhereInput = {
             deletedAt: null,
+            statut: StatutArtisan.ACTIF,
         };
 
         // Filtres simples
         if (dto.disponibleOnly === true) where.disponible = true;
-        if (dto.activeOnly === true) where.statut = StatutArtisan.ACTIF;
         if (dto.verifiedOnly) where.verified = true;
         if (dto.accepteUrgences) where.accepteUrgences = true;
         if (dto.accepteWeekend) where.accepteWeekend = true;
@@ -389,9 +454,11 @@ export class ArtisansService {
                     id: true,
                     nomEntreprise: true,
                     photoProfilUrl: true,
+                    photoCouvertureUrl: true,
                     noteMoyenne: true,
                     nombreAvis: true,
                     villePrincipale: true,
+                    tarifHoraire: true,
                     verified: true,
                     disponible: true,
                     abonnementType: true,
@@ -404,7 +471,6 @@ export class ArtisansService {
                             prenom: true,
                             nom: true,
                             email: true,
-                            telephone: true,
                         },
                     },
                     metiers: {
@@ -425,15 +491,25 @@ export class ArtisansService {
             this.prisma.artisan.count({ where }),
         ]);
 
+        // PROXIMITÉ : si le client envoie sa position, chaque résultat porte sa
+        // distance réelle (PostGIS) — l'app affiche la distance, pas les prix
+        const distances = await this.computeDistances(
+            artisans.map((a) => a.id),
+            dto.latitude,
+            dto.longitude,
+        );
+
         const result: ArtisanSearchResponseDto = {
             data: artisans.map(
                 (a): ArtisanListItemDto => ({
                     id: a.id,
                     nomEntreprise: a.nomEntreprise,
                     photoProfilUrl: a.photoProfilUrl,
+                    photoCouvertureUrl: a.photoCouvertureUrl,
                     noteMoyenne: Number(a.noteMoyenne),
                     nombreAvis: a.nombreAvis,
                     villePrincipale: a.villePrincipale,
+                    tarifHoraire: a.tarifHoraire ? Number(a.tarifHoraire) : null,
                     verified: a.verified,
                     disponible: a.disponible,
                     abonnementType: a.abonnementType,
@@ -442,6 +518,7 @@ export class ArtisansService {
                     accepteWeekend: a.accepteWeekend,
                     metierPrincipal: a.metiers[0]?.metier ?? null,
                     user: a.user,
+                    distanceKm: distances.get(a.id) ?? null,
                 }),
             ),
             total,
@@ -454,6 +531,46 @@ export class ArtisansService {
         await this.cacheService.set(cacheKey, result, CacheService.TTL.SEARCH_RESULTS);
         this.logger.debug(`Cache MISS → stored search results [${cacheKey}]`);
         return result;
+    }
+
+    /**
+     * Distances PostGIS entre la position du client et une page d'artisans.
+     * Une seule requête sur les ids de la page (≤ 20) : coût négligeable.
+     */
+    private async computeDistances(
+        artisanIds: string[],
+        latitude?: number,
+        longitude?: number,
+    ): Promise<Map<string, number>> {
+        const distances = new Map<string, number>();
+        if (latitude == null || longitude == null || artisanIds.length === 0) {
+            return distances;
+        }
+        try {
+            const rows = await this.prisma.$queryRaw<{ id: string; distance_km: number }[]>`
+                SELECT
+                    a.id,
+                    ROUND(
+                        ST_Distance(
+                            a.location,
+                            ST_SetSRID(ST_MakePoint(${longitude}::float, ${latitude}::float), 4326)::geography
+                        )::numeric / 1000,
+                        1
+                    ) AS distance_km
+                FROM artisans a
+                WHERE a.id = ANY(${artisanIds})
+                AND a.location IS NOT NULL
+            `;
+            for (const row of rows) {
+                distances.set(row.id, Number(row.distance_km));
+            }
+        } catch (error) {
+            // PostGIS indisponible : la recherche fonctionne, juste sans distances
+            this.logger.warn(
+                `Distances indisponibles: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+        return distances;
     }
 
     async findOne(id: string): Promise<ArtisanDetailResponseDto> {
@@ -499,6 +616,9 @@ export class ArtisansService {
         userId: string,
         dto: UpdateArtisanDto,
     ): Promise<ArtisanDetailResponseDto> {
+        this.assertCdnUrls(dto);
+        this.assertPositionZoneService(dto.latitude, dto.longitude);
+
         const artisan = await this.prisma.artisan.findUnique({
             where: { id },
         });
@@ -536,6 +656,14 @@ export class ArtisansService {
             include: ARTISAN_INCLUDE,
         });
 
+        // ASSAINISSEMENT : la ville du compte suit la ville professionnelle
+        if (dto.villePrincipale) {
+            await this.prisma.user.update({
+                where: { id: userId },
+                data: { ville: dto.villePrincipale },
+            });
+        }
+
         // Invalider le cache du profil modifié + les résultats de recherche
         await Promise.all([
             this.cacheService.invalidateArtisanProfile(id),
@@ -562,6 +690,8 @@ export class ArtisansService {
             throw new ForbiddenException('Vous ne pouvez modifier que votre propre profil');
         }
 
+        this.assertMetiersNorme(dto.metiers);
+
         // Vérifier que tous les métiers existent ET sont actifs
         const metierIds = dto.metiers.map((m) => m.metierId);
         const metiers = await this.prisma.metier.findMany({
@@ -573,12 +703,6 @@ export class ArtisansService {
 
         if (metiers.length !== metierIds.length) {
             throw new BadRequestException('Un ou plusieurs métiers sont invalides ou inactifs');
-        }
-
-        // Vérifier qu'il n'y a qu'un seul métier principal
-        const principaux = dto.metiers.filter((m) => m.estPrincipal);
-        if (principaux.length > 1) {
-            throw new BadRequestException("Il ne peut y avoir qu'un seul métier principal");
         }
 
         // Supprimer les anciens métiers et créer les nouveaux
@@ -655,6 +779,42 @@ export class ArtisansService {
             throw new ConflictException('Cet artisan est déjà vérifié');
         }
 
+        // RÈGLE D'ACTIVATION : pièce d'identité VALIDÉE + preuve du métier
+        // principal VALIDÉE. Les métiers secondaires restent optionnels : leurs
+        // preuves ne bloquent pas l'activation, elles donnent juste le badge
+        // « certifié » quand elles sont approuvées.
+        const [identiteValidee, principal] = await Promise.all([
+            this.prisma.certification.findFirst({
+                where: { artisanId: id, type: 'IDENTITE', statutVerification: 'VALIDEE' },
+                select: { id: true },
+            }),
+            this.prisma.artisanMetier.findFirst({
+                where: { artisanId: id, estPrincipal: true },
+                select: { metierId: true },
+            }),
+        ]);
+        if (!identiteValidee) {
+            throw new BadRequestException(
+                "Validez d'abord la pièce d'identité de l'artisan avant d'activer son profil",
+            );
+        }
+        if (principal) {
+            const preuvePrincipale = await this.prisma.certification.findFirst({
+                where: {
+                    artisanId: id,
+                    type: 'METIER',
+                    metierId: principal.metierId,
+                    statutVerification: 'VALIDEE',
+                },
+                select: { id: true },
+            });
+            if (!preuvePrincipale) {
+                throw new BadRequestException(
+                    "Validez d'abord la preuve du métier principal (diplôme ou attestation) avant d'activer le profil",
+                );
+            }
+        }
+
         const updated = await this.prisma.artisan.update({
             where: { id },
             data: {
@@ -671,6 +831,16 @@ export class ArtisansService {
             this.cacheService.invalidateArtisanProfile(id),
             this.cacheService.delByPattern(`${CacheService.PREFIX.SEARCH}*`),
         ]);
+
+        // Prévenir l'artisan : son profil vient d'être activé
+        void this.notificationService.send({
+            userId: artisan.userId,
+            type: 'SYSTEME',
+            titre: 'Profil validé 🎉',
+            corps:
+                'Félicitations, votre profil artisan a été vérifié ! Vous êtes maintenant visible des clients et pouvez recevoir des demandes.',
+            data: { screen: 'activite', artisanId: id },
+        });
 
         return this.formatArtisanResponse(updated);
     }
@@ -701,6 +871,15 @@ export class ArtisansService {
             this.cacheService.invalidateArtisanProfile(id),
             this.cacheService.delByPattern(`${CacheService.PREFIX.SEARCH}*`),
         ]);
+
+        // Prévenir l'artisan avec le motif : il corrige puis resoumets
+        void this.notificationService.send({
+            userId: artisan.userId,
+            type: 'SYSTEME',
+            titre: 'Profil refusé',
+            corps: `Votre profil n'a pas pu être validé. Motif : ${raison} Corrigez vos justificatifs dans l'app : votre dossier repartira automatiquement en examen.`,
+            data: { screen: 'justificatifs', artisanId: id },
+        });
 
         return this.formatArtisanResponse(updated);
     }
@@ -793,7 +972,19 @@ export class ArtisansService {
             slogan: artisan.slogan,
             photoProfilUrl: artisan.photoProfilUrl,
             photoCouvertureUrl: artisan.photoCouvertureUrl,
-            portfolioUrls: artisan.portfolioUrls as string[] | null,
+            // Le portfolio est stocké soit en ["url"] (seed), soit en [{url, caption…}]
+            // (module portfolio) : on expose toujours un simple tableau d'URLs ici.
+            portfolioUrls: Array.isArray(artisan.portfolioUrls)
+                ? (artisan.portfolioUrls
+                      .map((entry) =>
+                          typeof entry === 'string'
+                              ? entry
+                              : entry && typeof entry === 'object' && 'url' in entry
+                                ? (entry as { url: string }).url
+                                : null,
+                      )
+                      .filter((u): u is string => typeof u === 'string') as string[])
+                : null,
             adresseAtelier: artisan.adresseAtelier,
             latitude: Number(artisan.latitude),
             longitude: Number(artisan.longitude),
@@ -806,6 +997,8 @@ export class ArtisansService {
             nombreMissionsCompletees: artisan.nombreMissionsCompletees,
             tauxCompletion: Number(artisan.tauxCompletion),
             tauxReponseMoyen: artisan.tauxReponseMoyen,
+            tarifHoraire: artisan.tarifHoraire ? Number(artisan.tarifHoraire) : null,
+            tarifDeplacement: artisan.tarifDeplacement ? Number(artisan.tarifDeplacement) : null,
             disponible: artisan.disponible,
             accepteUrgences: artisan.accepteUrgences,
             accepteWeekend: artisan.accepteWeekend,

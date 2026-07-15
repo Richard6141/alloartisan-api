@@ -57,6 +57,20 @@ export class GetProfileResponseDto {
     ville: string | null;
 
     @ApiPropertyOptional({
+        description: 'Quartier de résidence',
+        example: 'Fidjrossè',
+        nullable: true,
+    })
+    quartier: string | null;
+
+    @ApiPropertyOptional({
+        description: 'Adresse principale',
+        example: 'Rue 234, maison bleue',
+        nullable: true,
+    })
+    adressePrincipale: string | null;
+
+    @ApiPropertyOptional({
         description: 'URL de la photo de profil',
         example: 'https://cdn.alloartisan.com/photos/user123.jpg',
         nullable: true,

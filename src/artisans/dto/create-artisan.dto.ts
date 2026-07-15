@@ -15,6 +15,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { SansContact } from 'src/common/validators/sans-contact.validator';
 
 export class HoraireTravailDto {
     @ApiProperty({ example: 'lundi' })
@@ -83,6 +84,7 @@ export class ArtisanMetierInputDto {
     })
     @IsOptional()
     @IsString()
+    @SansContact()
     description?: string;
 }
 
@@ -95,6 +97,7 @@ export class CreateArtisanDto {
     @IsOptional()
     @IsString()
     @MaxLength(200, { message: "Le nom d'entreprise ne peut pas dépasser 200 caractères" })
+    @SansContact()
     nomEntreprise?: string;
 
     @ApiPropertyOptional({
@@ -123,6 +126,8 @@ export class CreateArtisanDto {
     })
     @IsOptional()
     @IsString()
+    @MaxLength(1000, { message: 'La biographie ne peut pas dépasser 1000 caractères' })
+    @SansContact()
     bio?: string;
 
     @ApiPropertyOptional({
@@ -133,6 +138,7 @@ export class CreateArtisanDto {
     @IsOptional()
     @IsString()
     @MaxLength(200, { message: 'Le slogan ne peut pas dépasser 200 caractères' })
+    @SansContact()
     slogan?: string;
 
     @ApiPropertyOptional({

@@ -73,7 +73,6 @@ export class FedaPayProvider {
             cancelUrl: _cancelUrl, // Conservé dans la signature publique mais non utilisé par l'API v1
         } = params;
 
-        // FedaPay attend les montants en centimes pour les devises décimales
         // Pour XOF (FCFA), on envoie directement le montant entier
         const response = await this.client.post('/transactions', {
             description,
@@ -90,16 +89,19 @@ export class FedaPayProvider {
             },
         });
 
-        const transaction = response.data?.v1?.transaction;
+        // FORMAT RÉEL (vérifié sur le sandbox) : la clé racine contient un
+        // slash — response.data['v1/transaction'], PAS data.v1.transaction
+        const transaction = response.data?.['v1/transaction'];
         if (!transaction) {
             throw new Error('Réponse FedaPay invalide : transaction manquante');
         }
 
-        // Générer le token de paiement pour rediriger le client
+        // Générer le token de paiement : la réponse est { token, url } à la racine
         const tokenResponse = await this.client.post(`/transactions/${transaction.id}/token`);
 
-        const token = tokenResponse.data?.v1?.token?.token;
-        if (!token) {
+        const token: string | undefined = tokenResponse.data?.token;
+        const urlDirecte: string | undefined = tokenResponse.data?.url;
+        if (!token && !urlDirecte) {
             throw new Error('Réponse FedaPay invalide : token manquant');
         }
 
@@ -107,7 +109,8 @@ export class FedaPayProvider {
             ? 'https://checkout.fedapay.com'
             : 'https://sandbox-checkout.fedapay.com';
 
-        const paymentUrl = `${paymentBaseUrl}/${token}`;
+        // FedaPay fournit l'URL de checkout directement ; repli sur token
+        const paymentUrl = urlDirecte ?? `${paymentBaseUrl}/${token}`;
 
         this.logger.log(
             `Transaction FedaPay créée: ${transaction.id} | Montant: ${montant} XOF | Ref: ${referenceInterne}`,
@@ -116,7 +119,7 @@ export class FedaPayProvider {
         return {
             transactionId: String(transaction.id),
             paymentUrl,
-            token,
+            token: token ?? '',
         };
     }
 
@@ -125,7 +128,8 @@ export class FedaPayProvider {
      */
     async getTransaction(transactionId: string): Promise<FedaPayTransaction> {
         const response = await this.client.get(`/transactions/${transactionId}`);
-        const transaction = response.data?.v1?.transaction;
+        // Clé racine avec slash (format réel de l'API, vérifié sur le sandbox)
+        const transaction = response.data?.['v1/transaction'] ?? response.data?.v1?.transaction;
 
         if (!transaction) {
             throw new Error(`Transaction FedaPay ${transactionId} introuvable`);

@@ -124,3 +124,6 @@ REDIS.md
 *.pdf
 CAHIER*.png
 CAHIER*.jpg
+
+# Clés de service (Firebase, etc.) — JAMAIS commit
+secrets/
