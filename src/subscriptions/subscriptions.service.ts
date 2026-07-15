@@ -48,10 +48,7 @@ export class SubscriptionsService {
                 prix: PLAN_TARIFFS.STANDARD,
                 devise: 'XOF',
                 demandesMois: PLAN_QUOTAS.STANDARD,
-                avantages: [
-                    '8 mises en relation par mois',
-                    'Priorité dans les résultats',
-                ],
+                avantages: ['8 mises en relation par mois', 'Priorité dans les résultats'],
                 badge: 'STANDARD',
             },
             {
@@ -302,7 +299,9 @@ export class SubscriptionsService {
         });
         if (!artisan) throw new NotFoundException('Profil artisan introuvable');
 
-        if (PLAN_ORDER.indexOf(plan) < PLAN_ORDER.indexOf(artisan.abonnementType as PlanAbonnement)) {
+        if (
+            PLAN_ORDER.indexOf(plan) < PLAN_ORDER.indexOf(artisan.abonnementType as PlanAbonnement)
+        ) {
             throw new BadRequestException(
                 'Ce palier est inférieur à votre palier actuel. Contactez le support pour un changement.',
             );
@@ -444,7 +443,9 @@ export class SubscriptionsService {
             montantPaye = Number(remote?.amount ?? 0);
             if (remote?.status === 'approved' || remote?.status === 'transferred') {
                 statutDistant = 'REUSSI';
-            } else if (['declined', 'canceled', 'cancelled', 'refunded'].includes(remote?.status ?? '')) {
+            } else if (
+                ['declined', 'canceled', 'cancelled', 'refunded'].includes(remote?.status ?? '')
+            ) {
                 statutDistant = 'ECHOUE';
             }
         } else {
@@ -454,7 +455,8 @@ export class SubscriptionsService {
             reponse = (remote ?? {}) as unknown as Record<string, unknown>;
             montantPaye = Number(remote?.amount ?? 0);
             if (remote?.status === 'SUCCESS') statutDistant = 'REUSSI';
-            else if (['FAILED', 'CANCELLED'].includes(remote?.status ?? '')) statutDistant = 'ECHOUE';
+            else if (['FAILED', 'CANCELLED'].includes(remote?.status ?? ''))
+                statutDistant = 'ECHOUE';
         }
 
         if (statutDistant === 'REUSSI') {

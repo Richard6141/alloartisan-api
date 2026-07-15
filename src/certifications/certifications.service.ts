@@ -54,7 +54,7 @@ export class CertificationsService {
             });
             if (existing) {
                 throw new ConflictException(
-                    'Une pièce d\'identité existe déjà : remplacez son document au lieu d\'en ajouter une nouvelle',
+                    "Une pièce d'identité existe déjà : remplacez son document au lieu d'en ajouter une nouvelle",
                 );
             }
         }
@@ -67,7 +67,7 @@ export class CertificationsService {
             });
             if (!exerce) {
                 throw new BadRequestException(
-                    'Ce métier ne fait pas partie de votre profil : ajoutez-le d\'abord dans votre profil professionnel',
+                    "Ce métier ne fait pas partie de votre profil : ajoutez-le d'abord dans votre profil professionnel",
                 );
             }
         }
@@ -489,7 +489,7 @@ export class CertificationsService {
         if (artisan) {
             const nomDoc =
                 certification.type === 'IDENTITE'
-                    ? 'Votre pièce d\'identité'
+                    ? "Votre pièce d'identité"
                     : `« ${certification.titre} »`;
             void this.notificationService.send({
                 userId: artisan.userId,
@@ -521,7 +521,7 @@ export class CertificationsService {
         }
 
         if (!certification.verifie && certification.statutVerification !== 'VALIDEE') {
-            throw new BadRequestException('Ce document n\'est pas verrouillé');
+            throw new BadRequestException("Ce document n'est pas verrouillé");
         }
 
         const updated = await this.prisma.certification.update({
@@ -547,7 +547,7 @@ export class CertificationsService {
         if (artisan) {
             const nomDoc =
                 certification.type === 'IDENTITE'
-                    ? 'Votre pièce d\'identité'
+                    ? "Votre pièce d'identité"
                     : `« ${certification.titre} »`;
             void this.notificationService.send({
                 userId: artisan.userId,

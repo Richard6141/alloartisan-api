@@ -69,8 +69,7 @@ export class ArtisansService {
      */
     private assertPositionZoneService(latitude?: number, longitude?: number): void {
         if (latitude == null || longitude == null) return;
-        const auBenin =
-            latitude >= 6.0 && latitude <= 12.6 && longitude >= 0.5 && longitude <= 4.1;
+        const auBenin = latitude >= 6.0 && latitude <= 12.6 && longitude >= 0.5 && longitude <= 4.1;
         if (!auBenin) {
             throw new BadRequestException(
                 'Position hors de la zone de service (Bénin). Activez votre GPS et réessayez.',
@@ -837,8 +836,7 @@ export class ArtisansService {
             userId: artisan.userId,
             type: 'SYSTEME',
             titre: 'Profil validé 🎉',
-            corps:
-                'Félicitations, votre profil artisan a été vérifié ! Vous êtes maintenant visible des clients et pouvez recevoir des demandes.',
+            corps: 'Félicitations, votre profil artisan a été vérifié ! Vous êtes maintenant visible des clients et pouvez recevoir des demandes.',
             data: { screen: 'activite', artisanId: id },
         });
 
@@ -975,7 +973,7 @@ export class ArtisansService {
             // Le portfolio est stocké soit en ["url"] (seed), soit en [{url, caption…}]
             // (module portfolio) : on expose toujours un simple tableau d'URLs ici.
             portfolioUrls: Array.isArray(artisan.portfolioUrls)
-                ? (artisan.portfolioUrls
+                ? artisan.portfolioUrls
                       .map((entry) =>
                           typeof entry === 'string'
                               ? entry
@@ -983,7 +981,7 @@ export class ArtisansService {
                                 ? (entry as { url: string }).url
                                 : null,
                       )
-                      .filter((u): u is string => typeof u === 'string') as string[])
+                      .filter((u): u is string => typeof u === 'string')
                 : null,
             adresseAtelier: artisan.adresseAtelier,
             latitude: Number(artisan.latitude),

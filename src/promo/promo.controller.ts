@@ -45,7 +45,7 @@ export class PromoController {
     @ApiOperation({
         summary: 'Valider un code promo et calculer la réduction',
         description:
-            'Vérifie que le code est utilisable par l\'utilisateur courant pour le montant donné. ' +
+            "Vérifie que le code est utilisable par l'utilisateur courant pour le montant donné. " +
             'Ne consomme pas le code — la consommation a lieu au paiement.',
     })
     @ApiQuery({ name: 'code', description: 'Code promo à valider', example: 'BIENVENUE10' })

@@ -460,9 +460,9 @@ describe('MessagingService', () => {
                 buildArtisanGate({ essaisGratuitsUtilises: 3 }),
             );
 
-            await expect(
-                service.debloquerConversation('conv-1', 'user-artisan'),
-            ).rejects.toThrow(HttpException);
+            await expect(service.debloquerConversation('conv-1', 'user-artisan')).rejects.toThrow(
+                HttpException,
+            );
         });
 
         it('should be idempotent when already unlocked', async () => {
@@ -481,9 +481,9 @@ describe('MessagingService', () => {
             );
             mockPrisma.artisan.findUnique.mockResolvedValue(buildArtisanGate());
 
-            await expect(
-                service.debloquerConversation('conv-1', 'client-1'),
-            ).rejects.toThrow(ForbiddenException);
+            await expect(service.debloquerConversation('conv-1', 'client-1')).rejects.toThrow(
+                ForbiddenException,
+            );
         });
     });
 

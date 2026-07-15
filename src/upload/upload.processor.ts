@@ -99,9 +99,7 @@ export class UploadProcessor {
      * n'arrivaient JAMAIS sur le CDN (documentUrl restait vide).
      */
     @Process('certification-document')
-    async handleCertificationDocument(
-        job: Job<CertificationJobData>,
-    ): Promise<UploadJobResult> {
+    async handleCertificationDocument(job: Job<CertificationJobData>): Promise<UploadJobResult> {
         const { certificationId, artisanId, buffer: bufferArray, isPdf } = job.data;
 
         try {

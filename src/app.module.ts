@@ -49,8 +49,7 @@ import { HealthModule } from './health/health.module';
                         // keepAlive TCP + reconnexion progressive
                         // (client v1.5 du cache : délai en ms, pas un booléen)
                         keepAlive: 30000,
-                        reconnectStrategy: (retries: number) =>
-                            Math.min(retries * 200, 5000),
+                        reconnectStrategy: (retries: number) => Math.min(retries * 200, 5000),
                     },
                     password: config.get('REDIS_PASSWORD'),
                     // PING périodique : la connexion ne devient jamais inactive
@@ -62,7 +61,6 @@ import { HealthModule } from './health/health.module';
                 (store as unknown as { client?: NodeJS.EventEmitter }).client?.on(
                     'error',
                     (err: Error) => {
-                        // eslint-disable-next-line no-console
                         console.error(`[CacheRedis] ${err.message} (reconnexion automatique)`);
                     },
                 );

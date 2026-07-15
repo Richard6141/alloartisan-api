@@ -97,9 +97,9 @@ describe('TravailleursService', () => {
             patronUserId: 'patron1',
             profil: { userId: 'w1' },
         });
-        await expect(
-            service.deposerAvis('patron1', 'e1', { note: 5 } as never),
-        ).rejects.toThrow(BadRequestException);
+        await expect(service.deposerAvis('patron1', 'e1', { note: 5 } as never)).rejects.toThrow(
+            BadRequestException,
+        );
     });
 
     it('deposerAvis (patron) cree un avis PATRON_VERS_TRAVAILLEUR', async () => {
@@ -124,8 +124,8 @@ describe('TravailleursService', () => {
             patronUserId: 'patron1',
             profil: { userId: 'w1' },
         });
-        await expect(
-            service.deposerAvis('etranger', 'e1', { note: 5 } as never),
-        ).rejects.toThrow(ForbiddenException);
+        await expect(service.deposerAvis('etranger', 'e1', { note: 5 } as never)).rejects.toThrow(
+            ForbiddenException,
+        );
     });
 });

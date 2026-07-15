@@ -210,7 +210,6 @@ export class PortfolioService {
         }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
     private parsePortfolioUrls(raw: Prisma.JsonValue | null): PortfolioItem[] {
         if (!raw || !Array.isArray(raw)) return [];
         // Tolère les deux formats historiques : ["url", ...] (seed) et [{url, ...}, ...]

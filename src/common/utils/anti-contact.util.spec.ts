@@ -30,7 +30,7 @@ describe('anti-contact util', () => {
 
         it('NE masque PAS un prix ou petit nombre', () => {
             expect(masquerContacts('Le devis est de 15000 FCFA').modifie).toBe(false);
-            expect(masquerContacts('J\'ai 5 ans d\'expérience').modifie).toBe(false);
+            expect(masquerContacts("J'ai 5 ans d'expérience").modifie).toBe(false);
         });
 
         it('NE masque PAS une heure', () => {

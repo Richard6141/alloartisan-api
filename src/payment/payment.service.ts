@@ -102,8 +102,7 @@ export class PaymentService {
         // La réduction est absorbée par la plateforme : l'artisan touche toujours
         // sa part calculée sur le prix convenu. La commission peut devenir négative
         // (coût d'acquisition marketing assumé par la plateforme).
-        const montantArtisan =
-            Math.round(prixConvenu * (1 - this.commissionRate) * 100) / 100;
+        const montantArtisan = Math.round(prixConvenu * (1 - this.commissionRate) * 100) / 100;
         const commission = Math.round((montant - montantArtisan) * 100) / 100;
         const description = `AlloArtisan - Booking #${bookingId.substring(0, 8)}`;
         const referenceInterne = bookingId;

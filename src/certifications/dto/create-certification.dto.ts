@@ -13,7 +13,7 @@ export class CreateCertificationDto {
     type?: 'IDENTITE' | 'METIER';
 
     @ApiPropertyOptional({
-        description: 'Métier prouvé par ce document (doit être un métier déclaré par l\'artisan)',
+        description: "Métier prouvé par ce document (doit être un métier déclaré par l'artisan)",
     })
     @IsOptional()
     @IsUUID()

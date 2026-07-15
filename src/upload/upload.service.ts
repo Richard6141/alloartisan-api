@@ -143,9 +143,7 @@ export class UploadService {
                 (error, result) => {
                     if (error) {
                         reject(
-                            new BadRequestException(
-                                `Upload document impossible: ${error.message}`,
-                            ),
+                            new BadRequestException(`Upload document impossible: ${error.message}`),
                         );
                     } else if (result) {
                         resolve({ url: result.secure_url, publicId: result.public_id });
@@ -195,9 +193,7 @@ export class UploadService {
                             new BadRequestException(`Upload vidéo impossible: ${error.message}`),
                         );
                     } else if (result) {
-                        const eager = (
-                            result.eager as { secure_url?: string }[] | undefined
-                        )?.[0];
+                        const eager = (result.eager as { secure_url?: string }[] | undefined)?.[0];
                         resolve({
                             // Version compressée prête ; repli : l'originale
                             url: eager?.secure_url ?? result.secure_url,

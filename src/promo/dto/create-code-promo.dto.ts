@@ -61,7 +61,9 @@ export class CreateCodePromoDto {
     @Min(0)
     montantMinimum?: number;
 
-    @ApiPropertyOptional({ description: "Nombre total d'utilisations autorisées (null = illimité)" })
+    @ApiPropertyOptional({
+        description: "Nombre total d'utilisations autorisées (null = illimité)",
+    })
     @IsOptional()
     @Type(() => Number)
     @IsInt()

@@ -25,7 +25,7 @@ export class CreateConversationDto {
     @ApiPropertyOptional({
         enum: ['CLIENT', 'TRAVAIL'],
         default: 'CLIENT',
-        description: 'TRAVAIL = chat main-d\'œuvre (gratuit, hors paywall)',
+        description: "TRAVAIL = chat main-d'œuvre (gratuit, hors paywall)",
     })
     @IsOptional()
     @IsIn(['CLIENT', 'TRAVAIL'])

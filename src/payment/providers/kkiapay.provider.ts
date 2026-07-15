@@ -39,9 +39,7 @@ export class KkiaPayProvider {
         const secretKey = config.get<string>('KKIAPAY_SECRET_KEY', '');
         this.sandbox = config.get<string>('KKIAPAY_SANDBOX', 'true') === 'true';
 
-        const baseURL = this.sandbox
-            ? 'https://api-sandbox.kkiapay.me'
-            : 'https://api.kkiapay.me';
+        const baseURL = this.sandbox ? 'https://api-sandbox.kkiapay.me' : 'https://api.kkiapay.me';
 
         this.client = axios.create({
             baseURL,
@@ -76,7 +74,7 @@ export class KkiaPayProvider {
     }): Promise<KkiaPayInitResult> {
         return Promise.reject(
             new BadRequestException(
-                'Le paiement KkiaPay démarre dans l\'application (widget), pas côté serveur.',
+                "Le paiement KkiaPay démarre dans l'application (widget), pas côté serveur.",
             ),
         );
     }

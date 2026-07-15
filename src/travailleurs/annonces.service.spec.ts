@@ -54,9 +54,9 @@ describe('AnnoncesService', () => {
 
     it('manifesterInteret refuse sans profil travailleur', async () => {
         mockPrisma.profilTravailleur.findUnique.mockResolvedValue(null);
-        await expect(
-            service.manifesterInteret('u1', 'a1', {} as never),
-        ).rejects.toThrow(ForbiddenException);
+        await expect(service.manifesterInteret('u1', 'a1', {} as never)).rejects.toThrow(
+            ForbiddenException,
+        );
     });
 
     it('manifesterInteret enregistre + notifie le patron', async () => {
@@ -88,9 +88,9 @@ describe('AnnoncesService', () => {
             statut: 'OUVERTE',
             ville: 'X',
         });
-        await expect(
-            service.manifesterInteret('w1', 'a1', {} as never),
-        ).rejects.toThrow(ForbiddenException);
+        await expect(service.manifesterInteret('w1', 'a1', {} as never)).rejects.toThrow(
+            ForbiddenException,
+        );
     });
 
     it('cloturer refuse si pas propriétaire', async () => {

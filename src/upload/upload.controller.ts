@@ -55,10 +55,7 @@ export class UploadController {
         },
     })
     @ApiResponse({ status: 201, description: 'Image uploadée (url + variantes)' })
-    async uploadImage(
-        @UploadedFile() file: Express.Multer.File,
-        @Query('folder') folder?: string,
-    ) {
+    async uploadImage(@UploadedFile() file: Express.Multer.File, @Query('folder') folder?: string) {
         if (!file) {
             throw new BadRequestException('Aucun fichier reçu (champ attendu : "file")');
         }

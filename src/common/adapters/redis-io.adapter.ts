@@ -49,7 +49,9 @@ export class RedisIoAdapter extends IoAdapter {
 
             await Promise.all([pubClient.connect(), subClient.connect()]);
             this.adapterConstructor = createAdapter(pubClient, subClient);
-            this.logger.log('✅ Socket.io Redis adapter connecté — WebSockets scalables multi-instances');
+            this.logger.log(
+                '✅ Socket.io Redis adapter connecté — WebSockets scalables multi-instances',
+            );
         } catch (error) {
             this.logger.warn(
                 `Redis adapter indisponible (${error instanceof Error ? error.message : String(error)}) — ` +

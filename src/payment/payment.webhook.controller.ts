@@ -137,8 +137,7 @@ export class PaymentWebhookController {
                     body,
                 );
                 if (!estAbonnement) {
-                    const paidAmount =
-                        body?.amount !== undefined ? Number(body.amount) : undefined;
+                    const paidAmount = body?.amount !== undefined ? Number(body.amount) : undefined;
                     await this.paymentService.processSuccessfulPayment(
                         transactionId,
                         'kkiapay',

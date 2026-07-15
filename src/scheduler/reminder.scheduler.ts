@@ -69,7 +69,7 @@ export class ReminderScheduler {
                             corps: `Votre intervention "${titre}" est prévue à ${quand}. Vous pourrez suivre l'artisan en temps réel dès son départ.`,
                         },
                         artisan: {
-                            titre: '⏰ Mission dans moins d\'une heure',
+                            titre: "⏰ Mission dans moins d'une heure",
                             corps: `Votre mission "${titre}" commence à ${quand}. Activez le suivi "En route" quand vous partez.`,
                         },
                     }),
@@ -117,7 +117,7 @@ export class ReminderScheduler {
                 void this.notificationService.send({
                     userId: booking.clientId,
                     type: 'AVIS_NOUVEAU',
-                    titre: '⭐ Comment s\'est passée votre intervention ?',
+                    titre: "⭐ Comment s'est passée votre intervention ?",
                     corps: `Notez ${artisanNom} pour "${booking.titre}". Votre avis aide toute la communauté à choisir les meilleurs artisans.`,
                     data: { bookingId: booking.id, event: 'REVIEW_REMINDER' },
                 });

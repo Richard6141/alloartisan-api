@@ -156,7 +156,7 @@ export class MessagingService {
             });
             if (!booking) throw new NotFoundException('Réservation introuvable');
             if (booking.artisanId !== artisan.id) {
-                throw new ForbiddenException("Cette réservation ne vous concerne pas");
+                throw new ForbiddenException('Cette réservation ne vous concerne pas');
             }
             clientId = booking.clientId;
         }
@@ -269,7 +269,9 @@ export class MessagingService {
         // Main-d'œuvre : pour les convs TRAVAIL, artisanId porte le userId du
         // travailleur → on le résout en user pour afficher son nom/photo.
         const travailleurUserIds = [
-            ...new Set(conversations.filter((c) => c.contexte === 'TRAVAIL').map((c) => c.artisanId)),
+            ...new Set(
+                conversations.filter((c) => c.contexte === 'TRAVAIL').map((c) => c.artisanId),
+            ),
         ];
         const travailleurs = travailleurUserIds.length
             ? await this.prisma.user.findMany({
@@ -456,7 +458,7 @@ export class MessagingService {
             });
             if (!target || target.conversationId !== conversationId) {
                 throw new BadRequestException(
-                    'Le message cité n\'appartient pas à cette conversation',
+                    "Le message cité n'appartient pas à cette conversation",
                 );
             }
         }
@@ -609,9 +611,7 @@ export class MessagingService {
             throw new BadRequestException('Seuls les messages texte sont modifiables');
         }
         if (Date.now() - message.createdAt.getTime() > EDIT_WINDOW_MS) {
-            throw new BadRequestException(
-                'Le délai de modification (15 minutes) est dépassé',
-            );
+            throw new BadRequestException('Le délai de modification (15 minutes) est dépassé');
         }
 
         // ANTI-FUITE : bloquer aussi à la modification (même sanction)
@@ -715,7 +715,7 @@ export class MessagingService {
             userId,
         );
         if (!callerIsArtisan || !artisan) {
-            throw new ForbiddenException('Seul l\'artisan peut débloquer une conversation');
+            throw new ForbiddenException("Seul l'artisan peut débloquer une conversation");
         }
         if (conversation.debloque) {
             return { verrouille: false, dejaDebloque: true, gate: this.gateStatus(artisan) };
@@ -861,8 +861,7 @@ export class MessagingService {
         // Main-d'œuvre : pas d'artisan, pas de paywall. Les deux parties sont des
         // users (clientId = patron, artisanId = userId du travailleur).
         if (conversation.contexte === 'TRAVAIL') {
-            const membre =
-                conversation.clientId === userId || conversation.artisanId === userId;
+            const membre = conversation.clientId === userId || conversation.artisanId === userId;
             if (!membre) {
                 throw new ForbiddenException('Accès à cette conversation refusé');
             }

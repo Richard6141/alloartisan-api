@@ -86,12 +86,7 @@ export class NotificationService implements OnModuleInit {
             }
 
             // 3. Tenter l'envoi push FCM (PushService no-op si non configuré)
-            await this.push.sendToUser(
-                payload.userId,
-                payload.titre,
-                payload.corps,
-                payload.data,
-            );
+            await this.push.sendToUser(payload.userId, payload.titre, payload.corps, payload.data);
         } catch (error) {
             // Ne jamais bloquer le flux métier pour une notif ratée
             this.logger.error(

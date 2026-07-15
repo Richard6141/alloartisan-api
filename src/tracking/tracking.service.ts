@@ -198,7 +198,7 @@ export class TrackingService {
         const isClient = booking.clientId === userId;
         const isArtisan = booking.artisan.userId === userId;
         if (!isClient && !isArtisan) {
-            throw new ForbiddenException("Vous ne participez pas à cette réservation");
+            throw new ForbiddenException('Vous ne participez pas à cette réservation');
         }
         return booking;
     }

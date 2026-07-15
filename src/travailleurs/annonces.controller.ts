@@ -40,7 +40,7 @@ export class AnnoncesController {
         return this.service.manifesterInteret(userId, id, dto);
     }
 
-    @ApiOperation({ summary: 'Candidats d\'une annonce (patron)' })
+    @ApiOperation({ summary: "Candidats d'une annonce (patron)" })
     @Get(':id/candidats')
     candidats(@GetCurrentUser('sub') userId: string, @Param('id') id: string) {
         return this.service.candidats(userId, id);

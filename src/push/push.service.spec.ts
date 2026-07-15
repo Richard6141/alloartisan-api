@@ -20,7 +20,8 @@ function buildConfig(firebaseConfigured: boolean) {
         ? {
               FIREBASE_PROJECT_ID: 'alloartisan-812f4',
               FIREBASE_CLIENT_EMAIL: 'svc@alloartisan-812f4.iam.gserviceaccount.com',
-              FIREBASE_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nAAA\\n-----END PRIVATE KEY-----\\n',
+              FIREBASE_PRIVATE_KEY:
+                  '-----BEGIN PRIVATE KEY-----\\nAAA\\n-----END PRIVATE KEY-----\\n',
           }
         : { FIREBASE_PROJECT_ID: 'your-firebase-project-id' };
     return { get: jest.fn((k: string, d?: unknown) => values[k] ?? d) };

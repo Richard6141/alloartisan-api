@@ -170,14 +170,18 @@ export class AnnoncesService {
             .sort((x, y) => (x.distanceKm ?? 0) - (y.distanceKm ?? 0));
     }
 
-    async manifesterInteret(travailleurUserId: string, annonceId: string, dto: ManifesterInteretDto) {
+    async manifesterInteret(
+        travailleurUserId: string,
+        annonceId: string,
+        dto: ManifesterInteretDto,
+    ) {
         const profil = await this.prisma.profilTravailleur.findUnique({
             where: { userId: travailleurUserId },
             select: { id: true, user: { select: { nom: true, prenom: true } } },
         });
         if (!profil) {
             throw new ForbiddenException(
-                'Activez d\'abord votre profil travailleur pour vous manifester',
+                "Activez d'abord votre profil travailleur pour vous manifester",
             );
         }
         const annonce = await this.prisma.annonceChantier.findUnique({
@@ -201,7 +205,8 @@ export class AnnoncesService {
         });
 
         // Notifier le patron
-        const nom = `${profil.user?.prenom ?? ''} ${profil.user?.nom ?? ''}`.trim() || 'Un travailleur';
+        const nom =
+            `${profil.user?.prenom ?? ''} ${profil.user?.nom ?? ''}`.trim() || 'Un travailleur';
         void this.notifications
             .send({
                 userId: annonce.patronUserId,

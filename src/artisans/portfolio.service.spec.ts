@@ -141,10 +141,7 @@ describe('PortfolioService', () => {
 
             const result = await service.addPhoto(ARTISAN_ID, USER_ID, buffer, dto);
 
-            expect(mockUploadService.uploadPortfolioPhoto).toHaveBeenCalledWith(
-                buffer,
-                ARTISAN_ID,
-            );
+            expect(mockUploadService.uploadPortfolioPhoto).toHaveBeenCalledWith(buffer, ARTISAN_ID);
             expect(result.items).toHaveLength(2);
             expect(result.items[1].url).toBe(uploadedVariants.medium);
             expect(result.items[1].caption).toBe('Nouvelle photo');

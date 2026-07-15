@@ -27,7 +27,7 @@ export class ReferralController {
     @ApiOperation({
         summary: 'Mon code parrainage personnel',
         description:
-            'Retourne le code parrainage de l\'utilisateur (généré au premier appel). ' +
+            "Retourne le code parrainage de l'utilisateur (généré au premier appel). " +
             'À partager : chaque filleul qui paie sa première intervention rapporte une récompense.',
     })
     @ApiResponse({ status: 200, description: 'Code parrainage' })
@@ -43,9 +43,9 @@ export class ReferralController {
     @HttpCode(HttpStatus.OK)
     @Throttle({ default: { ttl: 60000, limit: 5 } }) // Anti brute-force de codes
     @ApiOperation({
-        summary: 'Utiliser le code parrainage d\'un autre utilisateur',
+        summary: "Utiliser le code parrainage d'un autre utilisateur",
         description:
-            'À saisir dans les 30 jours suivant l\'inscription. Un seul code parrain par compte. ' +
+            "À saisir dans les 30 jours suivant l'inscription. Un seul code parrain par compte. " +
             'Les récompenses sont versées quand le filleul paie sa première intervention.',
     })
     @ApiResponse({ status: 200, description: 'Code parrain appliqué' })

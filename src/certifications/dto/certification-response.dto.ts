@@ -76,7 +76,7 @@ export class CertificationResponseDto {
     statutVerification: 'EN_ATTENTE' | 'VALIDEE' | 'REJETEE';
 
     @ApiPropertyOptional({
-        description: 'Motif du rejet, lisible par l\'artisan pour corriger et resoumettre',
+        description: "Motif du rejet, lisible par l'artisan pour corriger et resoumettre",
         nullable: true,
     })
     raisonRejet: string | null;
@@ -145,7 +145,7 @@ export class VerifyCertificationDto {
     verifie: boolean;
 
     @ApiPropertyOptional({
-        description: 'Motif du rejet (obligatoire pour aider l\'artisan à corriger)',
+        description: "Motif du rejet (obligatoire pour aider l'artisan à corriger)",
         maxLength: 500,
     })
     @IsOptional()

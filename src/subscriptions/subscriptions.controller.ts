@@ -59,11 +59,11 @@ export class SubscriptionsController {
     }
 
     @ApiOperation({
-        summary: 'Préparer le paiement d\'un palier (widget KkiaPay)',
+        summary: "Préparer le paiement d'un palier (widget KkiaPay)",
         description:
-            'Crée l\'intention de paiement et renvoie la configuration du widget '
-            + '(clé publique, sandbox). Le widget encaisse côté app, puis '
-            + 'POST /pay/:paiementId/confirmer vérifie la transaction.',
+            "Crée l'intention de paiement et renvoie la configuration du widget " +
+            '(clé publique, sandbox). Le widget encaisse côté app, puis ' +
+            'POST /pay/:paiementId/confirmer vérifie la transaction.',
     })
     @UseGuards(AtGuard, RolesGuard)
     @Roles(Role.ARTISAN)
@@ -73,7 +73,7 @@ export class SubscriptionsController {
     }
 
     @ApiOperation({
-        summary: 'Confirmer un paiement d\'abonnement (transactionId du widget)',
+        summary: "Confirmer un paiement d'abonnement (transactionId du widget)",
         description:
             'Vérifie la transaction auprès de KkiaPay (statut + montant) et active le palier.',
     })
@@ -89,7 +89,7 @@ export class SubscriptionsController {
     }
 
     @ApiOperation({
-        summary: 'Re-vérifier un paiement d\'abonnement',
+        summary: "Re-vérifier un paiement d'abonnement",
         description:
             'Interroge KkiaPay sur un paiement déjà associé à une transaction et active le palier si confirmé.',
     })
