@@ -104,13 +104,23 @@ describe('ReferralService — programme Ambassadeur', () => {
             { parrainId: 'u2', _count: { _all: 2 } },
         ]);
         mockPrisma.user.findMany.mockResolvedValue([
-            { id: 'u1', prenom: 'Ada', nom: 'K', artisan: { ambassadeurNiveau: 'ARGENT', nomEntreprise: 'Ada Plomberie' } },
+            {
+                id: 'u1',
+                prenom: 'Ada',
+                nom: 'K',
+                artisan: { ambassadeurNiveau: 'ARGENT', nomEntreprise: 'Ada Plomberie' },
+            },
             { id: 'u2', prenom: 'Bob', nom: 'M', artisan: null },
         ]);
 
         const res = await service.getLeaderboard(10);
         expect(res[0]).toEqual(
-            expect.objectContaining({ rang: 1, nom: 'Ada Plomberie', niveau: 'ARGENT', filleulsAbonnes: 5 }),
+            expect.objectContaining({
+                rang: 1,
+                nom: 'Ada Plomberie',
+                niveau: 'ARGENT',
+                filleulsAbonnes: 5,
+            }),
         );
         expect(res[1]).toEqual(
             expect.objectContaining({ rang: 2, nom: 'Bob M', filleulsAbonnes: 2 }),

@@ -298,10 +298,7 @@ export class ReferralService {
             );
         } catch (error) {
             // Ne jamais faire échouer le paiement pour un problème de parrainage
-            this.logger.error(
-                `Erreur récompense parrainage pour filleul=${filleulUserId}`,
-                error,
-            );
+            this.logger.error(`Erreur récompense parrainage pour filleul=${filleulUserId}`, error);
         }
     }
 
@@ -349,9 +346,7 @@ export class ReferralService {
         const filleulsAbonnes = await this.prisma.parrainage.count({
             where: { parrainId: parrainUserId, statut: StatutParrainage.RECOMPENSE },
         });
-        const palier = [...AMBASSADEUR_PALIERS]
-            .reverse()
-            .find((p) => filleulsAbonnes >= p.seuil);
+        const palier = [...AMBASSADEUR_PALIERS].reverse().find((p) => filleulsAbonnes >= p.seuil);
         if (!palier) return;
 
         const artisan = await this.prisma.artisan.findUnique({

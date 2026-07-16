@@ -345,10 +345,7 @@ export class MetiersService {
         // Éviter les doublons : réutiliser un métier existant au nom/slug proche
         const existing = await this.prisma.metier.findFirst({
             where: {
-                OR: [
-                    { nom: { equals: nom, mode: 'insensitive' } },
-                    { slug },
-                ],
+                OR: [{ nom: { equals: nom, mode: 'insensitive' } }, { slug }],
             },
         });
         if (existing) {
