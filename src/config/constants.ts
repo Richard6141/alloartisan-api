@@ -53,3 +53,19 @@ export const REFERRAL_REWARD_VALIDITY_DAYS = 90;
 
 // Délai maximal après inscription pour saisir un code parrain (jours)
 export const REFERRAL_APPLY_WINDOW_DAYS = 30;
+
+// ==================== PROGRAMME AMBASSADEUR ====================
+// Récompense = temps d'abonnement offert (zéro cash), déclenchée quand le
+// filleul (artisan) paie son PREMIER abonnement.
+
+// Jours offerts au parrain, par filleul qui s'abonne
+export const AMBASSADEUR_JOURS_PARRAIN = 30;
+// Jours offerts au filleul, ajoutés à son 1er abonnement payé
+export const AMBASSADEUR_JOURS_FILLEUL = 30;
+
+// Paliers : seuil (nb filleuls abonnés) → niveau + bonus de jours offerts
+export const AMBASSADEUR_PALIERS = [
+    { seuil: 3, niveau: 'BRONZE' as const, bonusJours: 15 },
+    { seuil: 5, niveau: 'ARGENT' as const, bonusJours: 30 },
+    { seuil: 10, niveau: 'OR' as const, bonusJours: 60 },
+];

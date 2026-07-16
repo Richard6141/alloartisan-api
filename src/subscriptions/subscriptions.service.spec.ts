@@ -12,6 +12,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { KkiaPayProvider } from 'src/payment/providers/kkiapay.provider';
 import { FedaPayProvider } from 'src/payment/providers/fedapay.provider';
 import { NotificationService } from 'src/notification/notification.service';
+import { ReferralService } from 'src/promo/referral.service';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { PlanAbonnement } from './dto/upgrade-subscription.dto';
 
@@ -72,6 +73,10 @@ describe('SubscriptionsService', () => {
                 { provide: KkiaPayProvider, useValue: mockKkiaPay },
                 { provide: FedaPayProvider, useValue: mockFedaPay },
                 { provide: NotificationService, useValue: mockNotifications },
+                {
+                    provide: ReferralService,
+                    useValue: { onFirstPaidSubscription: jest.fn() },
+                },
             ],
         }).compile();
 

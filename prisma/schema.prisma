@@ -95,8 +95,15 @@ enum TypeReduction {
 
 enum StatutParrainage {
   EN_ATTENTE  // Le filleul s'est inscrit avec le code
-  RECOMPENSE  // Le filleul a payé sa 1ère intervention → récompenses versées
+  RECOMPENSE  // Le filleul a payé son 1er abonnement → récompenses versées
   EXPIRE
+}
+
+/// Programme Ambassadeur — palier atteint selon le nombre de filleuls abonnés
+enum NiveauAmbassadeur {
+  BRONZE  // 3 filleuls abonnés
+  ARGENT  // 5 filleuls abonnés
+  OR      // 10 filleuls abonnés
 }
 
 // ==================== USER ====================
@@ -256,6 +263,9 @@ model Metier {
   ordreAffichage  Int             @default(0) @map("ordre_affichage")
   populaire       Boolean         @default(false)
   actif           Boolean         @default(true)
+  // valide=false : métier suggéré par un artisan, en attente de validation admin.
+  // Invisible côté client tant que non validé ; l'artisan peut néanmoins s'y rattacher.
+  valide          Boolean         @default(true)
   createdAt       DateTime        @default(now()) @db.Timestamptz @map("created_at")
 
   // Relations
@@ -269,6 +279,7 @@ model Metier {
   @@index([slug], name: "idx_metiers_slug")
   @@index([categorieId], name: "idx_metiers_categorie")
   @@index([populaire, actif, ordreAffichage], name: "idx_metiers_display")
+  @@index([valide, actif], name: "idx_metiers_valide")
 
   @@map("metiers")
 }
@@ -329,6 +340,9 @@ model Artisan {
   // Abonnement
   abonnementType    AbonnementType  @default(GRATUIT) @map("abonnement_type")
   abonnementExpireAt DateTime?      @db.Timestamptz @map("abonnement_expire_at")
+
+  // Programme Ambassadeur (parrainage) — badge de statut visible
+  ambassadeurNiveau NiveauAmbassadeur? @map("ambassadeur_niveau")
 
   // Statistiques
   totalVuesProfil   Int             @default(0) @map("total_vues_profil")
@@ -744,9 +758,12 @@ model Parrainage {
   filleulId   String           @unique @map("filleul_id") @db.VarChar(36)
   codeUtilise String           @db.VarChar(20) @map("code_utilise")
   statut      StatutParrainage @default(EN_ATTENTE)
-  /// Montants effectivement versés (FCFA, sous forme de codes promo personnels)
+  /// Legacy (FCFA) — conservé pour l'historique, plus alimenté
   recompenseParrain Decimal?   @db.Decimal(10, 2) @map("recompense_parrain")
   recompenseFilleul Decimal?   @db.Decimal(10, 2) @map("recompense_filleul")
+  /// Programme Ambassadeur : jours d'abonnement offerts au 1er abonnement du filleul
+  joursParrain      Int?       @map("jours_parrain")
+  joursFilleul      Int?       @map("jours_filleul")
   recompenseAt      DateTime?  @db.Timestamptz @map("recompense_at")
   createdAt   DateTime         @default(now()) @db.Timestamptz @map("created_at")
 

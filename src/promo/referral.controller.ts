@@ -62,10 +62,21 @@ export class ReferralController {
 
     @Get('my-referrals')
     @ApiOperation({
-        summary: 'Mes filleuls et le total de mes récompenses',
+        summary: 'Mes filleuls, mon niveau Ambassadeur et ma progression',
     })
-    @ApiResponse({ status: 200, description: 'Liste des filleuls + statistiques' })
+    @ApiResponse({ status: 200, description: 'Filleuls + niveau + prochain palier' })
     getMyReferrals(@GetCurrentUserId() userId: string) {
         return this.referralService.getMyReferrals(userId);
+    }
+
+    // ============================================================
+    // GET /referral/leaderboard — Classement des Ambassadeurs
+    // ============================================================
+
+    @Get('leaderboard')
+    @ApiOperation({ summary: 'Top des Ambassadeurs (parrains ayant le plus de filleuls abonnés)' })
+    @ApiResponse({ status: 200, description: 'Classement des Ambassadeurs' })
+    getLeaderboard() {
+        return this.referralService.getLeaderboard(10);
     }
 }

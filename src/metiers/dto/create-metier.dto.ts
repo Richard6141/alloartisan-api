@@ -80,4 +80,13 @@ export class CreateMetierDto {
     @IsOptional()
     @IsBoolean()
     actif?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Métier validé (false = suggéré, en attente de validation admin)',
+        example: true,
+        default: true,
+    })
+    @IsOptional()
+    @IsBoolean()
+    valide?: boolean;
 }

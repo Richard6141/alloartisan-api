@@ -3,6 +3,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { KkiaPayProvider } from 'src/payment/providers/kkiapay.provider';
 import { FedaPayProvider } from 'src/payment/providers/fedapay.provider';
 import { NotificationService } from 'src/notification/notification.service';
+import { ReferralService } from 'src/promo/referral.service';
 import { PlanAbonnement } from './dto/upgrade-subscription.dto';
 import { PLAN_QUOTAS, PLAN_TARIFFS, PLAN_DURATIONS, ESSAIS_GRATUITS } from 'src/config/constants';
 
@@ -24,6 +25,7 @@ export class SubscriptionsService {
         private readonly kkiaPay: KkiaPayProvider,
         private readonly fedaPay: FedaPayProvider,
         private readonly notificationService: NotificationService,
+        private readonly referralService: ReferralService,
     ) {}
 
     // ─── Plans disponibles ───────────────────────────────────────────────────────
@@ -542,6 +544,10 @@ export class SubscriptionsService {
             corps: `Votre paiement de ${Number(paiement.montant).toLocaleString('fr-FR')} FCFA est confirmé. Votre abonnement ${paiement.plan} est actif pour 30 jours.`,
             data: { screen: 'activite' },
         });
+
+        // Programme Ambassadeur : si cet artisan a été parrainé, verser les
+        // récompenses (temps d'abonnement) au 1er abonnement payé. Fire-and-forget.
+        void this.referralService.onFirstPaidSubscription(paiement.artisan.userId);
 
         this.logger.log(`Abonnement ${paiement.plan} activé via paiement [${paiementId}]`);
     }

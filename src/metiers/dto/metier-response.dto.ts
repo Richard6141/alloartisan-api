@@ -56,6 +56,12 @@ export class MetierResponseDto {
     actif: boolean;
 
     @ApiProperty({
+        description: 'Métier validé (false = suggéré, en attente de validation admin)',
+        example: true,
+    })
+    valide: boolean;
+
+    @ApiProperty({
         description: 'Date de création',
         example: '2024-01-15T10:30:00Z',
     })

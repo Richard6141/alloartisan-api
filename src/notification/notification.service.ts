@@ -277,4 +277,51 @@ export class NotificationService implements OnModuleInit {
 
         return result.count;
     }
+
+    /**
+     * Purge les notifications DÉJÀ LUES au-delà de N jours : elles ont rempli
+     * leur rôle, inutile de les garder jusqu'à l'expiration (30 j). Gros levier
+     * d'allègement (les notifs lues sont l'essentiel du volume).
+     */
+    async purgeReadNotifications(): Promise<number> {
+        const days = this.config.get<number>('NOTIFICATION_READ_RETENTION_DAYS', 10);
+        const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        const result = await this.prisma.notification.deleteMany({
+            where: { lu: true, createdAt: { lt: cutoff } },
+        });
+        if (result.count > 0) {
+            this.logger.log(
+                `Scheduler: ${result.count} notification(s) lue(s) purgée(s) (> ${days} j)`,
+            );
+        }
+        return result.count;
+    }
+
+    /**
+     * Plafond DUR par utilisateur : ne conserve que les `max` notifications les
+     * plus récentes de chaque utilisateur, supprime le reste. Empêche un
+     * utilisateur très actif de faire gonfler la table indéfiniment.
+     */
+    async capNotificationsPerUser(): Promise<number> {
+        const max = this.config.get<number>('NOTIFICATION_MAX_PER_USER', 300);
+        const deleted = await this.prisma.$executeRaw(Prisma.sql`
+            DELETE FROM notifications n
+            USING (
+                SELECT id FROM (
+                    SELECT id, row_number() OVER (
+                        PARTITION BY user_id ORDER BY created_at DESC
+                    ) AS rn
+                    FROM notifications
+                ) ranked
+                WHERE ranked.rn > ${max}
+            ) old
+            WHERE n.id = old.id
+        `);
+        if (deleted > 0) {
+            this.logger.log(
+                `Scheduler: ${deleted} notification(s) au-delà du plafond (${max}/utilisateur) supprimées`,
+            );
+        }
+        return deleted;
+    }
 }

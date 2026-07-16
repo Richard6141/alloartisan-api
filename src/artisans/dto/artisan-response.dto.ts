@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { AbonnementType, StatutArtisan } from 'src/generated/prisma';
+import { AbonnementType, StatutArtisan, NiveauAmbassadeur } from 'src/generated/prisma';
 
 class UserMinimalDto {
     @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
@@ -238,6 +238,13 @@ export class ArtisanResponseDto {
     abonnementType: AbonnementType;
 
     @ApiPropertyOptional({
+        description: 'Niveau Ambassadeur (badge de parrainage)',
+        enum: NiveauAmbassadeur,
+        nullable: true,
+    })
+    ambassadeurNiveau?: NiveauAmbassadeur | null;
+
+    @ApiPropertyOptional({
         description: "Date d'expiration de l'abonnement",
     })
     abonnementExpireAt: Date | null;
@@ -399,6 +406,13 @@ export class ArtisanListItemDto {
         example: 'GRATUIT',
     })
     abonnementType: AbonnementType;
+
+    @ApiPropertyOptional({
+        description: 'Niveau Ambassadeur (badge de parrainage)',
+        enum: NiveauAmbassadeur,
+        nullable: true,
+    })
+    ambassadeurNiveau?: NiveauAmbassadeur | null;
 
     @ApiProperty({
         description: "Années d'expérience",

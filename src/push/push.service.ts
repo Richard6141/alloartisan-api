@@ -105,6 +105,14 @@ export class PushService implements OnModuleInit {
             }
         }
 
+        // Regroupement : un « tag » par conversation (ou par mission) fait que
+        // le nouveau message REMPLACE l'ancienne notification au lieu d'empiler
+        // → une seule notif par interlocuteur, toujours la plus récente.
+        const tag =
+            (typeof data?.conversationId === 'string' && data.conversationId) ||
+            (typeof data?.bookingId === 'string' && data.bookingId) ||
+            undefined;
+
         try {
             const response = await admin.messaging().sendEachForMulticast({
                 tokens: tokenStrings,
@@ -112,14 +120,17 @@ export class PushService implements OnModuleInit {
                 data: fcmData,
                 android: {
                     priority: 'high',
+                    ...(tag ? { collapseKey: tag } : {}),
                     notification: {
                         sound: 'default',
                         channelId: 'alloartisan-notifications',
+                        ...(tag ? { tag } : {}),
                     },
                 },
                 apns: {
+                    ...(tag ? { headers: { 'apns-collapse-id': tag } } : {}),
                     payload: {
-                        aps: { sound: 'default', badge: 1 },
+                        aps: { sound: 'default', badge: 1, ...(tag ? { threadId: tag } : {}) },
                     },
                 },
             });

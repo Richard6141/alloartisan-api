@@ -3,6 +3,7 @@ import { SubscriptionsService } from './subscriptions.service';
 import { SubscriptionsController } from './subscriptions.controller';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { NotificationModule } from 'src/notification/notification.module';
+import { PromoModule } from 'src/promo/promo.module';
 import { KkiaPayProvider } from 'src/payment/providers/kkiapay.provider';
 import { FedaPayProvider } from 'src/payment/providers/fedapay.provider';
 
@@ -19,7 +20,7 @@ import { FedaPayProvider } from 'src/payment/providers/fedapay.provider';
  * - SchedulerModule : downgrade automatique expiré (via scheduler)
  */
 @Module({
-    imports: [PrismaModule, NotificationModule],
+    imports: [PrismaModule, NotificationModule, PromoModule],
     controllers: [SubscriptionsController],
     providers: [SubscriptionsService, KkiaPayProvider, FedaPayProvider],
     exports: [SubscriptionsService],

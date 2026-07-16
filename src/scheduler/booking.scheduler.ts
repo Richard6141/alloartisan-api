@@ -129,6 +129,32 @@ export class BookingScheduler {
     }
 
     /**
+     * Purge des notifications LUES au-delà de la rétention courte.
+     * Tous les jours à 3h15.
+     */
+    @Cron('15 3 * * *')
+    async purgeReadNotifications(): Promise<void> {
+        try {
+            await this.notificationService.purgeReadNotifications();
+        } catch (error) {
+            this.logger.warn('Purge notifications lues: ' + (error as Error).message);
+        }
+    }
+
+    /**
+     * Plafond dur par utilisateur (garde les N plus récentes).
+     * Chaque dimanche à 3h30.
+     */
+    @Cron('30 3 * * 0')
+    async capNotificationsPerUser(): Promise<void> {
+        try {
+            await this.notificationService.capNotificationsPerUser();
+        } catch (error) {
+            this.logger.warn('Plafond notifications: ' + (error as Error).message);
+        }
+    }
+
+    /**
      * Vérification des abonnements artisans expirés
      * Tous les jours à 8h00
      */

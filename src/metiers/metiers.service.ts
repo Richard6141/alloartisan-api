@@ -12,6 +12,7 @@ import {
     UpdateMetierDto,
     MetierResponseDto,
     MetierWithCategorieResponseDto,
+    SuggestMetierDto,
 } from './dto';
 
 @Injectable()
@@ -86,6 +87,8 @@ export class MetiersService {
 
         if (!includeInactive) {
             where.actif = true;
+            // Route publique : ne jamais exposer les métiers suggérés non validés.
+            where.valide = true;
         }
 
         if (options?.categorieId) {
@@ -190,6 +193,7 @@ export class MetiersService {
             where: {
                 categorieId: categorie.id,
                 actif: true,
+                valide: true,
             },
             orderBy: [{ ordreAffichage: 'asc' }, { nom: 'asc' }],
             include: {
@@ -224,6 +228,7 @@ export class MetiersService {
             where: {
                 populaire: true,
                 actif: true,
+                valide: true,
             },
             take: limit,
             orderBy: [{ ordreAffichage: 'asc' }, { nom: 'asc' }],
@@ -305,13 +310,107 @@ export class MetiersService {
                 ordreAffichage: dto.ordreAffichage,
                 populaire: dto.populaire,
                 actif: dto.actif,
+                valide: dto.valide,
             },
         });
 
         // Invalider le cache des métiers
         await this.cacheService.invalidateMetiers();
+        await this.cacheService.invalidateCategories();
 
         return result;
+    }
+
+    /**
+     * Suggestion d'un métier par un artisan dont le métier n'est pas répertorié.
+     * Le métier est créé « en attente » (valide=false) : invisible côté client,
+     * mais l'artisan peut immédiatement s'y rattacher pour finir son inscription.
+     * Un administrateur le validera ensuite (PATCH valide=true) pour le rendre
+     * public. Si un métier au nom identique existe déjà, on le renvoie tel quel
+     * plutôt que de créer un doublon.
+     */
+    async suggest(dto: SuggestMetierDto): Promise<MetierWithCategorieResponseDto> {
+        const nom = dto.nom.trim();
+
+        // La catégorie doit exister
+        const categorie = await this.prisma.categorieMetier.findUnique({
+            where: { id: dto.categorieId },
+        });
+        if (!categorie) {
+            throw new NotFoundException('Catégorie de métier non trouvée');
+        }
+
+        const slug = this.slugify(nom);
+
+        // Éviter les doublons : réutiliser un métier existant au nom/slug proche
+        const existing = await this.prisma.metier.findFirst({
+            where: {
+                OR: [
+                    { nom: { equals: nom, mode: 'insensitive' } },
+                    { slug },
+                ],
+            },
+        });
+        if (existing) {
+            return this.findOne(existing.id);
+        }
+
+        const created = await this.prisma.metier.create({
+            data: {
+                nom,
+                slug,
+                description: 'Métier suggéré par un artisan, en attente de validation.',
+                categorieId: dto.categorieId,
+                ordreAffichage: 999,
+                populaire: false,
+                actif: true, // l'artisan doit pouvoir s'y rattacher (create profil exige actif=true)
+                valide: false, // …mais invisible côté client jusqu'à validation admin
+            },
+        });
+
+        // Rafraîchir les listes admin (les listes publiques ignorent valide=false)
+        await this.cacheService.invalidateMetiers();
+        await this.cacheService.invalidateCategories();
+
+        return this.findOne(created.id);
+    }
+
+    /** [Admin] Métiers suggérés en attente de validation (valide=false). */
+    async findPending(): Promise<MetierWithCategorieResponseDto[]> {
+        return this.prisma.metier.findMany({
+            where: { valide: false },
+            orderBy: [{ createdAt: 'asc' }],
+            include: {
+                categorie: { select: { id: true, nom: true, slug: true } },
+                _count: { select: { artisanMetiers: true } },
+            },
+        });
+    }
+
+    /** [Admin] Valide un métier suggéré : il devient public. */
+    async validate(id: string): Promise<MetierResponseDto> {
+        const existing = await this.prisma.metier.findUnique({ where: { id } });
+        if (!existing) {
+            throw new NotFoundException('Métier non trouvé');
+        }
+        const result = await this.prisma.metier.update({
+            where: { id },
+            data: { valide: true, actif: true },
+        });
+        await this.cacheService.invalidateMetiers();
+        await this.cacheService.invalidateCategories();
+        return result;
+    }
+
+    /** Slug URL-safe à partir d'un nom (accents retirés, espaces → tirets). */
+    private slugify(nom: string): string {
+        return nom
+            .normalize('NFD')
+            .replace(/[̀-ͯ]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 100);
     }
 
     async remove(id: string): Promise<{ message: string }> {

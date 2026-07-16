@@ -30,6 +30,7 @@ import {
     UpdateMetierDto,
     MetierResponseDto,
     MetierWithCategorieResponseDto,
+    SuggestMetierDto,
 } from './dto';
 import { Public, Roles } from 'src/common/decorators';
 import { RolesGuard } from 'src/common/guards';
@@ -62,6 +63,28 @@ export class MetiersController {
     })
     create(@Body() dto: CreateMetierDto): Promise<MetierResponseDto> {
         return this.metiersService.create(dto);
+    }
+
+    @Post('suggest')
+    @ApiBearerAuth('access-token')
+    @HttpCode(HttpStatus.CREATED)
+    @ApiOperation({
+        summary: 'Suggérer un métier',
+        description:
+            "Permet à un artisan dont le métier n'est pas répertorié de le proposer. " +
+            'Le métier est créé en attente de validation (invisible côté client), mais ' +
+            "l'artisan peut immédiatement s'y rattacher. Un administrateur le validera.",
+    })
+    @ApiResponse({
+        status: 201,
+        description: 'Métier suggéré (en attente de validation) ou métier existant réutilisé',
+        type: MetierWithCategorieResponseDto,
+    })
+    @ApiNotFoundResponse({
+        description: 'Catégorie non trouvée',
+    })
+    suggest(@Body() dto: SuggestMetierDto): Promise<MetierWithCategorieResponseDto> {
+        return this.metiersService.suggest(dto);
     }
 
     @Get()
@@ -126,6 +149,43 @@ export class MetiersController {
             populaire: populaire !== undefined ? populaire === 'true' : undefined,
             includeInactive: includeInactive === 'true',
         });
+    }
+
+    @Get('admin/pending')
+    @Roles(Role.ADMIN)
+    @UseGuards(RolesGuard)
+    @ApiBearerAuth('access-token')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: '[Admin] Métiers suggérés en attente',
+        description: 'Liste les métiers proposés par des artisans, à valider.',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Liste des métiers en attente de validation',
+        type: [MetierWithCategorieResponseDto],
+    })
+    findPending(): Promise<MetierWithCategorieResponseDto[]> {
+        return this.metiersService.findPending();
+    }
+
+    @Patch(':id/valider')
+    @Roles(Role.ADMIN)
+    @UseGuards(RolesGuard)
+    @ApiBearerAuth('access-token')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: '[Admin] Valider un métier suggéré',
+        description: 'Rend public un métier proposé par un artisan.',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Métier validé',
+        type: MetierResponseDto,
+    })
+    @ApiNotFoundResponse({ description: 'Métier non trouvé' })
+    valider(@Param('id', ParseUUIDPipe) id: string): Promise<MetierResponseDto> {
+        return this.metiersService.validate(id);
     }
 
     @Get('populaires')
