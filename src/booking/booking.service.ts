@@ -762,9 +762,7 @@ export class BookingService {
         createdAt: Date,
         acceptedAt: Date,
     ): Promise<void> {
-        const deltaMin = Math.round(
-            (acceptedAt.getTime() - new Date(createdAt).getTime()) / 60000,
-        );
+        const deltaMin = Math.round((acceptedAt.getTime() - new Date(createdAt).getTime()) / 60000);
         if (deltaMin < 0 || deltaMin > 24 * 60) return;
 
         const artisan = await this.prisma.artisan.findUnique({
