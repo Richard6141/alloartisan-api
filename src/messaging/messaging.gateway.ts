@@ -85,6 +85,19 @@ export class MessagingGateway implements OnGatewayInit, OnGatewayConnection, OnG
             // Rejoindre automatiquement la room personnelle (pour les notifs directes)
             await client.join(`user:${user.sub}`);
 
+            // Il vient en ligne : ses messages reçus hors-ligne passent « remis »
+            // (✓✓ gris) et on prévient les expéditeurs.
+            void this.messagingService
+                .marquerRecusCommeRemis(user.sub)
+                .then((remis) => {
+                    for (const m of remis) {
+                        this.server
+                            .to(`conv:${m.conversationId}`)
+                            .emit('message:delivered', { messageId: m.id });
+                    }
+                })
+                .catch(() => undefined);
+
             this.logger.log(`Client connecté: [user:${user.sub}] [socket:${client.id}]`);
         } catch {
             this.logger.warn(`Connexion refusée : token invalide [socket:${client.id}]`);
@@ -181,6 +194,20 @@ export class MessagingGateway implements OnGatewayInit, OnGatewayConnection, OnG
                 senderNom: info.senderNom,
                 message,
             });
+
+            // Destinataire en ligne (app ouverte) → message REMIS (✓✓ gris) :
+            // on prévient l'expéditeur en direct.
+            if (this.isUserOnline(info.recipientUserId)) {
+                const msgId = (message as { id?: string })?.id;
+                if (msgId) {
+                    const delivered = await this.messagingService.markDelivered(msgId);
+                    if (delivered) {
+                        this.server
+                            .to(`conv:${conversationId}`)
+                            .emit('message:delivered', { messageId: delivered.id });
+                    }
+                }
+            }
         } catch (err) {
             this.logger.warn(
                 `notifyRecipient échoué [conv:${conversationId}]: ${err instanceof Error ? err.message : String(err)}`,

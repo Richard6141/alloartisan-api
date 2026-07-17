@@ -704,6 +704,69 @@ export class MessagingService {
         return { updated: result.count };
     }
 
+    /**
+     * Marque UN message comme « remis » (parvenu au destinataire en ligne).
+     * Idempotent. Renvoie {id, conversationId} si l'état a changé, sinon null.
+     */
+    async markDelivered(
+        messageId: string,
+    ): Promise<{ id: string; conversationId: string } | null> {
+        const msg = await this.prisma.message.findUnique({
+            where: { id: messageId },
+            select: { id: true, conversationId: true, remis: true },
+        });
+        if (!msg || msg.remis) return null;
+        await this.prisma.message.update({
+            where: { id: messageId },
+            data: { remis: true, remisAt: new Date() },
+        });
+        return { id: msg.id, conversationId: msg.conversationId };
+    }
+
+    /**
+     * À la connexion d'un utilisateur : marque « remis » tous les messages qu'il
+     * a reçus et qui ne l'étaient pas encore (envoyés pendant qu'il était hors
+     * ligne). Renvoie la liste {id, conversationId} pour prévenir les expéditeurs.
+     */
+    async marquerRecusCommeRemis(
+        userId: string,
+    ): Promise<{ id: string; conversationId: string }[]> {
+        const artisan = await this.prisma.artisan.findUnique({
+            where: { userId },
+            select: { id: true },
+        });
+        const convs = await this.prisma.conversation.findMany({
+            where: {
+                OR: [
+                    { clientId: userId },
+                    { artisanId: userId },
+                    ...(artisan ? [{ artisanId: artisan.id }] : []),
+                ],
+            },
+            select: { id: true },
+        });
+        if (convs.length === 0) return [];
+
+        const convIds = convs.map((c) => c.id);
+        const aRemettre = await this.prisma.message.findMany({
+            where: {
+                conversationId: { in: convIds },
+                senderId: { not: userId },
+                remis: false,
+                supprime: false,
+            },
+            select: { id: true, conversationId: true },
+            take: 500,
+        });
+        if (aRemettre.length === 0) return [];
+
+        await this.prisma.message.updateMany({
+            where: { id: { in: aRemettre.map((m) => m.id) } },
+            data: { remis: true, remisAt: new Date() },
+        });
+        return aRemettre;
+    }
+
     // ─── Paywall (anti-désintermédiation) ──────────────────────────────────────
 
     /**

@@ -621,6 +621,10 @@ model Message {
   mediaDuree      Int?         @map("media_duree")
   latitude        Decimal?     @db.Decimal(10, 8)
   longitude       Decimal?     @db.Decimal(11, 8)
+  // Remis = parvenu au destinataire (app en ligne) → ✓✓ gris. Lu = conversation
+  // ouverte → ✓✓ bleu. (Modèle WhatsApp : envoyé / remis / lu.)
+  remis           Boolean      @default(false)
+  remisAt         DateTime?    @db.Timestamptz @map("remis_at")
   lu              Boolean      @default(false)
   luAt            DateTime?    @db.Timestamptz @map("lu_at")
 
