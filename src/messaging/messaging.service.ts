@@ -708,9 +708,7 @@ export class MessagingService {
      * Marque UN message comme « remis » (parvenu au destinataire en ligne).
      * Idempotent. Renvoie {id, conversationId} si l'état a changé, sinon null.
      */
-    async markDelivered(
-        messageId: string,
-    ): Promise<{ id: string; conversationId: string } | null> {
+    async markDelivered(messageId: string): Promise<{ id: string; conversationId: string } | null> {
         const msg = await this.prisma.message.findUnique({
             where: { id: messageId },
             select: { id: true, conversationId: true, remis: true },
