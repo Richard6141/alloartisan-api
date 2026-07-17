@@ -161,12 +161,16 @@ export class MessagingService {
             clientId = booking.clientId;
         }
 
-        // Recherche de conversation existante — findFirst ou create (pattern safe)
+        // UNE SEULE conversation par paire (client, artisan) en contexte CLIENT.
+        // On NE filtre PAS par bookingId : sinon une conversation ouverte depuis
+        // la fiche artisan (sans bookingId) et une autre ouverte depuis une
+        // réservation (avec bookingId) créaient DEUX fils pour la même personne.
+        // Le bookingId reste une simple métadonnée posée à la création.
         const existing = await this.prisma.conversation.findFirst({
             where: {
                 clientId,
                 artisanId,
-                bookingId: bookingId ?? undefined,
+                contexte: 'CLIENT',
             },
             include: {
                 messages: {

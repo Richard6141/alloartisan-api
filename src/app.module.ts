@@ -3,7 +3,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
 import { BullModule } from '@nestjs/bull';
 import { redisStore } from 'cache-manager-redis-yet';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { UserThrottlerGuard } from './common/guards/user-throttler.guard';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './users/user.module';
@@ -71,21 +72,26 @@ import { HealthModule } from './health/health.module';
             imports: [ConfigModule],
             inject: [ConfigService],
             useFactory: (config: ConfigService) => ({
+                // Limites PAR UTILISATEUR (voir UserThrottlerGuard). Une app
+                // mobile ouvre plusieurs requêtes en rafale (liste + détail +
+                // notifs) et rafraîchit périodiquement : des limites trop basses
+                // (3/s) provoquaient des 429 en usage normal. Ces valeurs
+                // laissent respirer l'app tout en bloquant un vrai abus.
                 throttlers: [
                     {
                         name: 'short',
                         ttl: config.get<number>('THROTTLE_SHORT_TTL', 1000),
-                        limit: config.get<number>('THROTTLE_SHORT_LIMIT', 3),
+                        limit: config.get<number>('THROTTLE_SHORT_LIMIT', 30),
                     },
                     {
                         name: 'medium',
                         ttl: config.get<number>('THROTTLE_MEDIUM_TTL', 10000),
-                        limit: config.get<number>('THROTTLE_MEDIUM_LIMIT', 20),
+                        limit: config.get<number>('THROTTLE_MEDIUM_LIMIT', 150),
                     },
                     {
                         name: 'long',
                         ttl: config.get<number>('THROTTLE_LONG_TTL', 60000),
-                        limit: config.get<number>('THROTTLE_LONG_LIMIT', 100),
+                        limit: config.get<number>('THROTTLE_LONG_LIMIT', 600),
                     },
                 ],
             }),
@@ -134,7 +140,7 @@ import { HealthModule } from './health/health.module';
         },
         {
             provide: APP_GUARD,
-            useClass: ThrottlerGuard,
+            useClass: UserThrottlerGuard,
         },
         {
             provide: APP_INTERCEPTOR,

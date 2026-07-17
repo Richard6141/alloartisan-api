@@ -13,7 +13,9 @@ interface RedisStore {
 @Injectable()
 export class SessionService {
     private readonly logger = new Logger(SessionService.name);
-    private readonly SESSION_TTL = 7 * 24 * 60 * 60 * 1000; // 7 jours en ms
+    // 30 jours (glissant : prolongé à chaque validation). Doit couvrir la durée
+    // de vie du refresh token, qui n'est plus tourné à chaque refresh.
+    private readonly SESSION_TTL = 30 * 24 * 60 * 60 * 1000; // 30 jours en ms
     private readonly MAX_SESSIONS_PER_USER = 5;
 
     constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}

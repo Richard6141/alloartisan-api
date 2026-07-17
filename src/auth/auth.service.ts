@@ -281,9 +281,19 @@ export class AuthService {
             throw new ForbiddenException('Access Denied');
         }
 
-        const tokens = await this.getTokens(userId, sessionId);
-        await this.sessionService.updateToken(userId, sessionId, tokens.refresh_token);
-        return tokens;
+        // PAS DE ROTATION du refresh token. Auparavant chaque refresh générait un
+        // nouveau refresh token et invalidait l'ancien ; sur réseau instable
+        // (courant au Bénin), si la réponse se perdait, l'app gardait l'ancien
+        // token désormais invalide → 403 au refresh suivant → DÉCONNEXION
+        // intempestive, et la déconnexion supprimait le token FCM (plus de push).
+        // On émet donc seulement un nouvel access token et on conserve le refresh
+        // token courant. `validate()` a déjà prolongé la session (TTL glissant).
+        const accessToken = await this.signAccessToken(userId, sessionId);
+        return {
+            access_token: accessToken,
+            refresh_token: rt,
+            session_id: sessionId,
+        };
     }
 
     // ==================== SESSIONS ====================
@@ -530,20 +540,28 @@ export class AuthService {
         return sessionTokens;
     }
 
+    /** Signe un access token court (15 min). Utilisé au login ET au refresh. */
+    private signAccessToken(userId: string, sessionId: string): Promise<string> {
+        return this.jwtService.signAsync(
+            { sub: userId, sid: sessionId, tokenType: 'at' },
+            {
+                secret: this.config.getOrThrow('JWT_ACCESS_SECRET'),
+                expiresIn: 60 * 15, // 15 minutes
+            },
+        );
+    }
+
     private async getTokens(userId: string, sessionId: string): Promise<Tokens> {
         const [at, rt] = await Promise.all([
-            this.jwtService.signAsync(
-                { sub: userId, sid: sessionId, tokenType: 'at' },
-                {
-                    secret: this.config.getOrThrow('JWT_ACCESS_SECRET'),
-                    expiresIn: 60 * 15, // 15 minutes
-                },
-            ),
+            this.signAccessToken(userId, sessionId),
             this.jwtService.signAsync(
                 { sub: userId, sid: sessionId },
                 {
                     secret: this.config.getOrThrow('JWT_REFRESH_SECRET'),
-                    expiresIn: 60 * 60 * 24 * 7, // 7 jours
+                    // 30 jours : le refresh token n'est PLUS tourné à chaque refresh
+                    // (voir refreshTokens), on lui donne donc une durée de vie
+                    // confortable pour garder l'utilisateur connecté.
+                    expiresIn: 60 * 60 * 24 * 30, // 30 jours
                 },
             ),
         ]);

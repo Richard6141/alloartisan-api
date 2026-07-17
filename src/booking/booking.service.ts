@@ -232,15 +232,20 @@ export class BookingService {
 
         const where: any = {};
 
-        if (userRole === Role.CLIENT) {
-            where.clientId = userId;
-        } else if (userRole === Role.ARTISAN) {
-            const artisan = await this.prisma.artisan.findFirst({ where: { userId } });
-            if (!artisan) throw new NotFoundException('Profil artisan non trouvé');
-            where.artisanId = artisan.id;
-        } else if (userRole === Role.ADMIN) {
-            // Admin voit tout — pas de filtre userId
+        if (userRole !== Role.ADMIN) {
+            // On liste toutes les réservations où l'utilisateur est PARTIE PRENANTE,
+            // qu'il en soit le client OU l'artisan. Un artisan peut avoir réservé un
+            // confrère : filtrer sur le seul rôle global masquait ces réservations.
+            const artisan = await this.prisma.artisan.findFirst({
+                where: { userId },
+                select: { id: true },
+            });
+            where.OR = [
+                { clientId: userId },
+                ...(artisan ? [{ artisanId: artisan.id }] : []),
+            ];
         }
+        // Admin : aucun filtre → voit tout
 
         if (dto?.statut) where.statut = dto.statut;
         if (dto?.type) where.type = dto.type;
@@ -725,18 +730,19 @@ export class BookingService {
     private async checkOwnership(booking: any, userId: string, userRole: Role): Promise<void> {
         if (userRole === Role.ADMIN) return; // Admin voit tout
 
-        let isOwner = false;
+        // On vérifie la RELATION réelle à la réservation, jamais le rôle global :
+        // un artisan peut très bien être le CLIENT d'une réservation (il a réservé
+        // un confrère). Se fier au rôle refusait alors l'accès à tort (403) et
+        // faisait échouer l'affichage de la mission côté app.
+        if (booking.clientId === userId) return; // il est le client
 
-        if (userRole === Role.CLIENT) {
-            isOwner = booking.clientId === userId;
-        } else if (userRole === Role.ARTISAN) {
-            const artisan = await this.prisma.artisan.findFirst({ where: { userId } });
-            isOwner = artisan ? booking.artisanId === artisan.id : false;
-        }
+        const artisan = await this.prisma.artisan.findFirst({
+            where: { userId },
+            select: { id: true },
+        });
+        if (artisan && booking.artisanId === artisan.id) return; // il est l'artisan
 
-        if (!isOwner) {
-            throw new ForbiddenException('Accès interdit à cette réservation');
-        }
+        throw new ForbiddenException('Accès interdit à cette réservation');
     }
 
     private getQuotaRestant(artisan: any): number | null {
@@ -759,6 +765,7 @@ export class BookingService {
             artisan: {
                 select: {
                     id: true,
+                    userId: true, // permet à l'app de savoir si le viewer EST l'artisan
                     nomEntreprise: true,
                     photoProfilUrl: true,
                     noteMoyenne: true,
