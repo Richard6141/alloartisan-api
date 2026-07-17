@@ -138,6 +138,36 @@ export class AnnoncesService {
 
     async annoncesAutour(dto: SearchAnnonceDto, callerUserId?: string) {
         const rayonM = (dto.rayonKm ?? 25) * 1000;
+
+        // Pertinence MÉTIER : un travailleur spécialisé (non polyvalent) ne voit
+        // que les annonces sans métier requis ou correspondant à ses métiers —
+        // exactement le même ciblage que les notifications (un plombier n'a pas à
+        // voir les annonces de maçonnerie). Sans profil (visiteur qui parcourt) ou
+        // profil polyvalent : aucun filtre métier, on montre tout.
+        let profilMetiers: string[] | null = null;
+        if (callerUserId) {
+            const profil = await this.prisma.profilTravailleur.findUnique({
+                where: { userId: callerUserId },
+                select: { polyvalent: true, metiers: { select: { metierId: true } } },
+            });
+            if (profil && !profil.polyvalent && profil.metiers.length > 0) {
+                profilMetiers = profil.metiers.map((m) => m.metierId);
+            }
+        }
+
+        const params: unknown[] = [
+            dto.longitude,
+            dto.latitude,
+            rayonM,
+            dto.type ?? null,
+            callerUserId ?? null,
+        ];
+        let metierClause = '';
+        if (profilMetiers) {
+            params.push(profilMetiers);
+            metierClause = `AND (a.metier_id IS NULL OR a.metier_id::text = ANY($6::text[]))`;
+        }
+
         const rows = (await this.prisma.$queryRawUnsafe(
             `SELECT a.id,
                 ST_DistanceSphere(ST_MakePoint(a.longitude, a.latitude), ST_MakePoint($1, $2)) / 1000 AS distance_km
@@ -149,13 +179,10 @@ export class AnnoncesService {
                AND ($4::text IS NULL OR a.type = $4::"TypeTravailleur")
                -- Ne pas montrer à l'utilisateur ses PROPRES annonces
                AND ($5::text IS NULL OR a.patron_user_id <> $5)
+               ${metierClause}
              ORDER BY a.created_at DESC
              LIMIT 50`,
-            dto.longitude,
-            dto.latitude,
-            rayonM,
-            dto.type ?? null,
-            callerUserId ?? null,
+            ...params,
         )) as { id: string; distance_km: number }[];
 
         if (rows.length === 0) return [];
