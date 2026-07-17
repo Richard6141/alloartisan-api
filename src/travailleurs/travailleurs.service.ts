@@ -186,4 +186,48 @@ export class TravailleursService {
             },
         });
     }
+
+    /**
+     * Liste mes engagements (comme patron OU comme ouvrier), enrichis de l'autre
+     * partie, du statut, et de « ai-je déjà laissé mon avis » — pour piloter les
+     * boutons Clôturer / Noter côté app.
+     */
+    async mesEngagements(userId: string) {
+        const engagements = await this.prisma.engagementTravail.findMany({
+            where: { OR: [{ patronUserId: userId }, { profil: { userId } }] },
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+            include: {
+                patron: { select: { id: true, nom: true, prenom: true, photoUrl: true } },
+                profil: {
+                    select: {
+                        id: true,
+                        userId: true,
+                        user: { select: { id: true, nom: true, prenom: true, photoUrl: true } },
+                    },
+                },
+                avis: { select: { sens: true } },
+            },
+        });
+
+        return engagements.map((e) => {
+            const estPatron = e.patronUserId === userId;
+            const monSens = estPatron ? 'PATRON_VERS_TRAVAILLEUR' : 'TRAVAILLEUR_VERS_PATRON';
+            const autre = estPatron ? e.profil.user : e.patron;
+            return {
+                id: e.id,
+                statut: e.statut,
+                role: estPatron ? ('PATRON' as const) : ('TRAVAILLEUR' as const),
+                conversationId: e.conversationId,
+                createdAt: e.createdAt,
+                termineAt: e.termineAt,
+                autrePartie: {
+                    userId: autre?.id ?? null,
+                    nom: `${autre?.prenom ?? ''} ${autre?.nom ?? ''}`.trim() || 'Utilisateur',
+                    photoUrl: autre?.photoUrl ?? null,
+                },
+                jaiNote: e.avis.some((a) => a.sens === monSens),
+            };
+        });
+    }
 }

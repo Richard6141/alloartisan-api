@@ -62,6 +62,12 @@ export class TravailleursController {
         return this.service.deposerAvis(userId, id, dto);
     }
 
+    @ApiOperation({ summary: 'Mes engagements (patron ou ouvrier)' })
+    @Get('engagements/mes')
+    mesEngagements(@GetCurrentUser('sub') userId: string) {
+        return this.service.mesEngagements(userId);
+    }
+
     // ─── Recherche + fiche ──────────────────────────────────────────────────
 
     @ApiOperation({ summary: 'Rechercher des travailleurs autour de moi' })
