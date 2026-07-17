@@ -127,6 +127,9 @@ model User {
 
   // Authentification
   passwordHash String   @db.VarChar(255) @map("password_hash")
+  // Connexion Google (Sybil : on s'appuie sur l'anti-abus de Google). Null pour
+  // les comptes créés par email/mot de passe.
+  googleId     String?  @unique @map("google_id") @db.VarChar(255)
   emailVerified Boolean @default(false) @map("email_verified")
   telephoneVerified Boolean @default(false) @map("telephone_verified")
   profilComplet Boolean @default(false) @map("profil_complet")

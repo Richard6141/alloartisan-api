@@ -23,6 +23,7 @@ import { AuthService } from './auth.service';
 import {
     AuthDto,
     RegisterDto,
+    GoogleAuthDto,
     ForgotPasswordDto,
     ResetPasswordDto,
     EnableMfaDto,
@@ -59,6 +60,20 @@ export class AuthController {
     @ApiForbiddenResponse({ description: 'Email déjà utilisé' })
     register(@Body() dto: RegisterDto, @Req() req: Request): Promise<Tokens> {
         return this.authService.register(dto, this.extractDeviceInfo(req));
+    }
+
+    @Public()
+    @Throttle({ short: { limit: 15, ttl: 300000 } })
+    @Post('google')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Connexion / inscription via Google',
+        description:
+            "Vérifie l'ID token Google et retourne les tokens. Crée le compte à la première connexion.",
+    })
+    @ApiResponse({ status: 200, description: 'Connecté', type: Tokens })
+    googleAuth(@Body() dto: GoogleAuthDto, @Req() req: Request): Promise<Tokens> {
+        return this.authService.googleAuth(dto.idToken, dto.role, this.extractDeviceInfo(req));
     }
 
     @Public()
@@ -329,6 +344,8 @@ export class AuthController {
         return {
             userAgent,
             ipAddress: ip,
+            // Identifiant d'appareil stable envoyé par l'app (anti multi-comptes)
+            deviceId: req.get('x-device-id') || undefined,
             deviceName: this.parseDeviceName(userAgent),
             deviceType: this.parseDeviceType(userAgent),
         };

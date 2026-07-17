@@ -5,7 +5,9 @@ import {
     BadRequestException,
     Inject,
     ConflictException,
+    UnauthorizedException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
     AuthDto,
@@ -35,6 +37,7 @@ interface DeviceInfo {
     deviceName?: string;
     deviceType?: string;
     ipAddress?: string;
+    deviceId?: string;
     userAgent?: string;
 }
 
@@ -72,6 +75,7 @@ export class AuthService {
 
     // ==================== REGISTER ====================
     async register(dto: RegisterDto, deviceInfo?: DeviceInfo): Promise<Tokens> {
+        await this.assertInscriptionAutorisee(deviceInfo);
         const hash = await argon.hash(dto.password);
 
         // Mode test : activer automatiquement les comptes (contourne la
@@ -91,6 +95,7 @@ export class AuthService {
             });
 
             const tokens = await this.createSession(user.id, deviceInfo);
+            await this.compterInscription(deviceInfo);
 
             // Pas d'OTP à envoyer si le compte est déjà activé
             if (!autoActivate) {
@@ -111,6 +116,163 @@ export class AuthService {
             }
             throw error;
         }
+    }
+
+    // ============ ANTI MULTI-COMPTES (appareil / IP) ============
+    private get maxComptesParAppareil(): number {
+        return this.config.get<number>('MAX_COMPTES_PAR_APPAREIL', 3);
+    }
+    private get maxComptesParIpJour(): number {
+        return this.config.get<number>('MAX_COMPTES_PAR_IP_JOUR', 10);
+    }
+
+    /**
+     * Bloque la création de compte si trop de comptes ont déjà été créés depuis
+     * le même APPAREIL (30 jours glissants) ou la même IP (24 h). C'est le
+     * garde-fou anti-Sybil sans SMS : on plafonne, sans jamais bloquer un usage
+     * légitime. Sans identifiant d'appareil (ancienne app), on n'applique que l'IP.
+     */
+    private async assertInscriptionAutorisee(deviceInfo?: DeviceInfo): Promise<void> {
+        if (deviceInfo?.deviceId) {
+            const n = (await this.cacheManager.get<number>(
+                `reg:device:${deviceInfo.deviceId}`,
+            )) ?? 0;
+            if (n >= this.maxComptesParAppareil) {
+                throw new ForbiddenException(
+                    'Trop de comptes ont été créés depuis cet appareil. Connectez-vous à votre compte existant.',
+                );
+            }
+        }
+        if (deviceInfo?.ipAddress) {
+            const n = (await this.cacheManager.get<number>(
+                `reg:ip:${deviceInfo.ipAddress}`,
+            )) ?? 0;
+            if (n >= this.maxComptesParIpJour) {
+                throw new ForbiddenException(
+                    'Trop de comptes créés depuis ce réseau aujourd’hui. Réessayez plus tard.',
+                );
+            }
+        }
+    }
+
+    /** Incrémente les compteurs après une création de compte réussie. */
+    private async compterInscription(deviceInfo?: DeviceInfo): Promise<void> {
+        const J30 = 30 * 24 * 60 * 60 * 1000;
+        const J1 = 24 * 60 * 60 * 1000;
+        if (deviceInfo?.deviceId) {
+            const key = `reg:device:${deviceInfo.deviceId}`;
+            const n = (await this.cacheManager.get<number>(key)) ?? 0;
+            await this.cacheManager.set(key, n + 1, J30);
+        }
+        if (deviceInfo?.ipAddress) {
+            const key = `reg:ip:${deviceInfo.ipAddress}`;
+            const n = (await this.cacheManager.get<number>(key)) ?? 0;
+            await this.cacheManager.set(key, n + 1, J1);
+        }
+    }
+
+    // ==================== CONNEXION GOOGLE ====================
+    /**
+     * Connexion / inscription via Google. L'app fournit un ID token Google ;
+     * on le vérifie auprès de Google (endpoint tokeninfo, aucune dépendance),
+     * puis on retrouve ou crée le compte. S'appuyer sur Google, c'est bénéficier
+     * gratuitement de SON anti-abus (création massive de comptes limitée).
+     */
+    async googleAuth(
+        idToken: string,
+        role: 'CLIENT' | 'ARTISAN' | undefined,
+        deviceInfo?: DeviceInfo,
+    ): Promise<Tokens> {
+        const claims = await this.verifierIdTokenGoogle(idToken);
+        const email = claims.email?.toLowerCase();
+        const googleId = claims.sub;
+        if (!email || !googleId) {
+            throw new UnauthorizedException('Jeton Google incomplet');
+        }
+
+        let user = await this.prisma.user.findFirst({
+            where: { OR: [{ googleId }, { email }] },
+        });
+
+        if (!user) {
+            // Nouveau compte → soumis aux plafonds anti multi-comptes
+            await this.assertInscriptionAutorisee(deviceInfo);
+            user = await this.prisma.user.create({
+                data: {
+                    email,
+                    googleId,
+                    passwordHash: await argon.hash(randomUUID()), // pas de mot de passe
+                    role: role === 'ARTISAN' ? Role.ARTISAN : Role.CLIENT,
+                    prenom: claims.given_name ?? null,
+                    nom: claims.family_name ?? null,
+                    photoUrl: claims.picture ?? null,
+                    emailVerified: true,
+                    statut: Statut.ACTIF,
+                },
+            });
+            await this.compterInscription(deviceInfo);
+        } else if (!user.googleId) {
+            // Compte email existant → on le lie à Google (et on l'active)
+            user = await this.prisma.user.update({
+                where: { id: user.id },
+                data: {
+                    googleId,
+                    emailVerified: true,
+                    ...(user.statut === Statut.EN_ATTENTE ? { statut: Statut.ACTIF } : {}),
+                },
+            });
+        }
+
+        if (user.statut === Statut.BANNI || user.statut === Statut.SUSPENDU) {
+            throw new ForbiddenException('Ce compte est suspendu.');
+        }
+
+        return this.createSession(user.id, deviceInfo);
+    }
+
+    /** Vérifie un ID token Google via l'endpoint tokeninfo officiel. */
+    private async verifierIdTokenGoogle(idToken: string): Promise<{
+        sub: string;
+        email?: string;
+        email_verified?: string | boolean;
+        given_name?: string;
+        family_name?: string;
+        picture?: string;
+        aud?: string;
+    }> {
+        let res: Response;
+        try {
+            res = await fetch(
+                `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`,
+            );
+        } catch {
+            throw new UnauthorizedException('Vérification Google indisponible, réessayez.');
+        }
+        if (!res.ok) {
+            throw new UnauthorizedException('Jeton Google invalide ou expiré');
+        }
+        const claims = (await res.json()) as {
+            sub: string;
+            email?: string;
+            email_verified?: string | boolean;
+            aud?: string;
+            given_name?: string;
+            family_name?: string;
+            picture?: string;
+        };
+
+        // Vérifier que le jeton a bien été émis pour NOS clients Google
+        const allowed = (this.config.get<string>('GOOGLE_CLIENT_IDS') ?? '')
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean);
+        if (allowed.length > 0 && (!claims.aud || !allowed.includes(claims.aud))) {
+            throw new UnauthorizedException('Jeton Google non destiné à cette application');
+        }
+        if (claims.email_verified !== true && claims.email_verified !== 'true') {
+            throw new UnauthorizedException('Adresse Google non vérifiée');
+        }
+        return claims;
     }
 
     // ==================== LOGIN ====================

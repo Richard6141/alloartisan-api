@@ -46,3 +46,19 @@ export class RegisterDto extends AuthDto {
     @IsIn(['CLIENT', 'ARTISAN'], { message: 'Le type de compte doit être CLIENT ou ARTISAN' })
     role?: 'CLIENT' | 'ARTISAN';
 }
+
+export class GoogleAuthDto {
+    @ApiProperty({ description: 'ID token Google obtenu côté app' })
+    @IsString()
+    @IsNotEmpty()
+    idToken: string;
+
+    @ApiPropertyOptional({
+        description: 'Type de compte si première connexion (CLIENT par défaut)',
+        enum: ['CLIENT', 'ARTISAN'],
+        default: 'CLIENT',
+    })
+    @IsOptional()
+    @IsIn(['CLIENT', 'ARTISAN'], { message: 'Le type de compte doit être CLIENT ou ARTISAN' })
+    role?: 'CLIENT' | 'ARTISAN';
+}
