@@ -4,6 +4,7 @@ import { Prisma } from 'src/generated/prisma';
 import { BookingService } from 'src/booking/booking.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { NotificationService } from 'src/notification/notification.service';
+import { DemandesExpressService } from 'src/demandes-express/demandes-express.service';
 
 @Injectable()
 export class BookingScheduler {
@@ -13,7 +14,25 @@ export class BookingScheduler {
         private readonly bookingService: BookingService,
         private readonly prisma: PrismaService,
         private readonly notificationService: NotificationService,
+        private readonly demandesExpressService: DemandesExpressService,
     ) {}
+
+    /**
+     * Expiration des demandes express sans preneur.
+     * Toutes les minutes (TTL express = 15 min) : les demandes EN_RECHERCHE
+     * dépassées passent EXPIREE et le client est prévenu.
+     */
+    @Cron(CronExpression.EVERY_MINUTE)
+    async expirerDemandesExpress(): Promise<void> {
+        try {
+            const count = await this.demandesExpressService.expirerDemandes();
+            if (count > 0) {
+                this.logger.log(`${count} demande(s) express expirée(s)`);
+            }
+        } catch (error) {
+            this.logger.error('Erreur expiration demandes express', error);
+        }
+    }
 
     /**
      * Annulation automatique des bookings expirés

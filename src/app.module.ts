@@ -24,6 +24,7 @@ import { AvisModule } from './avis/avis.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { TravailleursModule } from './travailleurs/travailleurs.module';
 import { TrackingModule } from './tracking/tracking.module';
+import { DemandesExpressModule } from './demandes-express/demandes-express.module';
 import { PromoModule } from './promo/promo.module';
 import { AdminModule } from './admin/admin.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
@@ -114,6 +115,7 @@ import { HealthModule } from './health/health.module';
         ArtisansModule,
         CategoriesMetiersModule,
         MetiersModule,
+        DemandesExpressModule,
         CertificationsModule,
         UploadModule,
         BookingModule,

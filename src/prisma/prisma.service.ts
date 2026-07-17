@@ -166,4 +166,12 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     get parrainage() {
         return this.client.parrainage;
     }
+
+    get demandeExpress() {
+        return this.client.demandeExpress;
+    }
+
+    get demandeExpressCandidat() {
+        return this.client.demandeExpressCandidat;
+    }
 }

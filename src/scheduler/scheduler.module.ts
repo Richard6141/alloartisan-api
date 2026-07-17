@@ -10,6 +10,7 @@ import { PrismaModule } from 'src/prisma/prisma.module';
 import { NotificationModule } from 'src/notification/notification.module';
 import { SubscriptionsModule } from 'src/subscriptions/subscriptions.module';
 import { CommonModule } from 'src/common/common.module';
+import { DemandesExpressModule } from 'src/demandes-express/demandes-express.module';
 
 @Module({
     imports: [
@@ -19,6 +20,7 @@ import { CommonModule } from 'src/common/common.module';
         NotificationModule,
         SubscriptionsModule,
         CommonModule,
+        DemandesExpressModule,
     ],
     providers: [
         BookingScheduler,

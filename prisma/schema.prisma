@@ -920,3 +920,55 @@ model ManifestationInteret {
   @@index([annonceId], name: "idx_interet_annonce")
   @@map("manifestations_interet")
 }
+
+// ==================== DEMANDE EXPRESS (dispatch) ====================
+// Mise en relation instantanée : le client diffuse une demande aux artisans
+// proches disponibles, le premier qui accepte décroche. Modèles volontairement
+// découplés (FK scalaires) pour ne pas impacter le reste du schéma.
+
+enum StatutDemandeExpress {
+  EN_RECHERCHE // diffusée, en attente d'un artisan
+  ATTRIBUEE    // un artisan a accepté → un Booking a été créé
+  EXPIREE      // personne n'a accepté à temps
+  ANNULEE      // annulée par le client
+}
+
+model DemandeExpress {
+  id                  String   @id @default(uuid()) @db.VarChar(36)
+  clientId            String   @map("client_id") @db.VarChar(36)
+  metierId            String   @map("metier_id") @db.VarChar(36)
+  titre               String   @db.VarChar(200)
+  description         String   @db.Text
+  adresseIntervention String   @db.Text @map("adresse_intervention")
+  latitude            Decimal  @db.Decimal(10, 8)
+  longitude           Decimal  @db.Decimal(11, 8)
+  estUrgent           Boolean  @default(false) @map("est_urgent")
+  rayonKm             Int      @default(10) @map("rayon_km")
+  statut              StatutDemandeExpress @default(EN_RECHERCHE)
+  artisanId           String?  @map("artisan_id") @db.VarChar(36)
+  bookingId           String?  @map("booking_id") @db.VarChar(36)
+  expireAt            DateTime @db.Timestamptz @map("expire_at")
+  createdAt           DateTime @default(now()) @db.Timestamptz @map("created_at")
+  updatedAt           DateTime @updatedAt @db.Timestamptz @map("updated_at")
+
+  candidats DemandeExpressCandidat[]
+
+  @@index([clientId], name: "idx_dexp_client")
+  @@index([statut, expireAt], name: "idx_dexp_statut")
+  @@map("demandes_express")
+}
+
+model DemandeExpressCandidat {
+  id            String   @id @default(uuid()) @db.VarChar(36)
+  demandeId     String   @map("demande_id") @db.VarChar(36)
+  artisanId     String   @map("artisan_id") @db.VarChar(36)
+  artisanUserId String   @map("artisan_user_id") @db.VarChar(36)
+  distanceKm    Decimal? @db.Decimal(6, 2) @map("distance_km")
+  createdAt     DateTime @default(now()) @db.Timestamptz @map("created_at")
+
+  demande DemandeExpress @relation(fields: [demandeId], references: [id], onDelete: Cascade)
+
+  @@unique([demandeId, artisanId], map: "uq_dexp_candidat")
+  @@index([artisanId], name: "idx_dexp_candidat_artisan")
+  @@map("demandes_express_candidats")
+}
