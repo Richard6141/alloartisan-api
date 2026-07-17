@@ -134,9 +134,8 @@ export class AuthService {
      */
     private async assertInscriptionAutorisee(deviceInfo?: DeviceInfo): Promise<void> {
         if (deviceInfo?.deviceId) {
-            const n = (await this.cacheManager.get<number>(
-                `reg:device:${deviceInfo.deviceId}`,
-            )) ?? 0;
+            const n =
+                (await this.cacheManager.get<number>(`reg:device:${deviceInfo.deviceId}`)) ?? 0;
             if (n >= this.maxComptesParAppareil) {
                 throw new ForbiddenException(
                     'Trop de comptes ont été créés depuis cet appareil. Connectez-vous à votre compte existant.',
@@ -144,9 +143,7 @@ export class AuthService {
             }
         }
         if (deviceInfo?.ipAddress) {
-            const n = (await this.cacheManager.get<number>(
-                `reg:ip:${deviceInfo.ipAddress}`,
-            )) ?? 0;
+            const n = (await this.cacheManager.get<number>(`reg:ip:${deviceInfo.ipAddress}`)) ?? 0;
             if (n >= this.maxComptesParIpJour) {
                 throw new ForbiddenException(
                     'Trop de comptes créés depuis ce réseau aujourd’hui. Réessayez plus tard.',
