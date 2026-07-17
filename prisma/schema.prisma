@@ -320,6 +320,10 @@ model Artisan {
   nombreMissionsCompletees Int      @default(0) @map("nombre_missions_completees")
   tauxCompletion    Decimal         @default(0) @db.Decimal(5, 2) @map("taux_completion")
   tauxReponseMoyen  Int?            @map("taux_reponse_moyen")
+  // Réactivité : temps de réponse moyen (minutes) calculé à chaque acceptation
+  // de mission, et nombre de réponses prises en compte (pour la moyenne mobile).
+  tempsReponseMinutes Int?          @map("temps_reponse_minutes")
+  nbReponses        Int             @default(0) @map("nb_reponses")
 
   // Tarification
   tarifHoraire      Decimal?        @db.Decimal(10, 2) @map("tarif_horaire")

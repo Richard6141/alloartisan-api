@@ -180,6 +180,12 @@ export class ArtisanResponseDto {
     tauxReponseMoyen: number | null;
 
     @ApiPropertyOptional({
+        description: 'Temps de réponse moyen à une demande (en minutes)',
+        example: 12,
+    })
+    tempsReponseMinutes: number | null;
+
+    @ApiPropertyOptional({
         description: 'Tarif horaire de base (FCFA)',
         example: 3500,
     })
@@ -399,6 +405,12 @@ export class ArtisanListItemDto {
         example: true,
     })
     disponible: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Temps de réponse moyen à une demande (en minutes)',
+        example: 12,
+    })
+    tempsReponseMinutes?: number | null;
 
     @ApiProperty({
         description: "Type d'abonnement",

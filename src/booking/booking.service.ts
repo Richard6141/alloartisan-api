@@ -300,16 +300,25 @@ export class BookingService {
             );
         }
 
+        const acceptedAt = new Date();
         const updated = await this.prisma.booking.update({
             where: { id: bookingId },
             data: {
                 statut: StatutBooking.ACCEPTEE,
-                accepteAt: new Date(),
+                accepteAt: acceptedAt,
             },
             include: this.bookingInclude(),
         });
 
         this.logger.log(`Booking accepté: ${bookingId}`);
+
+        // Réactivité : mettre à jour le temps de réponse moyen de l'artisan
+        // (moyenne mobile). Non bloquant : n'échoue jamais l'acceptation.
+        void this.majTempsReponse(
+            (booking as { artisanId: string }).artisanId,
+            (booking as { createdAt: Date }).createdAt,
+            acceptedAt,
+        ).catch(() => undefined);
 
         // Notifier le client
         const artisanUser = (updated as any).artisan?.user;
@@ -740,6 +749,38 @@ export class BookingService {
         if (artisan && booking.artisanId === artisan.id) return; // il est l'artisan
 
         throw new ForbiddenException('Accès interdit à cette réservation');
+    }
+
+    /**
+     * Met à jour le temps de réponse moyen d'un artisan (moyenne mobile en
+     * minutes) à partir du délai entre la création de la demande et son
+     * acceptation. On ignore les délais aberrants (> 24 h) pour ne pas fausser
+     * la moyenne quand une vieille demande est acceptée sur le tard.
+     */
+    private async majTempsReponse(
+        artisanId: string,
+        createdAt: Date,
+        acceptedAt: Date,
+    ): Promise<void> {
+        const deltaMin = Math.round(
+            (acceptedAt.getTime() - new Date(createdAt).getTime()) / 60000,
+        );
+        if (deltaMin < 0 || deltaMin > 24 * 60) return;
+
+        const artisan = await this.prisma.artisan.findUnique({
+            where: { id: artisanId },
+            select: { tempsReponseMinutes: true, nbReponses: true },
+        });
+        if (!artisan) return;
+
+        const n = artisan.nbReponses ?? 0;
+        const prev = artisan.tempsReponseMinutes ?? 0;
+        const moyenne = Math.round((prev * n + deltaMin) / (n + 1));
+
+        await this.prisma.artisan.update({
+            where: { id: artisanId },
+            data: { tempsReponseMinutes: moyenne, nbReponses: n + 1 },
+        });
     }
 
     private getQuotaRestant(artisan: any): number | null {
