@@ -105,4 +105,9 @@ export class CreateProfilTravailleurDto {
     @ValidateNested({ each: true })
     @Type(() => MetierRefDto)
     metiers?: MetierRefDto[];
+
+    @ApiPropertyOptional({ description: 'Profil visible des patrons', default: true })
+    @IsOptional()
+    @IsBoolean()
+    actif?: boolean;
 }
