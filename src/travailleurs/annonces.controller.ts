@@ -26,8 +26,8 @@ export class AnnoncesController {
 
     @ApiOperation({ summary: 'Annonces de chantier autour de moi (travailleur)' })
     @Get('autour')
-    autour(@Query() dto: SearchAnnonceDto) {
-        return this.service.annoncesAutour(dto);
+    autour(@GetCurrentUser('sub') userId: string, @Query() dto: SearchAnnonceDto) {
+        return this.service.annoncesAutour(dto, userId);
     }
 
     @ApiOperation({ summary: 'Se manifester sur une annonce (travailleur)' })

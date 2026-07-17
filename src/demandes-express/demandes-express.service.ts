@@ -205,6 +205,15 @@ export class DemandesExpressService {
             nbArtisansNotifies: demande._count.candidats,
             expireAt: demande.expireAt,
             createdAt: demande.createdAt,
+            // Renvoyés pour permettre de RELANCER (zone élargie) sans re-saisir
+            metierId: demande.metierId,
+            titre: demande.titre,
+            description: demande.description,
+            adresseIntervention: demande.adresseIntervention,
+            latitude: Number(demande.latitude),
+            longitude: Number(demande.longitude),
+            rayonKm: demande.rayonKm,
+            estUrgent: demande.estUrgent,
         };
     }
 

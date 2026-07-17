@@ -136,7 +136,7 @@ export class AnnoncesService {
 
     // ─── Travailleur : parcourir / se manifester ────────────────────────────
 
-    async annoncesAutour(dto: SearchAnnonceDto) {
+    async annoncesAutour(dto: SearchAnnonceDto, callerUserId?: string) {
         const rayonM = (dto.rayonKm ?? 25) * 1000;
         const rows = (await this.prisma.$queryRawUnsafe(
             `SELECT a.id,
@@ -147,12 +147,15 @@ export class AnnoncesService {
                      ST_MakePoint(a.longitude, a.latitude)::geography,
                      ST_MakePoint($1, $2)::geography, $3)
                AND ($4::text IS NULL OR a.type = $4::"TypeTravailleur")
+               -- Ne pas montrer à l'utilisateur ses PROPRES annonces
+               AND ($5::text IS NULL OR a.patron_user_id <> $5)
              ORDER BY a.created_at DESC
              LIMIT 50`,
             dto.longitude,
             dto.latitude,
             rayonM,
             dto.type ?? null,
+            callerUserId ?? null,
         )) as { id: string; distance_km: number }[];
 
         if (rows.length === 0) return [];
