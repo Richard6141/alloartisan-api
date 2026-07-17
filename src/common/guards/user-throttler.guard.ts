@@ -25,8 +25,7 @@ export class UserThrottlerGuard extends ThrottlerGuard {
                 // token illisible : on retombe sur l'IP
             }
         }
-        const ip =
-            (Array.isArray(req.ips) && req.ips.length ? req.ips[0] : req.ip) ?? 'unknown';
+        const ip = (Array.isArray(req.ips) && req.ips.length ? req.ips[0] : req.ip) ?? 'unknown';
         return `ip:${ip}`;
     }
 }

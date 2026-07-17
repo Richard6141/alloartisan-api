@@ -240,10 +240,7 @@ export class BookingService {
                 where: { userId },
                 select: { id: true },
             });
-            where.OR = [
-                { clientId: userId },
-                ...(artisan ? [{ artisanId: artisan.id }] : []),
-            ];
+            where.OR = [{ clientId: userId }, ...(artisan ? [{ artisanId: artisan.id }] : [])];
         }
         // Admin : aucun filtre → voit tout
 
