@@ -15,7 +15,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /** Création d'une demande express (mise en relation instantanée). */
 export class CreateDemandeExpressDto {
-    @ApiProperty({ description: 'Métier recherché', example: '550e8400-e29b-41d4-a716-446655440000' })
+    @ApiProperty({
+        description: 'Métier recherché',
+        example: '550e8400-e29b-41d4-a716-446655440000',
+    })
     @IsUUID('4', { message: 'metierId invalide' })
     metierId: string;
 
@@ -50,7 +53,12 @@ export class CreateDemandeExpressDto {
     @IsBoolean()
     estUrgent?: boolean;
 
-    @ApiPropertyOptional({ description: 'Rayon de diffusion (km)', default: 10, minimum: 1, maximum: 50 })
+    @ApiPropertyOptional({
+        description: 'Rayon de diffusion (km)',
+        default: 10,
+        minimum: 1,
+        maximum: 50,
+    })
     @IsOptional()
     @IsInt()
     @Min(1)

@@ -88,7 +88,9 @@ export class DemandesExpressService {
         );
 
         // Notifier chaque artisan candidat (push + in-app). Fire-and-forget.
-        const titre = dto.estUrgent ? '🚨 Demande urgente près de vous' : '⚡ Nouvelle demande express';
+        const titre = dto.estUrgent
+            ? '🚨 Demande urgente près de vous'
+            : '⚡ Nouvelle demande express';
         const corps = `${metier.nom} · ${dto.titre.trim()}`;
         void Promise.all(
             candidats.map((c) =>
@@ -129,7 +131,7 @@ export class DemandesExpressService {
             select: { id: true },
         });
         if (!candidat) {
-            throw new ForbiddenException("Cette demande ne vous a pas été adressée");
+            throw new ForbiddenException('Cette demande ne vous a pas été adressée');
         }
 
         // CLAIM ATOMIQUE : seul le premier passe de EN_RECHERCHE à ATTRIBUEE.
@@ -179,7 +181,9 @@ export class DemandesExpressService {
         // Prévenir les autres candidats que c'est pris (sauf l'artisan gagnant)
         void this.notifierAutresCandidats(demandeId, artisan.id).catch(() => undefined);
 
-        this.logger.log(`Demande express ${demandeId} attribuée à artisan=${artisan.id} → booking=${booking.id}`);
+        this.logger.log(
+            `Demande express ${demandeId} attribuée à artisan=${artisan.id} → booking=${booking.id}`,
+        );
 
         return { bookingId: booking.id, demandeId };
     }
@@ -344,7 +348,10 @@ export class DemandesExpressService {
         }
     }
 
-    private async notifierAutresCandidats(demandeId: string, gagnantArtisanId: string): Promise<void> {
+    private async notifierAutresCandidats(
+        demandeId: string,
+        gagnantArtisanId: string,
+    ): Promise<void> {
         const autres = await this.prisma.demandeExpressCandidat.findMany({
             where: { demandeId, artisanId: { not: gagnantArtisanId } },
             select: { artisanUserId: true },
