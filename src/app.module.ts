@@ -34,9 +34,20 @@ import { AtGuard } from './common/guards';
 import { CommonModule } from './common/common.module';
 import { AuditLogInterceptor } from './common/interceptors';
 import { HealthModule } from './health/health.module';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 
 @Module({
     imports: [
+        // Back-office admin (export statique Next.js) servi sous /admin, même
+        // origine que l'API → aucun CORS. Les fichiers sont déposés dans
+        // <racine app>/admin-public au déploiement. serveRoot limite l'effet à
+        // /admin (n'intercepte jamais /api/v1).
+        ServeStaticModule.forRoot({
+            rootPath: join(process.cwd(), 'admin-public'),
+            serveRoot: '/admin',
+            serveStaticOptions: { index: 'index.html', redirect: true },
+        }),
         ConfigModule.forRoot({ isGlobal: true }),
         CacheModule.registerAsync({
             isGlobal: true,
