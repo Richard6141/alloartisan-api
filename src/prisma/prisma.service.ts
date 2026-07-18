@@ -174,4 +174,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     get demandeExpressCandidat() {
         return this.client.demandeExpressCandidat;
     }
+
+    // Anti-fraude : empreintes d'identité (anti multi-comptes)
+    get identiteEmpreinte() {
+        return this.client.identiteEmpreinte;
+    }
 }

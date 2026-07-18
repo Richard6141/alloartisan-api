@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { FraudService } from './fraud.service';
+import { IdentiteService } from './identite.service';
 import { FraudController } from './fraud.controller';
 import { FraudScheduler } from './fraud.scheduler';
 import { PrismaModule } from 'src/prisma/prisma.module';
@@ -19,7 +20,7 @@ import { CommonModule } from 'src/common/common.module';
 @Module({
     imports: [PrismaModule, CommonModule],
     controllers: [FraudController],
-    providers: [FraudService, FraudScheduler],
-    exports: [FraudService],
+    providers: [FraudService, IdentiteService, FraudScheduler],
+    exports: [FraudService, IdentiteService],
 })
 export class FraudModule {}

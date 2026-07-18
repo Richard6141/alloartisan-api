@@ -1,16 +1,22 @@
 import {
     Controller,
     Get,
+    Post,
+    Body,
     Param,
     Query,
     ParseIntPipe,
     DefaultValuePipe,
+    HttpCode,
+    HttpStatus,
     UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { Roles } from 'src/common/decorators';
 import { RolesGuard } from 'src/common/guards';
 import { FraudService } from './fraud.service';
+import { IdentiteService } from './identite.service';
+import { CheckIdentiteDto } from './dto/check-identite.dto';
 import { Role } from 'src/generated/prisma';
 
 @ApiTags('Admin - Fraud Detection')
@@ -19,7 +25,31 @@ import { Role } from 'src/generated/prisma';
 @UseGuards(RolesGuard)
 @Controller('admin/fraud')
 export class FraudController {
-    constructor(private readonly fraudService: FraudService) {}
+    constructor(
+        private readonly fraudService: FraudService,
+        private readonly identiteService: IdentiteService,
+    ) {}
+
+    /**
+     * POST /api/v1/admin/fraud/identite/check
+     * Vérifie si une identité (numéro de pièce, ou nom + date de naissance)
+     * correspond déjà à un AUTRE compte validé — aide à la décision, jamais
+     * de blocage automatique.
+     */
+    @Post('identite/check')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Anti-doublon : identité déjà enregistrée ? (ADMIN)' })
+    async checkIdentite(@Body() dto: CheckIdentiteDto) {
+        const matches = await this.identiteService.check(
+            {
+                numeroPiece: dto.numeroPiece,
+                nom: dto.nom,
+                dateNaissance: dto.dateNaissance,
+            },
+            dto.excludeArtisanId,
+        );
+        return { matches };
+    }
 
     /**
      * GET /api/v1/admin/fraud/artisans/:artisanId

@@ -928,6 +928,29 @@ model ManifestationInteret {
   @@map("manifestations_interet")
 }
 
+// ==================== EMPREINTE D'IDENTITÉ (anti-doublon) ====================
+// Index anti multi-comptes : à la validation d'une pièce d'identité, on stocke
+// des EMPREINTES (hashes SHA-256, non réversibles) — jamais le document ni les
+// données en clair. Toute nouvelle validation est comparée à cet index pour
+// alerter le validateur si la même identité existe déjà sur un autre compte.
+// FK scalaires (découplé) : pas de relation pour ne pas alourdir le schéma.
+model IdentiteEmpreinte {
+  id              String   @id @default(uuid()) @db.VarChar(36)
+  artisanId       String?  @map("artisan_id") @db.VarChar(36)
+  userId          String   @map("user_id") @db.VarChar(36)
+  certificationId String?  @map("certification_id") @db.VarChar(36)
+  hashNumeroPiece String?  @map("hash_numero_piece") @db.VarChar(64)
+  hashNomDdn      String?  @map("hash_nom_ddn") @db.VarChar(64)
+  numeroApercu    String?  @map("numero_apercu") @db.VarChar(20)
+  nomApercu       String?  @map("nom_apercu") @db.VarChar(120)
+  createdAt       DateTime @default(now()) @db.Timestamptz @map("created_at")
+
+  @@index([hashNumeroPiece], name: "idx_empreinte_numero")
+  @@index([hashNomDdn], name: "idx_empreinte_nom_ddn")
+  @@index([artisanId], name: "idx_empreinte_artisan")
+  @@map("identite_empreintes")
+}
+
 // ==================== DEMANDE EXPRESS (dispatch) ====================
 // Mise en relation instantanée : le client diffuse une demande aux artisans
 // proches disponibles, le premier qui accepte décroche. Modèles volontairement

@@ -409,7 +409,10 @@ export class CertificationsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() dto: VerifyCertificationDto,
     ): Promise<CertificationResponseDto> {
-        return this.certificationsService.verify(id, dto.verifie, dto.raison);
+        return this.certificationsService.verify(id, dto.verifie, dto.raison, {
+            numeroPiece: dto.numeroPiece,
+            dateNaissance: dto.dateNaissance,
+        });
     }
 
     @Get('admin/artisan/:artisanId')

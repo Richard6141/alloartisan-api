@@ -124,9 +124,7 @@ export class FraudService {
     /**
      * Retourne les artisans à haut risque (score > 60) pour le dashboard admin.
      */
-    async getHighRiskArtisans(
-        limit = 20,
-    ): Promise<
+    async getHighRiskArtisans(limit = 20): Promise<
         {
             artisanId: string;
             nom: string;

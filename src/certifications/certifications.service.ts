@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { NotificationService } from 'src/notification/notification.service';
+import { IdentiteService } from 'src/fraud/identite.service';
 import { Certification, StatutArtisan } from 'src/generated/prisma';
 import {
     CreateCertificationDto,
@@ -21,6 +22,7 @@ export class CertificationsService {
     constructor(
         private prisma: PrismaService,
         private notificationService: NotificationService,
+        private identiteService: IdentiteService,
     ) {}
 
     /**
@@ -450,6 +452,7 @@ export class CertificationsService {
         id: string,
         verifie: boolean,
         raisonRejet?: string,
+        identite?: { numeroPiece?: string; dateNaissance?: string },
     ): Promise<CertificationResponseDto> {
         const certification = await this.prisma.certification.findUnique({
             where: { id },
@@ -484,7 +487,7 @@ export class CertificationsService {
         // Prévenir l'artisan de la décision (avec le motif en cas de refus)
         const artisan = await this.prisma.artisan.findUnique({
             where: { id: certification.artisanId },
-            select: { userId: true },
+            select: { userId: true, user: { select: { prenom: true, nom: true } } },
         });
         if (artisan) {
             // Une pièce d'IDENTITÉ validée alimente le badge « identité vérifiée »
@@ -495,6 +498,26 @@ export class CertificationsService {
                     where: { userId: artisan.userId },
                     data: { identiteVerifiee: verifie },
                 });
+
+                // Empreinte anti-doublon : on indexe l'identité validée (hash,
+                // jamais en clair) pour détecter un futur compte réutilisant la
+                // même pièce. Non bloquant.
+                if (verifie && (identite?.numeroPiece || identite?.dateNaissance)) {
+                    const nom =
+                        `${artisan.user?.prenom ?? ''} ${artisan.user?.nom ?? ''}`.trim();
+                    await this.identiteService
+                        .register({
+                            artisanId: certification.artisanId,
+                            userId: artisan.userId,
+                            certificationId: certification.id,
+                            input: {
+                                numeroPiece: identite.numeroPiece,
+                                nom,
+                                dateNaissance: identite.dateNaissance,
+                            },
+                        })
+                        .catch(() => undefined);
+                }
             }
             const nomDoc =
                 certification.type === 'IDENTITE'

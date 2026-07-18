@@ -152,4 +152,23 @@ export class VerifyCertificationDto {
     @IsString()
     @MaxLength(500)
     raison?: string;
+
+    @ApiPropertyOptional({
+        description:
+            "Numéro de la pièce d'identité (validation IDENTITE) — indexé (hash) pour la détection anti-doublon",
+        maxLength: 60,
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(60)
+    numeroPiece?: string;
+
+    @ApiPropertyOptional({
+        description: 'Date de naissance (YYYY-MM-DD), pour le rapprochement nom + date de naissance',
+        maxLength: 20,
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(20)
+    dateNaissance?: string;
 }
