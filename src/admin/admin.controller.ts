@@ -2,10 +2,13 @@ import {
     Controller,
     Get,
     Post,
+    Patch,
     Body,
+    Param,
     Query,
     UseGuards,
     ParseIntPipe,
+    ParseUUIDPipe,
     DefaultValuePipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
@@ -16,6 +19,8 @@ import {
     BroadcastNotificationDto,
     AdminLogsFilterDto,
 } from './dto/admin-stats.dto';
+import { AdminTrendsDto } from './dto/admin-trends.dto';
+import { ChangeUserStatutDto } from './dto/change-user-statut.dto';
 
 import { AtGuard, RolesGuard } from 'src/common/guards';
 import { GetCurrentUser, Roles } from 'src/common/decorators';
@@ -44,6 +49,40 @@ export class AdminController {
     @Get('stats/overview')
     getOverviewStats() {
         return this.adminService.getOverviewStats();
+    }
+
+    @ApiOperation({
+        summary: 'Séries temporelles (inscriptions, demandes, revenus)',
+        description: 'Points quotidiens sur 7/30/90 jours pour les graphiques du dashboard.',
+    })
+    @Get('stats/trends')
+    getTrends(@Query() dto: AdminTrendsDto) {
+        return this.adminService.getTrends(dto);
+    }
+
+    @ApiOperation({
+        summary: 'Répartitions (abonnements, top métiers, top villes)',
+        description: 'Alimente les graphiques de répartition du dashboard.',
+    })
+    @Get('stats/breakdown')
+    getBreakdown() {
+        return this.adminService.getBreakdown();
+    }
+
+    @ApiOperation({ summary: "Détail d'un utilisateur (profil + artisan lié)" })
+    @Get('users/:id')
+    getUserDetail(@Param('id', ParseUUIDPipe) id: string) {
+        return this.adminService.getUserDetail(id);
+    }
+
+    @ApiOperation({ summary: 'Changer le statut (ACTIF/SUSPENDU/BANNI)' })
+    @Patch('users/:id/statut')
+    changeUserStatut(
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() dto: ChangeUserStatutDto,
+        @GetCurrentUser('sub') adminId: string,
+    ) {
+        return this.adminService.changeUserStatut(id, dto, adminId);
     }
 
     @ApiOperation({

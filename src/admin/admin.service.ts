@@ -1,11 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { ChangeUserStatutDto } from './dto/change-user-statut.dto';
 import {
     AdminUsersFilterDto,
     AdminTransactionsFilterDto,
     BroadcastNotificationDto,
     AdminLogsFilterDto,
 } from './dto/admin-stats.dto';
+import { AdminTrendsDto } from './dto/admin-trends.dto';
 
 import { Role } from 'src/generated/prisma';
 
@@ -106,6 +108,142 @@ export class AdminService {
             },
             generatedAt: new Date().toISOString(),
         };
+    }
+
+    /**
+     * Séries temporelles quotidiennes (inscriptions, demandes, revenus) sur
+     * 7/30/90 jours. Série CONTINUE : les jours sans donnée valent 0. Alimente
+     * les graphiques du dashboard admin.
+     */
+    async getTrends(dto: AdminTrendsDto) {
+        const days = dto.range === '7d' ? 7 : dto.range === '90d' ? 90 : 30;
+        const since = new Date();
+        since.setUTCHours(0, 0, 0, 0);
+        since.setUTCDate(since.getUTCDate() - (days - 1));
+
+        const [inscr, dem, rev] = await Promise.all([
+            this.prisma.$queryRaw<{ jour: string; n: number }[]>`
+                SELECT to_char(date_trunc('day', "created_at"), 'YYYY-MM-DD') AS jour, COUNT(*)::int AS n
+                FROM "users" WHERE "created_at" >= ${since} GROUP BY 1`,
+            this.prisma.$queryRaw<{ jour: string; n: number }[]>`
+                SELECT to_char(date_trunc('day', "created_at"), 'YYYY-MM-DD') AS jour, COUNT(*)::int AS n
+                FROM "bookings" WHERE "created_at" >= ${since} GROUP BY 1`,
+            this.prisma.$queryRaw<{ jour: string; montant: number }[]>`
+                SELECT to_char(date_trunc('day', "created_at"), 'YYYY-MM-DD') AS jour, COALESCE(SUM("montant"),0)::int AS montant
+                FROM "transactions" WHERE "statut" = 'COMPLETEE' AND "created_at" >= ${since} GROUP BY 1`,
+        ]);
+
+        const mInscr = new Map<string, number>(inscr.map((r) => [r.jour, r.n]));
+        const mDem = new Map<string, number>(dem.map((r) => [r.jour, r.n]));
+        const mRev = new Map<string, number>(rev.map((r) => [r.jour, r.montant]));
+        const points: { date: string; inscriptions: number; demandes: number; revenus: number }[] =
+            [];
+        for (let i = 0; i < days; i++) {
+            const d = new Date(since);
+            d.setUTCDate(since.getUTCDate() + i);
+            const key = d.toISOString().slice(0, 10);
+            points.push({
+                date: key,
+                inscriptions: mInscr.get(key) ?? 0,
+                demandes: mDem.get(key) ?? 0,
+                revenus: mRev.get(key) ?? 0,
+            });
+        }
+        return { range: dto.range ?? '30d', points };
+    }
+
+    /**
+     * Répartitions pour le dashboard : abonnements artisans par palier, top
+     * métiers, top villes.
+     */
+    async getBreakdown() {
+        const [abon, metiers, villes] = await Promise.all([
+            this.prisma.artisan.groupBy({
+                by: ['abonnementType'],
+                where: { deletedAt: null },
+                _count: { id: true },
+            }),
+            this.prisma.$queryRaw<{ nom: string; count: number }[]>`
+                SELECT m."nom" AS nom, COUNT(*)::int AS count
+                FROM "artisan_metiers" am JOIN "metiers" m ON m."id" = am."metier_id"
+                GROUP BY m."nom" ORDER BY count DESC LIMIT 8`,
+            this.prisma.$queryRaw<{ ville: string; count: number }[]>`
+                SELECT "ville_principale" AS ville, COUNT(*)::int AS count
+                FROM "artisans" WHERE "deleted_at" IS NULL AND "ville_principale" IS NOT NULL
+                GROUP BY 1 ORDER BY count DESC LIMIT 8`,
+        ]);
+        return {
+            abonnements: abon.map((a) => ({ palier: a.abonnementType, count: a._count.id })),
+            topMetiers: metiers,
+            topVilles: villes,
+        };
+    }
+
+    /**
+     * Détail d'un utilisateur (profil + artisan lié le cas échéant).
+     */
+    async getUserDetail(id: string) {
+        const user = await this.prisma.user.findUnique({
+            where: { id },
+            select: {
+                id: true,
+                nom: true,
+                prenom: true,
+                email: true,
+                telephone: true,
+                role: true,
+                statut: true,
+                emailVerified: true,
+                mfaEnabled: true,
+                createdAt: true,
+                ville: true,
+                quartier: true,
+                artisan: {
+                    select: {
+                        id: true,
+                        nomEntreprise: true,
+                        villePrincipale: true,
+                        verified: true,
+                        statut: true,
+                        abonnementType: true,
+                        abonnementExpireAt: true,
+                        noteMoyenne: true,
+                        nombreAvis: true,
+                        ambassadeurNiveau: true,
+                        metiers: {
+                            select: {
+                                estPrincipal: true,
+                                certifie: true,
+                                metier: { select: { nom: true } },
+                            },
+                        },
+                    },
+                },
+            },
+        });
+        if (!user) throw new NotFoundException('Utilisateur introuvable');
+        return user;
+    }
+
+    /**
+     * Change le statut d'un compte (ACTIF / SUSPENDU / BANNI) + journalise
+     * l'action admin (audit).
+     */
+    async changeUserStatut(id: string, dto: ChangeUserStatutDto, adminId: string) {
+        const updated = await this.prisma.user.update({
+            where: { id },
+            data: { statut: dto.statut },
+            select: { id: true, statut: true },
+        });
+        await this.prisma.logActivite.create({
+            data: {
+                action: `ADMIN_USER_${dto.statut}`,
+                entite: 'user',
+                entiteId: id,
+                metadata: { adminId, raison: dto.raison ?? null } as never,
+            },
+        });
+        return updated;
     }
 
     /**

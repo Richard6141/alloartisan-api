@@ -8,11 +8,14 @@ const mockPrisma = {
     user: {
         count: jest.fn(),
         findMany: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
     },
     artisan: {
         count: jest.fn(),
         aggregate: jest.fn(),
         findMany: jest.fn(),
+        groupBy: jest.fn(),
     },
     booking: {
         count: jest.fn(),
@@ -35,6 +38,7 @@ const mockPrisma = {
     logActivite: {
         findMany: jest.fn(),
         count: jest.fn(),
+        create: jest.fn(),
     },
     $queryRaw: jest.fn(),
 };
@@ -234,6 +238,64 @@ describe('AdminService', () => {
                     where: expect.objectContaining({ userId: 'user-1' }),
                 }),
             );
+        });
+    });
+
+    // ─── getTrends ────────────────────────────────────────────────────────────
+
+    describe('getTrends', () => {
+        it('getTrends renvoie une série continue par jour', async () => {
+            mockPrisma.$queryRaw
+                .mockResolvedValueOnce([{ jour: '2026-07-12', n: 3 }])
+                .mockResolvedValueOnce([{ jour: '2026-07-12', n: 5 }])
+                .mockResolvedValueOnce([{ jour: '2026-07-12', montant: 12000 }]);
+            const res = await service.getTrends({ range: '7d' });
+            expect(res.points).toHaveLength(7);
+            const j12 = res.points.find((p) => p.date === '2026-07-12');
+            expect(j12).toMatchObject({ inscriptions: 3, demandes: 5, revenus: 12000 });
+        });
+    });
+
+    // ─── getBreakdown ───────────────────────────────────────────────────────────
+
+    describe('getBreakdown', () => {
+        it('agrège abonnements + top métiers/villes', async () => {
+            (mockPrisma.artisan.groupBy as jest.Mock).mockResolvedValue([
+                { abonnementType: 'GRATUIT', _count: { id: 4 } },
+                { abonnementType: 'STANDARD', _count: { id: 2 } },
+            ]);
+            mockPrisma.$queryRaw
+                .mockResolvedValueOnce([{ nom: 'Plomberie', count: 5 }])
+                .mockResolvedValueOnce([{ ville: 'Cotonou', count: 7 }]);
+            const res = await service.getBreakdown();
+            expect(res.abonnements).toEqual([
+                { palier: 'GRATUIT', count: 4 },
+                { palier: 'STANDARD', count: 2 },
+            ]);
+            expect(res.topMetiers[0]).toEqual({ nom: 'Plomberie', count: 5 });
+            expect(res.topVilles[0]).toEqual({ ville: 'Cotonou', count: 7 });
+        });
+    });
+
+    // ─── changeUserStatut ───────────────────────────────────────────────────────
+
+    describe('changeUserStatut', () => {
+        it('met à jour le statut + journalise', async () => {
+            (mockPrisma.user.update as jest.Mock).mockResolvedValue({ id: 'u1', statut: 'SUSPENDU' });
+            (mockPrisma.logActivite.create as jest.Mock).mockResolvedValue({});
+            const res = await service.changeUserStatut(
+                'u1',
+                { statut: 'SUSPENDU', raison: 'abus' },
+                'admin1',
+            );
+            expect(res).toEqual({ id: 'u1', statut: 'SUSPENDU' });
+            expect(mockPrisma.user.update).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { id: 'u1' },
+                    data: expect.objectContaining({ statut: 'SUSPENDU' }),
+                }),
+            );
+            expect(mockPrisma.logActivite.create).toHaveBeenCalled();
         });
     });
 });
