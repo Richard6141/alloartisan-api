@@ -126,12 +126,26 @@ export class FraudService {
      */
     async getHighRiskArtisans(
         limit = 20,
-    ): Promise<{ artisanId: string; score: number; niveau: FraudNiveau }[]> {
+    ): Promise<
+        {
+            artisanId: string;
+            nom: string;
+            ville: string | null;
+            score: number;
+            niveau: FraudNiveau;
+        }[]
+    > {
         const artisans = await this.prisma.artisan.findMany({
             where: { deletedAt: null },
-            select: { id: true },
+            select: {
+                id: true,
+                nomEntreprise: true,
+                villePrincipale: true,
+                user: { select: { prenom: true, nom: true } },
+            },
             take: 200, // On évalue les 200 premiers — optimisation possible via table dédiée
         });
+        const infoById = new Map(artisans.map((a) => [a.id, a]));
 
         const scores = await Promise.all(artisans.map((a) => this.scoreArtisan(a.id)));
 
@@ -139,7 +153,20 @@ export class FraudService {
             .filter((s) => s.score > 60)
             .sort((a, b) => b.score - a.score)
             .slice(0, limit)
-            .map((s) => ({ artisanId: s.artisanId, score: s.score, niveau: s.niveau }));
+            .map((s) => {
+                const info = infoById.get(s.artisanId);
+                const nom =
+                    info?.nomEntreprise ||
+                    `${info?.user?.prenom ?? ''} ${info?.user?.nom ?? ''}`.trim() ||
+                    'Artisan';
+                return {
+                    artisanId: s.artisanId,
+                    nom,
+                    ville: info?.villePrincipale ?? null,
+                    score: s.score,
+                    niveau: s.niveau,
+                };
+            });
     }
 
     // ─── Collecte des signaux ─────────────────────────────────────────────────
