@@ -487,6 +487,15 @@ export class CertificationsService {
             select: { userId: true },
         });
         if (artisan) {
+            // Une pièce d'IDENTITÉ validée alimente le badge « identité vérifiée »
+            // du profil travailleur (main-d'œuvre), s'il en possède un. Un refus
+            // le retire. Sans ce câblage, le badge restait toujours faux.
+            if (certification.type === 'IDENTITE') {
+                await this.prisma.profilTravailleur.updateMany({
+                    where: { userId: artisan.userId },
+                    data: { identiteVerifiee: verifie },
+                });
+            }
             const nomDoc =
                 certification.type === 'IDENTITE'
                     ? "Votre pièce d'identité"
