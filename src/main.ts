@@ -85,6 +85,7 @@ async function bootstrap() {
     const allowedOrigins = process.env.CORS_ORIGINS?.split(',') || [
         'http://localhost:3000',
         'http://localhost:3001',
+        'http://localhost:3002', // back-office admin (dev)
         'http://localhost:4200',
     ];
 
