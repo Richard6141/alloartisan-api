@@ -13,10 +13,15 @@ interface RedisStore {
 @Injectable()
 export class SessionService {
     private readonly logger = new Logger(SessionService.name);
-    // 30 jours (glissant : prolongé à chaque validation). Doit couvrir la durée
-    // de vie du refresh token, qui n'est plus tourné à chaque refresh.
-    private readonly SESSION_TTL = 30 * 24 * 60 * 60 * 1000; // 30 jours en ms
-    private readonly MAX_SESSIONS_PER_USER = 5;
+    // 60 jours GLISSANTS : prolongé à chaque validation (refresh). C'est ce TTL
+    // qui déconnecte un compte réellement INACTIF — ici après 60 jours sans
+    // ouvrir l'app (largement au-dessus des « 2 semaines minimum » voulues).
+    // Un utilisateur actif voit sa session repoussée en continu → jamais
+    // déconnecté (façon WhatsApp).
+    private readonly SESSION_TTL = 60 * 24 * 60 * 60 * 1000; // 60 jours en ms
+    // Assez haut pour couvrir plusieurs appareils réels + tests (téléphone,
+    // tablette, Google + email…) sans évincer la session la plus ancienne.
+    private readonly MAX_SESSIONS_PER_USER = 10;
 
     constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
 

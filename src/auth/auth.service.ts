@@ -699,13 +699,19 @@ export class AuthService {
         return sessionTokens;
     }
 
-    /** Signe un access token court (15 min). Utilisé au login ET au refresh. */
+    /**
+     * Signe un access token. Durée de vie 2 h : `AtStrategy` revalide la SESSION
+     * Redis + le statut du compte À CHAQUE requête, donc une révocation (logout,
+     * ban, suspension) prend effet immédiatement quelle que soit cette durée.
+     * Un token plus long = moins de refresh = moins de surface de déconnexion
+     * intempestive sur réseau instable, sans compromis de sécurité.
+     */
     private signAccessToken(userId: string, sessionId: string): Promise<string> {
         return this.jwtService.signAsync(
             { sub: userId, sid: sessionId, tokenType: 'at' },
             {
                 secret: this.config.getOrThrow('JWT_ACCESS_SECRET'),
-                expiresIn: 60 * 15, // 15 minutes
+                expiresIn: 60 * 60 * 2, // 2 heures
             },
         );
     }
@@ -717,10 +723,12 @@ export class AuthService {
                 { sub: userId, sid: sessionId },
                 {
                     secret: this.config.getOrThrow('JWT_REFRESH_SECRET'),
-                    // 30 jours : le refresh token n'est PLUS tourné à chaque refresh
-                    // (voir refreshTokens), on lui donne donc une durée de vie
-                    // confortable pour garder l'utilisateur connecté.
-                    expiresIn: 60 * 60 * 24 * 30, // 30 jours
+                    // ~13 mois : le refresh token n'est PLUS tourné à chaque
+                    // refresh (voir refreshTokens). Une durée très longue évite
+                    // qu'un utilisateur ACTIF soit déconnecté à l'échéance du
+                    // token (façon WhatsApp). L'inactivité est gérée séparément
+                    // par le TTL glissant de la SESSION (voir SessionService).
+                    expiresIn: 60 * 60 * 24 * 400, // 400 jours
                 },
             ),
         ]);
