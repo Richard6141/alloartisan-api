@@ -19,13 +19,15 @@ export interface IdentiteInput {
     dateNaissance?: string; // ISO (YYYY-MM-DD), optionnel
 }
 
+export type MotifMatch = 'numero' | 'nom' | 'image_exacte' | 'image_similaire';
+
 export interface EmpreinteMatch {
     artisanId: string | null;
     userId: string;
     nomApercu: string | null;
     numeroApercu: string | null;
     createdAt: Date;
-    motif: 'numero' | 'nom';
+    motif: MotifMatch;
 }
 
 @Injectable()
@@ -115,7 +117,50 @@ export class IdentiteService {
         }));
     }
 
-    /** Enregistre (ou remplace) l'empreinte d'un compte artisan. */
+    /**
+     * Upsert-MERGE : une seule empreinte par artisan. Les champs `undefined` ne
+     * sont PAS écrits (Prisma les ignore) → le n° saisi à la validation et
+     * l'image indexée à l'upload se CUMULENT sans s'écraser.
+     */
+    private async mergeEmpreinte(
+        artisanId: string | null | undefined,
+        userId: string,
+        certificationId: string | null | undefined,
+        data: {
+            hashNumeroPiece?: string | null;
+            hashNomDdn?: string | null;
+            numeroApercu?: string | null;
+            nomApercu?: string | null;
+            docSha256?: string | null;
+            docPhash?: string | null;
+        },
+    ): Promise<void> {
+        if (!Object.values(data).some((v) => v !== undefined)) return;
+
+        if (artisanId) {
+            const existing = await this.prisma.identiteEmpreinte.findFirst({
+                where: { artisanId },
+                select: { id: true },
+            });
+            if (existing) {
+                await this.prisma.identiteEmpreinte.update({
+                    where: { id: existing.id },
+                    data: { ...data, certificationId: certificationId ?? undefined },
+                });
+                return;
+            }
+        }
+        await this.prisma.identiteEmpreinte.create({
+            data: {
+                artisanId: artisanId ?? null,
+                userId,
+                certificationId: certificationId ?? null,
+                ...data,
+            },
+        });
+    }
+
+    /** Indexe l'identité (numéro / nom+DDN) validée d'un compte artisan. */
     async register(params: {
         artisanId?: string | null;
         userId: string;
@@ -124,24 +169,94 @@ export class IdentiteService {
     }): Promise<void> {
         const hNum = this.hashNumero(params.input.numeroPiece);
         const hNom = this.hashNomDdn(params.input.nom, params.input.dateNaissance);
-        if (!hNum && !hNom) return; // rien d'exploitable à indexer
-
-        // Une seule empreinte par artisan : on remplace l'existante
-        if (params.artisanId) {
-            await this.prisma.identiteEmpreinte.deleteMany({
-                where: { artisanId: params.artisanId },
-            });
-        }
-        await this.prisma.identiteEmpreinte.create({
-            data: {
-                artisanId: params.artisanId ?? null,
-                userId: params.userId,
-                certificationId: params.certificationId ?? null,
-                hashNumeroPiece: hNum,
-                hashNomDdn: hNom,
-                numeroApercu: this.apercuNumero(params.input.numeroPiece),
-                nomApercu: this.apercuNom(params.input.nom),
-            },
+        if (!hNum && !hNom) return;
+        await this.mergeEmpreinte(params.artisanId, params.userId, params.certificationId, {
+            hashNumeroPiece: hNum,
+            hashNomDdn: hNom,
+            numeroApercu: this.apercuNumero(params.input.numeroPiece),
+            nomApercu: this.apercuNom(params.input.nom),
         });
+    }
+
+    /** Indexe l'empreinte de l'IMAGE du document (calculée à l'upload). */
+    async registerDocImage(params: {
+        artisanId?: string | null;
+        userId: string;
+        certificationId?: string | null;
+        docSha256?: string | null;
+        docPhash?: string | null;
+    }): Promise<void> {
+        if (!params.docSha256 && !params.docPhash) return;
+        await this.mergeEmpreinte(params.artisanId, params.userId, params.certificationId, {
+            docSha256: params.docSha256 ?? null,
+            docPhash: params.docPhash ?? null,
+        });
+    }
+
+    /** Distance de Hamming entre deux hashes hexadécimaux (dHash 64 bits). */
+    private hamming(a: string, b: string): number {
+        if (a.length !== b.length) return 64;
+        let d = 0;
+        for (let i = 0; i < a.length; i++) {
+            let x = parseInt(a[i], 16) ^ parseInt(b[i], 16);
+            while (x) {
+                d += x & 1;
+                x >>= 1;
+            }
+        }
+        return d;
+    }
+
+    /**
+     * L'image de CETTE pièce (par son certificationId) correspond-elle à un
+     * document déjà soumis par un AUTRE compte ? (fichier identique = sha256,
+     * ou même image ré-encodée = distance de Hamming faible sur le pHash).
+     */
+    async docMatchesForCertification(certificationId: string): Promise<EmpreinteMatch[]> {
+        const self = await this.prisma.identiteEmpreinte.findFirst({
+            where: { certificationId },
+            select: { artisanId: true, docSha256: true, docPhash: true },
+        });
+        if (!self || (!self.docSha256 && !self.docPhash)) return [];
+
+        const rows = await this.prisma.identiteEmpreinte.findMany({
+            where: {
+                ...(self.artisanId ? { artisanId: { not: self.artisanId } } : {}),
+                OR: [
+                    ...(self.docSha256 ? [{ docSha256: self.docSha256 }] : []),
+                    ...(self.docPhash ? [{ docPhash: { not: null } }] : []),
+                ],
+            },
+            select: {
+                artisanId: true,
+                userId: true,
+                nomApercu: true,
+                numeroApercu: true,
+                docSha256: true,
+                docPhash: true,
+                createdAt: true,
+            },
+            take: 300, // borne : à grande échelle, prévoir un index pHash dédié
+        });
+
+        return rows
+            .map((r) => {
+                const exacte = !!self.docSha256 && r.docSha256 === self.docSha256;
+                const similaire =
+                    !!self.docPhash &&
+                    !!r.docPhash &&
+                    this.hamming(self.docPhash, r.docPhash) <= 6;
+                if (!exacte && !similaire) return null;
+                return {
+                    artisanId: r.artisanId,
+                    userId: r.userId,
+                    nomApercu: r.nomApercu,
+                    numeroApercu: r.numeroApercu,
+                    createdAt: r.createdAt,
+                    motif: (exacte ? 'image_exacte' : 'image_similaire') as MotifMatch,
+                };
+            })
+            .filter((m): m is EmpreinteMatch => m !== null)
+            .slice(0, 10);
     }
 }

@@ -943,11 +943,17 @@ model IdentiteEmpreinte {
   hashNomDdn      String?  @map("hash_nom_ddn") @db.VarChar(64)
   numeroApercu    String?  @map("numero_apercu") @db.VarChar(20)
   nomApercu       String?  @map("nom_apercu") @db.VarChar(120)
+  // Empreintes de l'IMAGE du document (Phase 1) : sha256 = fichier identique,
+  // phash = même image ré-encodée/redimensionnée (distance de Hamming).
+  docSha256       String?  @map("doc_sha256") @db.VarChar(64)
+  docPhash        String?  @map("doc_phash") @db.VarChar(32)
   createdAt       DateTime @default(now()) @db.Timestamptz @map("created_at")
 
   @@index([hashNumeroPiece], name: "idx_empreinte_numero")
   @@index([hashNomDdn], name: "idx_empreinte_nom_ddn")
   @@index([artisanId], name: "idx_empreinte_artisan")
+  @@index([docSha256], name: "idx_empreinte_sha")
+  @@index([docPhash], name: "idx_empreinte_phash")
   @@map("identite_empreintes")
 }
 

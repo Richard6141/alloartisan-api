@@ -10,12 +10,14 @@ import { MulterConfigService } from './multer.config';
 import { CloudinaryProvider } from './cloudinary.config';
 import { UploadProcessor } from './upload.processor';
 import { PrismaModule } from 'src/prisma/prisma.module';
+import { FraudModule } from 'src/fraud/fraud.module';
 
 @Global()
 @Module({
     imports: [
         ConfigModule,
         PrismaModule,
+        FraudModule,
         // Configuration Multer avec stockage disque
         MulterModule.registerAsync({
             imports: [ConfigModule],

@@ -52,6 +52,20 @@ export class FraudController {
     }
 
     /**
+     * GET /api/v1/admin/fraud/identite/doc-matches/:certificationId
+     * L'IMAGE de cette pièce d'identité (empreinte calculée à l'upload)
+     * correspond-elle à un document déjà soumis par un autre compte ?
+     * Détection AUTOMATIQUE, sans aucune saisie.
+     */
+    @Get('identite/doc-matches/:certificationId')
+    @ApiOperation({ summary: 'Anti-doublon : image de pièce déjà soumise ? (ADMIN)' })
+    @ApiParam({ name: 'certificationId', description: 'UUID de la certification IDENTITE' })
+    async docMatches(@Param('certificationId') certificationId: string) {
+        const matches = await this.identiteService.docMatchesForCertification(certificationId);
+        return { matches };
+    }
+
+    /**
      * GET /api/v1/admin/fraud/artisans/:artisanId
      * Score de fraude d'un artisan specifique (ADMIN uniquement).
      */

@@ -8,7 +8,9 @@ export class CheckIdentiteDto {
     @MaxLength(60)
     numeroPiece?: string;
 
-    @ApiPropertyOptional({ description: 'Nom complet (pour le rapprochement nom + date de naissance)' })
+    @ApiPropertyOptional({
+        description: 'Nom complet (pour le rapprochement nom + date de naissance)',
+    })
     @IsOptional()
     @IsString()
     @MaxLength(120)
