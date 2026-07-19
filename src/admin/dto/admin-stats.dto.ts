@@ -24,6 +24,16 @@ export class PaginationDto {
     @IsOptional()
     @IsString()
     search?: string;
+
+    @ApiPropertyOptional({ description: 'Champ de tri (whitelisté par endpoint)' })
+    @IsOptional()
+    @IsString()
+    sortBy?: string;
+
+    @ApiPropertyOptional({ description: 'Sens du tri', enum: ['asc', 'desc'] })
+    @IsOptional()
+    @IsEnum(['asc', 'desc'])
+    sortDir?: 'asc' | 'desc';
 }
 
 // ─── Filtre utilisateurs ────────────────────────────────────────────────────

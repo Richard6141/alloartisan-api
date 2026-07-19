@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class AdminBookingsFilterDto {
     @ApiPropertyOptional({ default: 1 })
@@ -26,4 +26,14 @@ export class AdminBookingsFilterDto {
     @IsOptional()
     @IsString()
     search?: string;
+
+    @ApiPropertyOptional({ description: 'Champ de tri' })
+    @IsOptional()
+    @IsString()
+    sortBy?: string;
+
+    @ApiPropertyOptional({ description: 'Sens du tri', enum: ['asc', 'desc'] })
+    @IsOptional()
+    @IsIn(['asc', 'desc'])
+    sortDir?: 'asc' | 'desc';
 }

@@ -10,7 +10,7 @@ import {
 } from './dto/admin-stats.dto';
 import { AdminTrendsDto } from './dto/admin-trends.dto';
 
-import { Role } from 'src/generated/prisma';
+import { Role, Prisma } from 'src/generated/prisma';
 
 @Injectable()
 export class AdminService {
@@ -366,6 +366,17 @@ export class AdminService {
     async getUsers(dto: AdminUsersFilterDto) {
         const { page = 1, limit = 20, role, search } = dto;
         const skip = (page - 1) * limit;
+        const dir: Prisma.SortOrder = dto.sortDir === 'asc' ? 'asc' : 'desc';
+        const orderBy =
+            dto.sortBy === 'nom'
+                ? [{ prenom: dir }, { nom: dir }]
+                : dto.sortBy === 'email'
+                  ? { email: dir }
+                  : dto.sortBy === 'statut'
+                    ? { statut: dir }
+                    : dto.sortBy === 'role'
+                      ? { role: dir }
+                      : { createdAt: dir };
 
         const where = {
             ...(role ? { role } : {}),
@@ -405,7 +416,7 @@ export class AdminService {
                         },
                     },
                 },
-                orderBy: { createdAt: 'desc' },
+                orderBy,
             }),
             this.prisma.user.count({ where }),
         ]);
@@ -437,6 +448,15 @@ export class AdminService {
                   }
                 : {}),
         };
+        const dir: Prisma.SortOrder = dto.sortDir === 'asc' ? 'asc' : 'desc';
+        const orderBy =
+            dto.sortBy === 'titre'
+                ? { titre: dir }
+                : dto.sortBy === 'statut'
+                  ? { statut: dir }
+                  : dto.sortBy === 'datePreferee'
+                    ? { datePreferee: dir }
+                    : { createdAt: dir };
         const [rows, total] = await Promise.all([
             this.prisma.booking.findMany({
                 where,
@@ -459,7 +479,7 @@ export class AdminService {
                     },
                     metier: { select: { nom: true } },
                 },
-                orderBy: { createdAt: 'desc' },
+                orderBy,
             }),
             this.prisma.booking.count({ where }),
         ]);
@@ -680,6 +700,16 @@ export class AdminService {
                 : {}),
         };
 
+        const dir: Prisma.SortOrder = dto.sortDir === 'asc' ? 'asc' : 'desc';
+        const orderBy =
+            dto.sortBy === 'montant'
+                ? { montant: dir }
+                : dto.sortBy === 'statut'
+                  ? { statut: dir }
+                  : dto.sortBy === 'provider'
+                    ? { provider: dir }
+                    : { createdAt: dir };
+
         const [transactions, total, aggregat] = await Promise.all([
             this.prisma.transaction.findMany({
                 where,
@@ -693,7 +723,7 @@ export class AdminService {
                         },
                     },
                 },
-                orderBy: { createdAt: 'desc' },
+                orderBy,
             }),
             this.prisma.transaction.count({ where }),
             this.prisma.transaction.aggregate({
@@ -789,12 +819,15 @@ export class AdminService {
                 : {}),
         };
 
+        const dir: Prisma.SortOrder = dto.sortDir === 'asc' ? 'asc' : 'desc';
+        const orderBy = dto.sortBy === 'action' ? { action: dir } : { createdAt: dir };
+
         const [logs, total] = await Promise.all([
             this.prisma.logActivite.findMany({
                 where,
                 skip,
                 take: limit,
-                orderBy: { createdAt: 'desc' },
+                orderBy,
                 // Sélection précise pour réduire le payload
                 select: {
                     id: true,
