@@ -92,6 +92,30 @@ export class AdminController {
         return this.adminService.getBookings(dto);
     }
 
+    @ApiOperation({ summary: "Détail complet d'une réservation" })
+    @Get('bookings/:id')
+    getBookingDetail(@Param('id', ParseUUIDPipe) id: string) {
+        return this.adminService.getBookingDetail(id);
+    }
+
+    @ApiOperation({ summary: "Détail complet d'un artisan (profil, métiers, certifs, stats)" })
+    @Get('artisans/:id')
+    getArtisanDetail(@Param('id', ParseUUIDPipe) id: string) {
+        return this.adminService.getArtisanDetail(id);
+    }
+
+    @ApiOperation({ summary: 'Tous les métiers (catégorie + compteurs)' })
+    @Get('metiers')
+    getMetiers() {
+        return this.adminService.getMetiers();
+    }
+
+    @ApiOperation({ summary: 'Toutes les catégories de métiers' })
+    @Get('categories')
+    getCategories() {
+        return this.adminService.getCategories();
+    }
+
     @ApiOperation({
         summary: 'Stats réservations',
         description: 'Répartition par statut, évolution 30 jours, top métiers.',

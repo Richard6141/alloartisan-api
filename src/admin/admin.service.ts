@@ -409,7 +409,12 @@ export class AdminService {
                 ? {
                       OR: [
                           { titre: { contains: search, mode: 'insensitive' as const } },
-                          { adresseIntervention: { contains: search, mode: 'insensitive' as const } },
+                          {
+                              adresseIntervention: {
+                                  contains: search,
+                                  mode: 'insensitive' as const,
+                              },
+                          },
                       ],
                   }
                 : {}),
@@ -441,6 +446,119 @@ export class AdminService {
             this.prisma.booking.count({ where }),
         ]);
         return { data: rows, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+    }
+
+    /** Détail complet d'une réservation (parties, prix, workflow, paiement, avis). */
+    async getBookingDetail(id: string) {
+        const b = await this.prisma.booking.findUnique({
+            where: { id },
+            include: {
+                client: {
+                    select: { id: true, nom: true, prenom: true, email: true, telephone: true, photoUrl: true },
+                },
+                artisan: {
+                    select: {
+                        id: true,
+                        nomEntreprise: true,
+                        villePrincipale: true,
+                        user: { select: { nom: true, prenom: true, email: true, telephone: true } },
+                    },
+                },
+                metier: { select: { nom: true, categorie: { select: { nom: true } } } },
+                transaction: {
+                    select: {
+                        id: true,
+                        montant: true,
+                        commission: true,
+                        montantArtisan: true,
+                        statut: true,
+                        provider: true,
+                        createdAt: true,
+                    },
+                },
+                avis: {
+                    select: {
+                        note: true,
+                        commentaire: true,
+                        signale: true,
+                        visible: true,
+                        reponseArtisan: true,
+                        createdAt: true,
+                    },
+                },
+            },
+        });
+        if (!b) throw new NotFoundException('Réservation introuvable');
+        return b;
+    }
+
+    /** Détail complet d'un artisan (profil pro, métiers, certifications, stats). */
+    async getArtisanDetail(id: string) {
+        const a = await this.prisma.artisan.findUnique({
+            where: { id },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        nom: true,
+                        prenom: true,
+                        email: true,
+                        telephone: true,
+                        photoUrl: true,
+                        statut: true,
+                        emailVerified: true,
+                        mfaEnabled: true,
+                        createdAt: true,
+                    },
+                },
+                metiers: {
+                    include: { metier: { select: { nom: true, categorie: { select: { nom: true } } } } },
+                },
+                certifications: {
+                    select: {
+                        id: true,
+                        titre: true,
+                        type: true,
+                        documentUrl: true,
+                        statutVerification: true,
+                        raisonRejet: true,
+                        createdAt: true,
+                    },
+                },
+                _count: { select: { bookings: true, avis: true } },
+            },
+        });
+        if (!a) throw new NotFoundException('Artisan introuvable');
+
+        // Répartition des réservations de cet artisan par statut
+        const parStatut = await this.prisma.booking.groupBy({
+            by: ['statut'],
+            where: { artisanId: id },
+            _count: { id: true },
+        });
+        return {
+            ...a,
+            bookingsParStatut: parStatut.map((s) => ({ statut: s.statut, count: s._count.id })),
+        };
+    }
+
+    /** Tous les métiers (avec catégorie + nb d'artisans + nb de demandes). */
+    async getMetiers() {
+        return this.prisma.metier.findMany({
+            include: {
+                categorie: { select: { nom: true } },
+                _count: { select: { artisanMetiers: true, bookings: true } },
+            },
+            orderBy: [{ categorie: { ordreAffichage: 'asc' } }, { nom: 'asc' }],
+        });
+    }
+
+    /** Toutes les catégories (avec nb de métiers). */
+    async getCategories() {
+        return this.prisma.categorieMetier.findMany({
+            include: { _count: { select: { metiers: true } } },
+            orderBy: { ordreAffichage: 'asc' },
+        });
     }
 
     // ─── Artisans en attente de validation ──────────────────────────────────────
@@ -661,6 +779,7 @@ export class AdminService {
                     ipAddress: true,
                     userAgent: true,
                     createdAt: true,
+                    user: { select: { nom: true, prenom: true, email: true, role: true } },
                 },
             }),
             this.prisma.logActivite.count({ where }),
