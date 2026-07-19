@@ -21,6 +21,7 @@ import {
 } from './dto/admin-stats.dto';
 import { AdminTrendsDto } from './dto/admin-trends.dto';
 import { ChangeUserStatutDto } from './dto/change-user-statut.dto';
+import { AdminBookingsFilterDto } from './dto/admin-bookings.dto';
 
 import { AtGuard, RolesGuard } from 'src/common/guards';
 import { GetCurrentUser, Roles } from 'src/common/decorators';
@@ -83,6 +84,12 @@ export class AdminController {
         @GetCurrentUser('sub') adminId: string,
     ) {
         return this.adminService.changeUserStatut(id, dto, adminId);
+    }
+
+    @ApiOperation({ summary: 'Réservations (paginées + filtrables par statut)' })
+    @Get('bookings')
+    getBookings(@Query() dto: AdminBookingsFilterDto) {
+        return this.adminService.getBookings(dto);
     }
 
     @ApiOperation({

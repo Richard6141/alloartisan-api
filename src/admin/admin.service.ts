@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ChangeUserStatutDto } from './dto/change-user-statut.dto';
+import { AdminBookingsFilterDto } from './dto/admin-bookings.dto';
 import {
     AdminUsersFilterDto,
     AdminTransactionsFilterDto,
@@ -395,6 +396,51 @@ export class AdminService {
             data: users,
             meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
         };
+    }
+
+    // ─── Réservations (navigateur admin) ─────────────────────────────────────────
+
+    async getBookings(dto: AdminBookingsFilterDto) {
+        const { page = 1, limit = 20, statut, search } = dto;
+        const skip = (page - 1) * limit;
+        const where = {
+            ...(statut ? { statut: statut as never } : {}),
+            ...(search
+                ? {
+                      OR: [
+                          { titre: { contains: search, mode: 'insensitive' as const } },
+                          { adresseIntervention: { contains: search, mode: 'insensitive' as const } },
+                      ],
+                  }
+                : {}),
+        };
+        const [rows, total] = await Promise.all([
+            this.prisma.booking.findMany({
+                where,
+                skip,
+                take: limit,
+                select: {
+                    id: true,
+                    titre: true,
+                    statut: true,
+                    estUrgent: true,
+                    createdAt: true,
+                    datePreferee: true,
+                    adresseIntervention: true,
+                    client: { select: { nom: true, prenom: true } },
+                    artisan: {
+                        select: {
+                            nomEntreprise: true,
+                            user: { select: { nom: true, prenom: true } },
+                        },
+                    },
+                    metier: { select: { nom: true } },
+                },
+                orderBy: { createdAt: 'desc' },
+            }),
+            this.prisma.booking.count({ where }),
+        ]);
+        return { data: rows, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
     }
 
     // ─── Artisans en attente de validation ──────────────────────────────────────
