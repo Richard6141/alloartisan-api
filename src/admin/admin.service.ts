@@ -199,6 +199,24 @@ export class AdminService {
                 createdAt: true,
                 ville: true,
                 quartier: true,
+                _count: { select: { bookingsClient: true, avisClient: true } },
+                bookingsClient: {
+                    take: 6,
+                    orderBy: { createdAt: 'desc' },
+                    select: {
+                        id: true,
+                        titre: true,
+                        statut: true,
+                        createdAt: true,
+                        metier: { select: { nom: true } },
+                        artisan: {
+                            select: {
+                                nomEntreprise: true,
+                                user: { select: { nom: true, prenom: true } },
+                            },
+                        },
+                    },
+                },
                 artisan: {
                     select: {
                         id: true,
@@ -454,7 +472,14 @@ export class AdminService {
             where: { id },
             include: {
                 client: {
-                    select: { id: true, nom: true, prenom: true, email: true, telephone: true, photoUrl: true },
+                    select: {
+                        id: true,
+                        nom: true,
+                        prenom: true,
+                        email: true,
+                        telephone: true,
+                        photoUrl: true,
+                    },
                 },
                 artisan: {
                     select: {
@@ -512,7 +537,9 @@ export class AdminService {
                     },
                 },
                 metiers: {
-                    include: { metier: { select: { nom: true, categorie: { select: { nom: true } } } } },
+                    include: {
+                        metier: { select: { nom: true, categorie: { select: { nom: true } } } },
+                    },
                 },
                 certifications: {
                     select: {
