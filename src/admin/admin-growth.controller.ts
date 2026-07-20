@@ -59,6 +59,14 @@ export class AdminGrowthController {
         return this.growth.getTravailleurs(dto);
     }
 
+    // ─── Comptes admin ───────────────────────────────────────────────────────────
+
+    @ApiOperation({ summary: 'Comptes administrateurs + activité (journal)' })
+    @Get('admins')
+    getAdmins() {
+        return this.growth.getAdmins();
+    }
+
     // ─── Demandes Express ────────────────────────────────────────────────────────
 
     @ApiOperation({ summary: 'Stats demandes express (dispatch urgent)' })

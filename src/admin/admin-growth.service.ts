@@ -336,6 +336,60 @@ export class AdminGrowthService {
         return { data: rows, meta: this.meta(total, page, limit) };
     }
 
+    // ─── Comptes admin (oversight) ───────────────────────────────────────────────
+
+    async getAdmins() {
+        const admins = await this.prisma.user.findMany({
+            where: { role: 'ADMIN' },
+            select: {
+                id: true,
+                nom: true,
+                prenom: true,
+                email: true,
+                telephone: true,
+                statut: true,
+                createdAt: true,
+            },
+            orderBy: { createdAt: 'asc' },
+        });
+        const ids = admins.map((a) => a.id);
+
+        const now = new Date();
+        const since24 = new Date(now.getTime() - 24 * 3600 * 1000);
+        const since7 = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
+
+        const [agg, agg24, agg7] = await Promise.all([
+            this.prisma.logActivite.groupBy({
+                by: ['userId'],
+                where: { userId: { in: ids } },
+                _count: { _all: true },
+                _max: { createdAt: true },
+            }),
+            this.prisma.logActivite.groupBy({
+                by: ['userId'],
+                where: { userId: { in: ids }, createdAt: { gte: since24 } },
+                _count: { _all: true },
+            }),
+            this.prisma.logActivite.groupBy({
+                by: ['userId'],
+                where: { userId: { in: ids }, createdAt: { gte: since7 } },
+                _count: { _all: true },
+            }),
+        ]);
+
+        const totalMap = new Map(agg.map((a) => [a.userId, a]));
+        const map24 = new Map(agg24.map((a) => [a.userId, a._count._all]));
+        const map7 = new Map(agg7.map((a) => [a.userId, a._count._all]));
+
+        return admins.map((a) => ({
+            ...a,
+            actionsTotal: totalMap.get(a.id)?._count._all ?? 0,
+            derniereAction: totalMap.get(a.id)?._max.createdAt ?? null,
+            actions24h: map24.get(a.id) ?? 0,
+            actions7j: map7.get(a.id) ?? 0,
+        }));
+    }
+
     // ─── Demandes Express (dispatch) ─────────────────────────────────────────────
 
     async getExpressStats() {
