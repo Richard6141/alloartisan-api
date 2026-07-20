@@ -193,9 +193,10 @@ export class UploadProcessor {
                         docSha256: sha256,
                         docPhash: phash,
                     });
-                    // Biométrie Phase 2 : indexe l'empreinte faciale (si moteur actif,
-                    // et uniquement pour une image — pas de PDF). Jamais bloquant.
-                    if (!isPdf && this.faceBiometrie.enabled) {
+                    // Biométrie Phase 2 : indexe l'empreinte faciale (si moteur
+                    // actif). Le CIP béninois étant délivré en PDF, registerFace
+                    // rasterise la 1ʳᵉ page au besoin. Jamais bloquant.
+                    if (this.faceBiometrie.enabled) {
                         await this.faceBiometrie.registerFace({
                             artisanId,
                             userId,

@@ -3,6 +3,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import type { EmpreinteMatch, MotifMatch } from './identite.service';
 import { FACE_EMBEDDING_PROVIDER, type EmbeddingProvider } from './face/embedding.provider';
 import { ScrfdFaceDetector } from './face/scrfd-detector';
+import { toImageBuffer } from './face/pdf-raster';
 
 /**
  * Seuils de similarité cosinus (embeddings L2-normalisés). Calibrés pour
@@ -35,8 +36,10 @@ export class FaceBiometrieService {
      * Outil de test : compare deux images et renvoie le score de similarité +
      * si un visage a été détecté sur chacune. Ne stocke rien.
      */
-    async compareBuffers(a: Buffer, b: Buffer) {
+    async compareBuffers(rawA: Buffer, rawB: Buffer) {
         if (!this.provider.enabled) return { enabled: false as const };
+        // Le CIP béninois est délivré en PDF → rasterise la 1ʳᵉ page si besoin.
+        const [a, b] = await Promise.all([this.toImage(rawA), this.toImage(rawB)]);
         const [faceA, faceB, va, vb] = await Promise.all([
             this.detector.alignedFaceTensor(a),
             this.detector.alignedFaceTensor(b),
@@ -74,7 +77,8 @@ export class FaceBiometrieService {
         imageBuffer: Buffer;
     }): Promise<void> {
         if (!this.provider.enabled) return;
-        const vec = await this.provider.embed(params.imageBuffer);
+        const img = await this.toImage(params.imageBuffer);
+        const vec = await this.provider.embed(img);
         if (!vec || vec.length === 0) return;
 
         const data = { faceEmbedding: vec, faceModel: this.provider.modelId };
@@ -100,6 +104,18 @@ export class FaceBiometrieService {
                 ...data,
             },
         });
+    }
+
+    /** Buffer image exploitable par sharp (rasterise si PDF, sinon inchangé). */
+    private async toImage(buf: Buffer): Promise<Buffer> {
+        try {
+            return await toImageBuffer(buf);
+        } catch (e) {
+            this.logger.warn(
+                `Rasterisation PDF échouée : ${e instanceof Error ? e.message : String(e)}`,
+            );
+            return buf;
+        }
     }
 
     private cosine(a: number[], b: number[]): number {
