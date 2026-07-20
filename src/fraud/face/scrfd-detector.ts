@@ -27,11 +27,19 @@ const OUT = 112;
 export class ScrfdFaceDetector {
     private readonly logger = new Logger(ScrfdFaceDetector.name);
     private readonly runtimePkg = 'onnxruntime-node';
-    private readonly inputSize = 640;
+    // Entrée dynamique : 1024 par défaut (meilleure détection des PETITS visages,
+    // ex. photo d'identité dans une pièce), surchargeable via FACE_DET_SIZE.
+    // Doit être un multiple de 32 (plus grand stride).
+    private readonly inputSize = this.readSize();
     private readonly strides = [8, 16, 32];
     private readonly numAnchors = 2;
-    private readonly scoreThresh = 0.5;
+    private readonly scoreThresh = Number(process.env.FACE_DET_THRESH ?? 0.4);
     private session: unknown = null;
+
+    private readSize(): number {
+        const s = Number(process.env.FACE_DET_SIZE ?? 1024);
+        return Number.isFinite(s) && s >= 320 ? Math.round(s / 32) * 32 : 1024;
+    }
     private initTried = false;
     private available = false;
 
@@ -45,11 +53,14 @@ export class ScrfdFaceDetector {
         if (!this.enabled) return false;
         try {
             const ort: any = await import(this.runtimePkg);
+            // logSeverityLevel:3 → silence les warnings "VerifyOutputSizes"
+            // (normaux quand l'entrée dynamique diffère de la taille nominale).
             this.session = await ort.InferenceSession.create(
                 process.env.FACE_DETECTOR_PATH as string,
+                { logSeverityLevel: 3 },
             );
             this.available = true;
-            this.logger.log('Détecteur de visage SCRFD chargé.');
+            this.logger.log(`Détecteur de visage SCRFD chargé (input ${this.inputSize}).`);
         } catch (e) {
             this.available = false;
             this.logger.warn(
