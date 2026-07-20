@@ -22,8 +22,8 @@ export class OnnxEmbeddingProvider implements EmbeddingProvider {
     // (la dépendance native n'est installée que si la biométrie est activée).
     private readonly runtimePkg = 'onnxruntime-node';
     private session: unknown = null;
-    private initTried = false;
     private available = false;
+    private initPromise: Promise<boolean> | null = null;
 
     constructor(private readonly detector: ScrfdFaceDetector) {}
 
@@ -39,10 +39,15 @@ export class OnnxEmbeddingProvider implements EmbeddingProvider {
         return process.env.FACE_INPUT_BGR === 'true';
     }
 
+    /** Init concurrente-sûre : les appels parallèles partagent la même promesse. */
     private async ensureSession(): Promise<boolean> {
-        if (this.initTried) return this.available;
-        this.initTried = true;
+        if (this.available) return true;
         if (!this.enabled) return false;
+        if (!this.initPromise) this.initPromise = this.loadSession();
+        return this.initPromise;
+    }
+
+    private async loadSession(): Promise<boolean> {
         try {
             // Import dynamique : absent des deps → désactivation propre.
             const ort: any = await import(this.runtimePkg);

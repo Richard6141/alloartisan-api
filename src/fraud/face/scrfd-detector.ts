@@ -40,17 +40,22 @@ export class ScrfdFaceDetector {
         const s = Number(process.env.FACE_DET_SIZE ?? 1024);
         return Number.isFinite(s) && s >= 320 ? Math.round(s / 32) * 32 : 1024;
     }
-    private initTried = false;
     private available = false;
+    private initPromise: Promise<boolean> | null = null;
 
     get enabled(): boolean {
         return process.env.FACE_DETECTOR_ENABLED === 'true' && !!process.env.FACE_DETECTOR_PATH;
     }
 
+    /** Init concurrente-sûre : les appels parallèles partagent la même promesse. */
     private async ensureSession(): Promise<boolean> {
-        if (this.initTried) return this.available;
-        this.initTried = true;
+        if (this.available) return true;
         if (!this.enabled) return false;
+        if (!this.initPromise) this.initPromise = this.loadSession();
+        return this.initPromise;
+    }
+
+    private async loadSession(): Promise<boolean> {
         try {
             const ort: any = await import(this.runtimePkg);
             // logSeverityLevel:3 → silence les warnings "VerifyOutputSizes"
