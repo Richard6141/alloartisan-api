@@ -234,14 +234,34 @@ Retourne les réservations selon le rôle :
     @Roles(Role.ARTISAN)
     @UseGuards(RolesGuard)
     @ApiOperation({
-        summary: "Terminer l'intervention",
-        description: "L'artisan marque les travaux comme terminés. Statut → TERMINEE.",
+        summary: "Marquer l'intervention terminée (artisan)",
+        description:
+            "L'artisan marque les travaux terminés. Statut → ATTENTE_CONFIRMATION : le client doit ensuite confirmer.",
     })
     @ApiParam({ name: 'id', description: 'UUID de la réservation' })
-    @ApiResponse({ status: 200, description: 'Intervention terminée' })
+    @ApiResponse({ status: 200, description: 'Intervention en attente de confirmation client' })
     @ApiBadRequestResponse({ description: 'La réservation doit être EN_COURS' })
     complete(@Param('id', ParseUUIDPipe) id: string, @GetCurrentUserId() userId: string) {
         return this.bookingService.complete(id, userId);
+    }
+
+    // ============================================================
+    // PATCH /bookings/:id/confirm-completion — Client confirme la fin
+    // ============================================================
+
+    @Patch(':id/confirm-completion')
+    @HttpCode(HttpStatus.OK)
+    @Roles(Role.CLIENT)
+    @UseGuards(RolesGuard)
+    @ApiOperation({
+        summary: "Confirmer la fin de l'intervention (client)",
+        description: 'Le client confirme que les travaux sont bien terminés. Statut → TERMINEE.',
+    })
+    @ApiParam({ name: 'id', description: 'UUID de la réservation' })
+    @ApiResponse({ status: 200, description: 'Intervention confirmée et clôturée' })
+    @ApiBadRequestResponse({ description: 'La réservation doit être en attente de confirmation' })
+    confirmCompletion(@Param('id', ParseUUIDPipe) id: string, @GetCurrentUserId() userId: string) {
+        return this.bookingService.confirmCompletion(id, userId);
     }
 
     // ============================================================

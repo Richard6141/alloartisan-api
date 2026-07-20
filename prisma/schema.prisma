@@ -54,6 +54,7 @@ enum StatutBooking {
   CONTRE_OFFRE
   CONFIRMEE
   EN_COURS
+  ATTENTE_CONFIRMATION // artisan a marqué terminé → le client doit confirmer (et noter)
   TERMINEE
   ANNULEE
   LITIGE

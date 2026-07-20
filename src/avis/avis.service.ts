@@ -43,8 +43,11 @@ export class AvisService {
             throw new ForbiddenException("Ce n'est pas votre réservation");
         }
 
-        // 2. Règle : seulement sur booking TERMINEE
-        if (booking.statut !== StatutBooking.TERMINEE) {
+        // 2. Règle : booking TERMINEE, ou ATTENTE_CONFIRMATION (noter = confirmer).
+        if (
+            booking.statut !== StatutBooking.TERMINEE &&
+            booking.statut !== StatutBooking.ATTENTE_CONFIRMATION
+        ) {
             throw new BadRequestException(
                 `Vous ne pouvez laisser un avis que sur une réservation terminée (statut actuel: ${booking.statut})`,
             );
@@ -63,6 +66,14 @@ export class AvisService {
                     `Le délai de ${REVIEW_DELAY_DAYS} jours pour laisser un avis est dépassé`,
                 );
             }
+        }
+
+        // 4bis. Noter vaut confirmation : clôture le booking si en attente.
+        if (booking.statut === StatutBooking.ATTENTE_CONFIRMATION) {
+            await this.prisma.booking.update({
+                where: { id: booking.id },
+                data: { statut: StatutBooking.TERMINEE, finAt: booking.finAt ?? new Date() },
+            });
         }
 
         // 5. Calculer note globale pondérée si plusieurs sous-notes

@@ -63,6 +63,15 @@ export const NotificationTemplates = {
         titre: '🎉 Intervention terminée',
         corps: `${artisanNom} a marqué l'intervention comme terminée. Laissez un avis !`,
     }),
+    // Clôture à deux temps : l'artisan a marqué terminé, le client doit confirmer.
+    interventionAConfirmer: (artisanNom: string) => ({
+        titre: '✅ Intervention à confirmer',
+        corps: `${artisanNom} a marqué l'intervention comme terminée. Confirmez la fin et notez votre artisan.`,
+    }),
+    interventionConfirmee: (clientNom: string) => ({
+        titre: '🎉 Intervention confirmée',
+        corps: `${clientNom} a confirmé la fin de l'intervention. Mission clôturée !`,
+    }),
     bookingAnnule: (parQui: string, raison?: string) => ({
         titre: '🚫 Réservation annulée',
         corps: raison

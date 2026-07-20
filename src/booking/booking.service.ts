@@ -471,10 +471,19 @@ export class BookingService {
     // TERMINER — Artisan marque l'intervention comme terminée
     // ============================================================
 
+    /**
+     * L'artisan marque l'intervention comme terminée. Clôture à DEUX temps :
+     * le booking passe en ATTENTE_CONFIRMATION — il n'est PAS encore TERMINEE.
+     * Le client doit confirmer (et noter) pour finaliser. Anti-fraude : l'artisan
+     * ne clôture pas seul.
+     */
     async complete(bookingId: string, artisanUserId: string): Promise<BookingWithRelations> {
         const booking = await this.findBookingForArtisan(bookingId, artisanUserId);
 
-        if (booking.statut !== StatutBooking.EN_COURS) {
+        if (
+            booking.statut !== StatutBooking.EN_COURS &&
+            booking.statut !== StatutBooking.ATTENTE_CONFIRMATION
+        ) {
             throw new BadRequestException(
                 `Impossible de terminer : statut actuel "${booking.statut}"`,
             );
@@ -483,25 +492,72 @@ export class BookingService {
         const updated = await this.prisma.booking.update({
             where: { id: bookingId },
             data: {
-                statut: StatutBooking.TERMINEE,
-                finAt: new Date(),
+                statut: StatutBooking.ATTENTE_CONFIRMATION,
+                finAt: booking.finAt ?? new Date(),
             },
             include: this.bookingInclude(),
         });
 
-        this.logger.log(`Intervention terminée: ${bookingId}`);
+        this.logger.log(`Intervention marquée terminée (attente confirmation client): ${bookingId}`);
 
-        // Notifier le client (invitation à laisser un avis)
+        // Notifier le client : il doit confirmer la fin et noter l'artisan.
         const artU3 = (updated as any).artisan?.user;
         const artNom3 = nomLisible(artU3, "L'artisan");
-        const tplComplete = NotificationTemplates.interventionTerminee(artNom3);
+        const tpl = NotificationTemplates.interventionAConfirmer(artNom3);
         void this.notificationService.send({
             userId: (updated as any).clientId,
             type: 'AVIS_NOUVEAU',
-            titre: tplComplete.titre,
-            corps: tplComplete.corps,
+            titre: tpl.titre,
+            corps: tpl.corps,
             data: { bookingId },
         });
+
+        return updated as BookingWithRelations;
+    }
+
+    /**
+     * Le CLIENT confirme la fin de l'intervention → le booking devient TERMINEE.
+     * (La notation reste possible via l'avis ; l'avis auto-confirme aussi.)
+     */
+    async confirmCompletion(
+        bookingId: string,
+        clientId: string,
+    ): Promise<BookingWithRelations> {
+        const booking = await this.findBookingForClient(bookingId, clientId);
+
+        if (
+            booking.statut !== StatutBooking.ATTENTE_CONFIRMATION &&
+            booking.statut !== StatutBooking.EN_COURS
+        ) {
+            throw new BadRequestException(
+                `Impossible de confirmer : statut actuel "${booking.statut}"`,
+            );
+        }
+
+        const updated = await this.prisma.booking.update({
+            where: { id: bookingId },
+            data: {
+                statut: StatutBooking.TERMINEE,
+                finAt: booking.finAt ?? new Date(),
+            },
+            include: this.bookingInclude(),
+        });
+
+        this.logger.log(`Fin d'intervention confirmée par le client: ${bookingId}`);
+
+        // Notifier l'artisan que le client a confirmé.
+        const artisanUserId = (updated as any).artisan?.userId;
+        if (artisanUserId) {
+            const clientNom = nomLisible((updated as any).client, 'Le client');
+            const tpl = NotificationTemplates.interventionConfirmee(clientNom);
+            void this.notificationService.send({
+                userId: artisanUserId,
+                type: 'AVIS_NOUVEAU',
+                titre: tpl.titre,
+                corps: tpl.corps,
+                data: { bookingId },
+            });
+        }
 
         return updated as BookingWithRelations;
     }
