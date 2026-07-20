@@ -447,6 +447,14 @@ export class AdminService {
                       ],
                   }
                 : {}),
+            ...(dto.dateDebut || dto.dateFin
+                ? {
+                      createdAt: {
+                          ...(dto.dateDebut ? { gte: new Date(dto.dateDebut) } : {}),
+                          ...(dto.dateFin ? { lte: new Date(dto.dateFin) } : {}),
+                      },
+                  }
+                : {}),
         };
         const dir: Prisma.SortOrder = dto.sortDir === 'asc' ? 'asc' : 'desc';
         const orderBy =
@@ -696,6 +704,14 @@ export class AdminService {
                           { id: { contains: search } },
                           { providerTransactionId: { contains: search } },
                       ],
+                  }
+                : {}),
+            ...(dto.dateDebut || dto.dateFin
+                ? {
+                      createdAt: {
+                          ...(dto.dateDebut ? { gte: new Date(dto.dateDebut) } : {}),
+                          ...(dto.dateFin ? { lte: new Date(dto.dateFin) } : {}),
+                      },
                   }
                 : {}),
         };

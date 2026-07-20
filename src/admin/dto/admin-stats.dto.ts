@@ -58,6 +58,16 @@ export class AdminTransactionsFilterDto extends PaginationDto {
     @IsOptional()
     @IsEnum(['EN_ATTENTE', 'COMPLETEE', 'ECHOUEE', 'REMBOURSEE'])
     statut?: 'EN_ATTENTE' | 'COMPLETEE' | 'ECHOUEE' | 'REMBOURSEE';
+
+    @ApiPropertyOptional({ description: 'Date de début (ISO 8601)' })
+    @IsOptional()
+    @IsString()
+    dateDebut?: string;
+
+    @ApiPropertyOptional({ description: 'Date de fin (ISO 8601)' })
+    @IsOptional()
+    @IsString()
+    dateFin?: string;
 }
 
 // ─── Filtre logs d'audit ─────────────────────────────────────────────────────

@@ -36,4 +36,14 @@ export class AdminBookingsFilterDto {
     @IsOptional()
     @IsIn(['asc', 'desc'])
     sortDir?: 'asc' | 'desc';
+
+    @ApiPropertyOptional({ description: 'Date de début (ISO 8601)' })
+    @IsOptional()
+    @IsString()
+    dateDebut?: string;
+
+    @ApiPropertyOptional({ description: 'Date de fin (ISO 8601)' })
+    @IsOptional()
+    @IsString()
+    dateFin?: string;
 }
