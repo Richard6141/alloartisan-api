@@ -10,7 +10,12 @@ import {
     HttpCode,
     HttpStatus,
     UseGuards,
+    UseInterceptors,
+    UploadedFiles,
+    BadRequestException,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { Roles } from 'src/common/decorators';
 import { RolesGuard } from 'src/common/guards';
@@ -79,6 +84,27 @@ export class FraudController {
     async faceMatches(@Param('certificationId') certificationId: string) {
         const matches = await this.faceBiometrie.faceMatchesForCertification(certificationId);
         return { matches, enabled: this.faceBiometrie.enabled };
+    }
+
+    /**
+     * POST /api/v1/admin/fraud/identite/face-compare
+     * Outil de test : compare deux images (multipart, champ « images ») et
+     * renvoie le score de similarité faciale. Ne stocke rien.
+     */
+    @Post('identite/face-compare')
+    @HttpCode(HttpStatus.OK)
+    @UseInterceptors(
+        FilesInterceptor('images', 2, {
+            storage: memoryStorage(),
+            limits: { fileSize: 10 * 1024 * 1024 },
+        }),
+    )
+    @ApiOperation({ summary: 'Test biométrie : similarité entre deux images (ADMIN)' })
+    async faceCompare(@UploadedFiles() files: Array<{ buffer: Buffer }>) {
+        if (!files || files.length < 2) {
+            throw new BadRequestException('Deux images sont requises (champ « images »).');
+        }
+        return this.faceBiometrie.compareBuffers(files[0].buffer, files[1].buffer);
     }
 
     /**

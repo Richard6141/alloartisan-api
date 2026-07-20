@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import type { EmpreinteMatch, MotifMatch } from './identite.service';
 import { FACE_EMBEDDING_PROVIDER, type EmbeddingProvider } from './face/embedding.provider';
+import { ScrfdFaceDetector } from './face/scrfd-detector';
 
 /**
  * Seuils de similarité cosinus (embeddings L2-normalisés). Calibrés pour
@@ -23,10 +24,46 @@ export class FaceBiometrieService {
     constructor(
         private readonly prisma: PrismaService,
         @Inject(FACE_EMBEDDING_PROVIDER) private readonly provider: EmbeddingProvider,
+        private readonly detector: ScrfdFaceDetector,
     ) {}
 
     get enabled(): boolean {
         return this.provider.enabled;
+    }
+
+    /**
+     * Outil de test : compare deux images et renvoie le score de similarité +
+     * si un visage a été détecté sur chacune. Ne stocke rien.
+     */
+    async compareBuffers(a: Buffer, b: Buffer) {
+        if (!this.provider.enabled) return { enabled: false as const };
+        const [faceA, faceB, va, vb] = await Promise.all([
+            this.detector.alignedFaceTensor(a),
+            this.detector.alignedFaceTensor(b),
+            this.provider.embed(a),
+            this.provider.embed(b),
+        ]);
+        if (!va || !vb) {
+            return {
+                enabled: true as const,
+                faceDetectedA: !!faceA,
+                faceDetectedB: !!faceB,
+                embeddedA: !!va,
+                embeddedB: !!vb,
+            };
+        }
+        const score = this.cosine(va, vb);
+        return {
+            enabled: true as const,
+            faceDetectedA: !!faceA,
+            faceDetectedB: !!faceB,
+            embeddedA: true,
+            embeddedB: true,
+            cosine: Math.round(score * 1000) / 1000,
+            possibleMatch: score >= FACE_SIM_WEAK,
+            samePersonLikely: score >= FACE_SIM_STRONG,
+            seuils: { faible: FACE_SIM_WEAK, fort: FACE_SIM_STRONG },
+        };
     }
 
     /** Calcule et indexe l'empreinte faciale d'un compte (non bloquant). */
