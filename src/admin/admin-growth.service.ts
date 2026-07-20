@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Prisma } from 'src/generated/prisma';
 import { AdminGrowthFilterDto } from './dto/admin-growth.dto';
@@ -502,5 +502,129 @@ export class AdminGrowthService {
         }));
 
         return { data, meta: this.meta(total, page, limit) };
+    }
+
+    async getDemandeExpressDetail(id: string) {
+        const d = await this.prisma.demandeExpress.findUnique({
+            where: { id },
+            include: { candidats: true },
+        });
+        if (!d) throw new NotFoundException('Demande express introuvable');
+
+        const [client, metier, artisanAttribue, booking] = await Promise.all([
+            this.prisma.user.findUnique({
+                where: { id: d.clientId },
+                select: { id: true, nom: true, prenom: true, email: true, telephone: true },
+            }),
+            this.prisma.metier.findUnique({
+                where: { id: d.metierId },
+                select: { id: true, nom: true },
+            }),
+            d.artisanId
+                ? this.prisma.artisan.findUnique({
+                      where: { id: d.artisanId },
+                      select: {
+                          id: true,
+                          nomEntreprise: true,
+                          villePrincipale: true,
+                          user: { select: { nom: true, prenom: true, telephone: true } },
+                      },
+                  })
+                : Promise.resolve(null),
+            d.bookingId
+                ? this.prisma.booking.findUnique({
+                      where: { id: d.bookingId },
+                      select: { id: true, statut: true, titre: true },
+                  })
+                : Promise.resolve(null),
+        ]);
+
+        const artisanIds = [...new Set(d.candidats.map((c) => c.artisanId))];
+        const artisans = await this.prisma.artisan.findMany({
+            where: { id: { in: artisanIds } },
+            select: {
+                id: true,
+                nomEntreprise: true,
+                villePrincipale: true,
+                noteMoyenne: true,
+                user: { select: { nom: true, prenom: true } },
+            },
+        });
+        const aMap = new Map(artisans.map((a) => [a.id, a]));
+
+        const candidats = d.candidats
+            .slice()
+            .sort((a, b) => Number(a.distanceKm ?? 9999) - Number(b.distanceKm ?? 9999))
+            .map((c) => ({
+                id: c.id,
+                distanceKm: c.distanceKm,
+                createdAt: c.createdAt,
+                estGagnant: !!d.artisanId && c.artisanId === d.artisanId,
+                artisan: aMap.get(c.artisanId) ?? null,
+            }));
+
+        return { ...d, client, metier, artisan: artisanAttribue, booking, candidats };
+    }
+
+    async getTravailleurDetail(id: string) {
+        const t = await this.prisma.profilTravailleur.findUnique({
+            where: { id },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        nom: true,
+                        prenom: true,
+                        email: true,
+                        telephone: true,
+                        photoUrl: true,
+                        createdAt: true,
+                    },
+                },
+                metiers: {
+                    include: { metier: { select: { nom: true } } },
+                },
+                engagements: {
+                    orderBy: { createdAt: 'desc' },
+                    take: 50,
+                    include: {
+                        patron: { select: { nom: true, prenom: true } },
+                        avis: true,
+                    },
+                },
+                _count: { select: { engagements: true, manifestations: true } },
+            },
+        });
+        if (!t) throw new NotFoundException('Profil travailleur introuvable');
+        return t;
+    }
+
+    async getAnnonceDetail(id: string) {
+        const a = await this.prisma.annonceChantier.findUnique({
+            where: { id },
+            include: {
+                patron: {
+                    select: { id: true, nom: true, prenom: true, email: true, telephone: true },
+                },
+                metier: { select: { nom: true } },
+                interets: {
+                    orderBy: { createdAt: 'desc' },
+                    include: {
+                        profil: {
+                            select: {
+                                id: true,
+                                type: true,
+                                villePrincipale: true,
+                                noteMoyenne: true,
+                                nombreAvis: true,
+                                user: { select: { nom: true, prenom: true } },
+                            },
+                        },
+                    },
+                },
+            },
+        });
+        if (!a) throw new NotFoundException('Annonce introuvable');
+        return a;
     }
 }

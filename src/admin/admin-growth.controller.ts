@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AdminGrowthService } from './admin-growth.service';
 import { AdminGrowthFilterDto } from './dto/admin-growth.dto';
@@ -53,10 +53,22 @@ export class AdminGrowthController {
         return this.growth.getAnnonces(dto);
     }
 
+    @ApiOperation({ summary: "Détail d'une annonce de chantier + candidats" })
+    @Get('annonces/:id')
+    getAnnonceDetail(@Param('id', ParseUUIDPipe) id: string) {
+        return this.growth.getAnnonceDetail(id);
+    }
+
     @ApiOperation({ summary: 'Profils travailleurs (paginés + filtrables)' })
     @Get('travailleurs')
     getTravailleurs(@Query() dto: AdminGrowthFilterDto) {
         return this.growth.getTravailleurs(dto);
+    }
+
+    @ApiOperation({ summary: "Détail d'un travailleur (métiers, engagements, avis)" })
+    @Get('travailleurs/:id')
+    getTravailleurDetail(@Param('id', ParseUUIDPipe) id: string) {
+        return this.growth.getTravailleurDetail(id);
     }
 
     // ─── Comptes admin ───────────────────────────────────────────────────────────
@@ -79,5 +91,11 @@ export class AdminGrowthController {
     @Get('demandes-express')
     getDemandesExpress(@Query() dto: AdminGrowthFilterDto) {
         return this.growth.getDemandesExpress(dto);
+    }
+
+    @ApiOperation({ summary: "Détail d'une demande express + candidats notifiés" })
+    @Get('demandes-express/:id')
+    getDemandeExpressDetail(@Param('id', ParseUUIDPipe) id: string) {
+        return this.growth.getDemandeExpressDetail(id);
     }
 }
