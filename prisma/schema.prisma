@@ -957,6 +957,9 @@ model IdentiteEmpreinte {
   // phash = même image ré-encodée/redimensionnée (distance de Hamming).
   docSha256       String?  @map("doc_sha256") @db.VarChar(64)
   docPhash        String?  @map("doc_phash") @db.VarChar(32)
+  /// Phase 2 biométrie : embedding facial L2-normalisé (aucune image stockée) + version du modèle
+  faceEmbedding   Float[]  @default([]) @map("face_embedding")
+  faceModel       String?  @map("face_model") @db.VarChar(40)
   createdAt       DateTime @default(now()) @db.Timestamptz @map("created_at")
 
   @@index([hashNumeroPiece], name: "idx_empreinte_numero")

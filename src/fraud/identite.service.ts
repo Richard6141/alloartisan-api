@@ -19,7 +19,13 @@ export interface IdentiteInput {
     dateNaissance?: string; // ISO (YYYY-MM-DD), optionnel
 }
 
-export type MotifMatch = 'numero' | 'nom' | 'image_exacte' | 'image_similaire';
+export type MotifMatch =
+    | 'numero'
+    | 'nom'
+    | 'image_exacte'
+    | 'image_similaire'
+    | 'visage_similaire'
+    | 'visage_fort';
 
 export interface EmpreinteMatch {
     artisanId: string | null;
@@ -28,6 +34,8 @@ export interface EmpreinteMatch {
     numeroApercu: string | null;
     createdAt: Date;
     motif: MotifMatch;
+    /** Score de similarité (0-1), présent pour les motifs biométriques. */
+    score?: number;
 }
 
 @Injectable()
@@ -243,9 +251,7 @@ export class IdentiteService {
             .map((r) => {
                 const exacte = !!self.docSha256 && r.docSha256 === self.docSha256;
                 const similaire =
-                    !!self.docPhash &&
-                    !!r.docPhash &&
-                    this.hamming(self.docPhash, r.docPhash) <= 6;
+                    !!self.docPhash && !!r.docPhash && this.hamming(self.docPhash, r.docPhash) <= 6;
                 if (!exacte && !similaire) return null;
                 return {
                     artisanId: r.artisanId,

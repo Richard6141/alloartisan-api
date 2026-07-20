@@ -16,6 +16,7 @@ import { Roles } from 'src/common/decorators';
 import { RolesGuard } from 'src/common/guards';
 import { FraudService } from './fraud.service';
 import { IdentiteService } from './identite.service';
+import { FaceBiometrieService } from './face-biometrie.service';
 import { CheckIdentiteDto } from './dto/check-identite.dto';
 import { Role } from 'src/generated/prisma';
 
@@ -28,6 +29,7 @@ export class FraudController {
     constructor(
         private readonly fraudService: FraudService,
         private readonly identiteService: IdentiteService,
+        private readonly faceBiometrie: FaceBiometrieService,
     ) {}
 
     /**
@@ -63,6 +65,20 @@ export class FraudController {
     async docMatches(@Param('certificationId') certificationId: string) {
         const matches = await this.identiteService.docMatchesForCertification(certificationId);
         return { matches };
+    }
+
+    /**
+     * GET /api/v1/admin/fraud/identite/face-matches/:certificationId
+     * Le VISAGE de cette pièce ressemble-t-il à celui d'un autre compte ?
+     * (biométrie Phase 2 — renvoie [] si le moteur est désactivé). Alerte
+     * uniquement, jamais de blocage automatique.
+     */
+    @Get('identite/face-matches/:certificationId')
+    @ApiOperation({ summary: 'Anti-doublon : visage ressemblant à un autre compte ? (ADMIN)' })
+    @ApiParam({ name: 'certificationId', description: 'UUID de la certification IDENTITE' })
+    async faceMatches(@Param('certificationId') certificationId: string) {
+        const matches = await this.faceBiometrie.faceMatchesForCertification(certificationId);
+        return { matches, enabled: this.faceBiometrie.enabled };
     }
 
     /**

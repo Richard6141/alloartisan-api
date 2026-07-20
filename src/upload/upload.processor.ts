@@ -5,6 +5,7 @@ import sharp from 'sharp';
 import { createHash } from 'crypto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { IdentiteService } from 'src/fraud/identite.service';
+import { FaceBiometrieService } from 'src/fraud/face-biometrie.service';
 import { UploadService, ImageVariants } from './upload.service';
 import { ImageValidatorService } from './image-validator.service';
 
@@ -40,6 +41,7 @@ export class UploadProcessor {
         private uploadService: UploadService,
         private imageValidator: ImageValidatorService,
         private identiteService: IdentiteService,
+        private faceBiometrie: FaceBiometrieService,
     ) {}
 
     /**
@@ -191,6 +193,16 @@ export class UploadProcessor {
                         docSha256: sha256,
                         docPhash: phash,
                     });
+                    // Biométrie Phase 2 : indexe l'empreinte faciale (si moteur actif,
+                    // et uniquement pour une image — pas de PDF). Jamais bloquant.
+                    if (!isPdf && this.faceBiometrie.enabled) {
+                        await this.faceBiometrie.registerFace({
+                            artisanId,
+                            userId,
+                            certificationId,
+                            imageBuffer: original,
+                        });
+                    }
                 }
             } catch (e) {
                 this.logger.warn(
