@@ -96,7 +96,17 @@ export class FraudController {
     @UseInterceptors(
         FilesInterceptor('images', 2, {
             storage: memoryStorage(),
-            limits: { fileSize: 10 * 1024 * 1024 },
+            limits: { fileSize: 25 * 1024 * 1024, files: 2 },
+            // Surcharge le filtre multer global (images uniquement) : ici on
+            // accepte aussi le PDF (le CIP béninois est délivré en PDF).
+            fileFilter: (_req, file, cb) => {
+                const ok =
+                    file.mimetype === 'application/pdf' || file.mimetype.startsWith('image/');
+                cb(
+                    ok ? null : new BadRequestException(`Type non supporté : ${file.mimetype}`),
+                    ok,
+                );
+            },
         }),
     )
     @ApiOperation({ summary: 'Test biométrie : similarité entre deux images (ADMIN)' })
