@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import sharp from 'sharp';
 import { EmbeddingProvider } from './embedding.provider';
+import { ScrfdFaceDetector } from './scrfd-detector';
 
 /**
  * Fournisseur d'embedding facial ONNX auto-hébergé (ArcFace/InsightFace).
@@ -23,6 +24,8 @@ export class OnnxEmbeddingProvider implements EmbeddingProvider {
     private session: unknown = null;
     private initTried = false;
     private available = false;
+
+    constructor(private readonly detector: ScrfdFaceDetector) {}
 
     get enabled(): boolean {
         return process.env.FACE_BIOMETRIE_ENABLED === 'true' && !!process.env.FACE_MODEL_PATH;
@@ -58,8 +61,22 @@ export class OnnxEmbeddingProvider implements EmbeddingProvider {
     async embed(imageBuffer: Buffer): Promise<number[] | null> {
         if (!(await this.ensureSession()) || !this.session) return null;
         try {
-            const { data, info } = await sharp(imageBuffer)
-                .removeAlpha()
+            // Recadrage du visage via SCRFD si dispo (ArcFace attend un visage isolé).
+            // Sinon repli : recadrage centré de l'image entière.
+            let pipeline = sharp(imageBuffer).removeAlpha();
+            if (this.detector.enabled) {
+                const region = await this.detector.detectRegion(imageBuffer);
+                if (region) {
+                    pipeline = sharp(imageBuffer).removeAlpha().extract({
+                        left: region.left,
+                        top: region.top,
+                        width: region.width,
+                        height: region.height,
+                    });
+                }
+            }
+
+            const { data, info } = await pipeline
                 .resize(this.size, this.size, { fit: 'cover' })
                 .raw()
                 .toBuffer({ resolveWithObject: true });

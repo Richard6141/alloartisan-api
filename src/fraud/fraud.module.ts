@@ -3,6 +3,7 @@ import { FraudService } from './fraud.service';
 import { IdentiteService } from './identite.service';
 import { FaceBiometrieService } from './face-biometrie.service';
 import { OnnxEmbeddingProvider } from './face/onnx-embedding.provider';
+import { ScrfdFaceDetector } from './face/scrfd-detector';
 import { FACE_EMBEDDING_PROVIDER } from './face/embedding.provider';
 import { FraudController } from './fraud.controller';
 import { FraudScheduler } from './fraud.scheduler';
@@ -28,6 +29,7 @@ import { CommonModule } from 'src/common/common.module';
         IdentiteService,
         FraudScheduler,
         FaceBiometrieService,
+        ScrfdFaceDetector,
         { provide: FACE_EMBEDDING_PROVIDER, useClass: OnnxEmbeddingProvider },
     ],
     exports: [FraudService, IdentiteService, FaceBiometrieService],
