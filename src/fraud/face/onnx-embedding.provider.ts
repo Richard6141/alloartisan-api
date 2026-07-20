@@ -84,16 +84,17 @@ export class OnnxEmbeddingProvider implements EmbeddingProvider {
 
             const n = this.size * this.size;
             const tensorData = new Float32Array(3 * n);
-            // NCHW, normalisation [-1, 1]
+            // NCHW, PIXELS BRUTS [0,255] RGB — préprocessing validé pour
+            // arcfaceresnet100-8 (ONNX zoo) : la normalisation casse la
+            // discrimination (tous les visages ~0.96). RGB par défaut ;
+            // FACE_INPUT_BGR pour un modèle attendant du BGR.
             for (let i = 0; i < n; i++) {
                 const r = data[i * info.channels];
                 const g = data[i * info.channels + 1];
                 const b = data[i * info.channels + 2];
-                const c0 = this.inputBgr ? b : r;
-                const c2 = this.inputBgr ? r : b;
-                tensorData[i] = (c0 - 127.5) / 127.5;
-                tensorData[n + i] = (g - 127.5) / 127.5;
-                tensorData[2 * n + i] = (c2 - 127.5) / 127.5;
+                tensorData[i] = this.inputBgr ? b : r;
+                tensorData[n + i] = g;
+                tensorData[2 * n + i] = this.inputBgr ? r : b;
             }
 
             const ort: any = await import(this.runtimePkg);

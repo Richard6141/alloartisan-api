@@ -3,9 +3,13 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import type { EmpreinteMatch, MotifMatch } from './identite.service';
 import { FACE_EMBEDDING_PROVIDER, type EmbeddingProvider } from './face/embedding.provider';
 
-/** Seuils de similarité cosinus (embeddings L2-normalisés). Ajustables. */
-export const FACE_SIM_WEAK = 0.5; // visage ressemblant → alerte
-export const FACE_SIM_STRONG = 0.62; // très probablement la même personne
+/**
+ * Seuils de similarité cosinus (embeddings L2-normalisés). Calibrés pour
+ * arcfaceresnet100-8 + recadrage bbox (sans alignement fin) : sur de vraies
+ * paires, même personne ≈ 0.47, personnes différentes ≈ 0. Ajustables.
+ */
+export const FACE_SIM_WEAK = 0.3; // visage ressemblant → alerte
+export const FACE_SIM_STRONG = 0.45; // très probablement la même personne
 
 /**
  * Biométrie faciale (Phase 2) — même philosophie que les empreintes Phase 0/1 :
