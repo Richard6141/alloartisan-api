@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ChangeUserStatutDto } from './dto/change-user-statut.dto';
 import { AdminBookingsFilterDto } from './dto/admin-bookings.dto';
+import { UpdateUserAdminDto, UpdateArtisanAdminDto } from './dto/admin-update.dto';
 import {
     AdminUsersFilterDto,
     AdminTransactionsFilterDto,
@@ -595,6 +596,55 @@ export class AdminService {
             ...a,
             bookingsParStatut: parStatut.map((s) => ({ statut: s.statut, count: s._count.id })),
         };
+    }
+
+    /** Édition du profil d'un utilisateur (admin). */
+    async updateUser(id: string, dto: UpdateUserAdminDto, adminId: string) {
+        await this.prisma.user.update({
+            where: { id },
+            data: {
+                prenom: dto.prenom,
+                nom: dto.nom,
+                telephone: dto.telephone,
+                role: dto.role,
+            },
+        });
+        await this.prisma.logActivite.create({
+            data: {
+                action: 'ADMIN_USER_UPDATE',
+                entite: 'user',
+                entiteId: id,
+                metadata: { adminId } as never,
+            },
+        });
+        return this.getUserDetail(id);
+    }
+
+    /** Édition du profil pro / abonnement d'un artisan (admin). */
+    async updateArtisan(id: string, dto: UpdateArtisanAdminDto, adminId: string) {
+        await this.prisma.artisan.update({
+            where: { id },
+            data: {
+                nomEntreprise: dto.nomEntreprise,
+                bio: dto.bio,
+                villePrincipale: dto.villePrincipale,
+                abonnementType: dto.abonnementType,
+                abonnementExpireAt: dto.abonnementExpireAt
+                    ? new Date(dto.abonnementExpireAt)
+                    : undefined,
+                verified: dto.verified,
+                ...(dto.verified === true ? { verifiedAt: new Date() } : {}),
+            },
+        });
+        await this.prisma.logActivite.create({
+            data: {
+                action: 'ADMIN_ARTISAN_UPDATE',
+                entite: 'artisan',
+                entiteId: id,
+                metadata: { adminId } as never,
+            },
+        });
+        return this.getArtisanDetail(id);
     }
 
     /** Tous les métiers (avec catégorie + nb d'artisans + nb de demandes). */

@@ -22,6 +22,7 @@ import {
 import { AdminTrendsDto } from './dto/admin-trends.dto';
 import { ChangeUserStatutDto } from './dto/change-user-statut.dto';
 import { AdminBookingsFilterDto } from './dto/admin-bookings.dto';
+import { UpdateUserAdminDto, UpdateArtisanAdminDto } from './dto/admin-update.dto';
 
 import { AtGuard, RolesGuard } from 'src/common/guards';
 import { GetCurrentUser, Roles } from 'src/common/decorators';
@@ -76,6 +77,16 @@ export class AdminController {
         return this.adminService.getUserDetail(id);
     }
 
+    @ApiOperation({ summary: "Éditer le profil d'un utilisateur" })
+    @Patch('users/:id')
+    updateUser(
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() dto: UpdateUserAdminDto,
+        @GetCurrentUser('sub') adminId: string,
+    ) {
+        return this.adminService.updateUser(id, dto, adminId);
+    }
+
     @ApiOperation({ summary: 'Changer le statut (ACTIF/SUSPENDU/BANNI)' })
     @Patch('users/:id/statut')
     changeUserStatut(
@@ -102,6 +113,16 @@ export class AdminController {
     @Get('artisans/:id')
     getArtisanDetail(@Param('id', ParseUUIDPipe) id: string) {
         return this.adminService.getArtisanDetail(id);
+    }
+
+    @ApiOperation({ summary: "Éditer le profil / abonnement d'un artisan" })
+    @Patch('artisans/:id')
+    updateArtisan(
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() dto: UpdateArtisanAdminDto,
+        @GetCurrentUser('sub') adminId: string,
+    ) {
+        return this.adminService.updateArtisan(id, dto, adminId);
     }
 
     @ApiOperation({ summary: 'Tous les métiers (catégorie + compteurs)' })
