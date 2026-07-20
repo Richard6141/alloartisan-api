@@ -3,6 +3,7 @@ import { AdminService } from './admin.service';
 import { AdminController } from './admin.controller';
 import { AdminGrowthService } from './admin-growth.service';
 import { AdminGrowthController } from './admin-growth.controller';
+import { AdminPermGuard } from './rbac.guard';
 import { PrismaModule } from 'src/prisma/prisma.module';
 
 /**
@@ -14,7 +15,7 @@ import { PrismaModule } from 'src/prisma/prisma.module';
 @Module({
     imports: [PrismaModule],
     controllers: [AdminController, AdminGrowthController],
-    providers: [AdminService, AdminGrowthService],
+    providers: [AdminService, AdminGrowthService, AdminPermGuard],
     exports: [AdminService],
 })
 export class AdminModule {}

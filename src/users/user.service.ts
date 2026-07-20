@@ -29,6 +29,7 @@ const USER_PROFILE_SELECT = {
     adressePrincipale: true,
     photoUrl: true,
     role: true,
+    adminRole: true,
     statut: true,
     emailVerified: true,
     mfaEnabled: true,

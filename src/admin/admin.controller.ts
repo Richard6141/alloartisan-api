@@ -23,6 +23,7 @@ import { AdminTrendsDto } from './dto/admin-trends.dto';
 import { ChangeUserStatutDto } from './dto/change-user-statut.dto';
 import { AdminBookingsFilterDto } from './dto/admin-bookings.dto';
 import { UpdateUserAdminDto, UpdateArtisanAdminDto } from './dto/admin-update.dto';
+import { AdminPermGuard, RequirePerm } from './rbac.guard';
 
 import { AtGuard, RolesGuard } from 'src/common/guards';
 import { GetCurrentUser, Roles } from 'src/common/decorators';
@@ -35,7 +36,7 @@ import { Role } from 'src/generated/prisma';
  */
 @ApiTags('Admin')
 @ApiBearerAuth()
-@UseGuards(AtGuard, RolesGuard)
+@UseGuards(AtGuard, RolesGuard, AdminPermGuard)
 @Roles(Role.ADMIN)
 @Controller('admin')
 export class AdminController {
@@ -48,6 +49,7 @@ export class AdminController {
         description:
             'Vue globale : utilisateurs, bookings, revenus, artisans actifs, avis. Requêtes parallèles optimisées.',
     })
+    @RequirePerm('dashboard', 'read')
     @Get('stats/overview')
     getOverviewStats() {
         return this.adminService.getOverviewStats();
@@ -57,6 +59,7 @@ export class AdminController {
         summary: 'Séries temporelles (inscriptions, demandes, revenus)',
         description: 'Points quotidiens sur 7/30/90 jours pour les graphiques du dashboard.',
     })
+    @RequirePerm('dashboard', 'read')
     @Get('stats/trends')
     getTrends(@Query() dto: AdminTrendsDto) {
         return this.adminService.getTrends(dto);
@@ -66,18 +69,21 @@ export class AdminController {
         summary: 'Répartitions (abonnements, top métiers, top villes)',
         description: 'Alimente les graphiques de répartition du dashboard.',
     })
+    @RequirePerm('dashboard', 'read')
     @Get('stats/breakdown')
     getBreakdown() {
         return this.adminService.getBreakdown();
     }
 
     @ApiOperation({ summary: "Détail d'un utilisateur (profil + artisan lié)" })
+    @RequirePerm('users', 'read')
     @Get('users/:id')
     getUserDetail(@Param('id', ParseUUIDPipe) id: string) {
         return this.adminService.getUserDetail(id);
     }
 
     @ApiOperation({ summary: "Éditer le profil d'un utilisateur" })
+    @RequirePerm('users', 'write')
     @Patch('users/:id')
     updateUser(
         @Param('id', ParseUUIDPipe) id: string,
@@ -88,6 +94,7 @@ export class AdminController {
     }
 
     @ApiOperation({ summary: 'Changer le statut (ACTIF/SUSPENDU/BANNI)' })
+    @RequirePerm('users', 'write')
     @Patch('users/:id/statut')
     changeUserStatut(
         @Param('id', ParseUUIDPipe) id: string,
@@ -98,24 +105,28 @@ export class AdminController {
     }
 
     @ApiOperation({ summary: 'Réservations (paginées + filtrables par statut)' })
+    @RequirePerm('bookings', 'read')
     @Get('bookings')
     getBookings(@Query() dto: AdminBookingsFilterDto) {
         return this.adminService.getBookings(dto);
     }
 
     @ApiOperation({ summary: "Détail complet d'une réservation" })
+    @RequirePerm('bookings', 'read')
     @Get('bookings/:id')
     getBookingDetail(@Param('id', ParseUUIDPipe) id: string) {
         return this.adminService.getBookingDetail(id);
     }
 
     @ApiOperation({ summary: "Détail complet d'un artisan (profil, métiers, certifs, stats)" })
+    @RequirePerm('artisans', 'read')
     @Get('artisans/:id')
     getArtisanDetail(@Param('id', ParseUUIDPipe) id: string) {
         return this.adminService.getArtisanDetail(id);
     }
 
     @ApiOperation({ summary: "Éditer le profil / abonnement d'un artisan" })
+    @RequirePerm('artisans', 'write')
     @Patch('artisans/:id')
     updateArtisan(
         @Param('id', ParseUUIDPipe) id: string,
@@ -126,12 +137,14 @@ export class AdminController {
     }
 
     @ApiOperation({ summary: 'Tous les métiers (catégorie + compteurs)' })
+    @RequirePerm('metiers', 'read')
     @Get('metiers')
     getMetiers() {
         return this.adminService.getMetiers();
     }
 
     @ApiOperation({ summary: 'Toutes les catégories de métiers' })
+    @RequirePerm('metiers', 'read')
     @Get('categories')
     getCategories() {
         return this.adminService.getCategories();
@@ -141,6 +154,7 @@ export class AdminController {
         summary: 'Stats réservations',
         description: 'Répartition par statut, évolution 30 jours, top métiers.',
     })
+    @RequirePerm('dashboard', 'read')
     @Get('stats/bookings')
     getBookingStats() {
         return this.adminService.getBookingStats();
@@ -150,6 +164,7 @@ export class AdminController {
         summary: 'Stats revenus',
         description: 'Par provider de paiement, évolution 12 mois, top artisans.',
     })
+    @RequirePerm('finances', 'read')
     @Get('stats/revenue')
     getRevenueStats() {
         return this.adminService.getRevenueStats();
@@ -162,6 +177,7 @@ export class AdminController {
         description:
             'Filtres disponibles : rôle (CLIENT/ARTISAN/ADMIN), recherche textuelle (nom, email, téléphone).',
     })
+    @RequirePerm('users', 'read')
     @Get('users')
     getUsers(@Query() dto: AdminUsersFilterDto) {
         return this.adminService.getUsers(dto);
@@ -174,6 +190,7 @@ export class AdminController {
         description:
             'Liste les artisans avec verified=false et statut=EN_ATTENTE, triés FIFO. Inclut les certifications et métiers.',
     })
+    @RequirePerm('artisans', 'read')
     @Get('artisans/pending')
     getPendingArtisans() {
         return this.adminService.getPendingArtisans();
@@ -188,6 +205,7 @@ export class AdminController {
     })
     @ApiQuery({ name: 'page', required: false, description: 'Numéro de page' })
     @ApiQuery({ name: 'limit', required: false, description: 'Éléments par page' })
+    @RequirePerm('avis', 'read')
     @Get('avis/reported')
     getReportedAvis(
         @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
@@ -203,6 +221,7 @@ export class AdminController {
         description:
             'Vue admin de toutes les transactions. Filtrable par statut. Inclut les totaux sur la sélection.',
     })
+    @RequirePerm('finances', 'read')
     @Get('transactions')
     getTransactions(@Query() dto: AdminTransactionsFilterDto) {
         return this.adminService.getTransactions(dto);
@@ -215,6 +234,7 @@ export class AdminController {
         description:
             "Envoie une notification in-app à un segment d'utilisateurs (ALL/CLIENT/ARTISAN). Batch de 500 pour éviter les timeouts.",
     })
+    @RequirePerm('diffusion', 'write')
     @Post('notifications/broadcast')
     broadcastNotification(
         @Body() dto: BroadcastNotificationDto,
@@ -230,6 +250,7 @@ export class AdminController {
         description:
             "Retourne l'historique des actions enregistrées dans logs_activites. Filtrable par userId, action, entité et plage de dates. Paginaté (max 100/page).",
     })
+    @RequirePerm('audit', 'read')
     @Get('logs')
     getActivityLogs(@Query() dto: AdminLogsFilterDto) {
         return this.adminService.getActivityLogs(dto);

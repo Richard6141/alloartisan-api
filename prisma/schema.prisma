@@ -25,6 +25,14 @@ enum Statut {
   BANNI
 }
 
+/// Rôle fin d'administration (RBAC). Ne s'applique qu'aux users role=ADMIN.
+enum RoleAdmin {
+  SUPER_ADMIN
+  MODERATEUR
+  SUPPORT
+  FINANCE
+}
+
 enum StatutArtisan {
   EN_ATTENTE
   ACTIF
@@ -145,6 +153,8 @@ model User {
   telephoneVerificationExpiresAt DateTime? @db.Timestamptz @map("telephone_verification_expires_at")
   role      Role   @default(CLIENT)
   statut    Statut @default(EN_ATTENTE)
+  /// RBAC : rôle fin d'admin (null hors ADMIN). Cf. RoleAdmin.
+  adminRole RoleAdmin? @map("admin_role")
   langue     String  @default("fr") @db.VarChar(5)
   timezone   String  @default("Africa/Porto-Novo") @db.VarChar(50)
   notificationEmail Boolean @default(true)  @map("notification_email")

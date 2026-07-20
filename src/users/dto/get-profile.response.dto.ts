@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Role, Statut } from 'src/generated/prisma';
+import { Role, Statut, RoleAdmin } from 'src/generated/prisma';
 
 export class GetProfileResponseDto {
     @ApiProperty({
@@ -83,6 +83,14 @@ export class GetProfileResponseDto {
         example: 'CLIENT',
     })
     role: Role;
+
+    @ApiProperty({
+        description: "Rôle fin d'administration (RBAC), null hors ADMIN",
+        enum: ['SUPER_ADMIN', 'MODERATEUR', 'SUPPORT', 'FINANCE'],
+        required: false,
+        nullable: true,
+    })
+    adminRole?: RoleAdmin | null;
 
     @ApiProperty({
         description: 'Statut du compte',
