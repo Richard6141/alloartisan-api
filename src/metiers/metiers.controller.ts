@@ -34,6 +34,7 @@ import {
 } from './dto';
 import { Public, Roles } from 'src/common/decorators';
 import { RolesGuard } from 'src/common/guards';
+import { AdminPermGuard, RequirePerm } from 'src/admin/rbac.guard';
 import { Role } from 'src/generated/prisma';
 
 @ApiTags('Métiers')
@@ -43,7 +44,8 @@ export class MetiersController {
 
     @Post()
     @Roles(Role.ADMIN)
-    @UseGuards(RolesGuard)
+    @UseGuards(RolesGuard, AdminPermGuard)
+    @RequirePerm('metiers', 'write')
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.CREATED)
     @ApiOperation({
@@ -132,7 +134,8 @@ export class MetiersController {
 
     @Get('admin/all')
     @Roles(Role.ADMIN)
-    @UseGuards(RolesGuard)
+    @UseGuards(RolesGuard, AdminPermGuard)
+    @RequirePerm('metiers', 'read')
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -153,7 +156,8 @@ export class MetiersController {
 
     @Get('admin/pending')
     @Roles(Role.ADMIN)
-    @UseGuards(RolesGuard)
+    @UseGuards(RolesGuard, AdminPermGuard)
+    @RequirePerm('metiers', 'read')
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -171,7 +175,8 @@ export class MetiersController {
 
     @Patch(':id/valider')
     @Roles(Role.ADMIN)
-    @UseGuards(RolesGuard)
+    @UseGuards(RolesGuard, AdminPermGuard)
+    @RequirePerm('metiers', 'write')
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -286,7 +291,8 @@ export class MetiersController {
 
     @Patch(':id')
     @Roles(Role.ADMIN)
-    @UseGuards(RolesGuard)
+    @UseGuards(RolesGuard, AdminPermGuard)
+    @RequirePerm('metiers', 'write')
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -317,7 +323,8 @@ export class MetiersController {
 
     @Delete(':id')
     @Roles(Role.ADMIN)
-    @UseGuards(RolesGuard)
+    @UseGuards(RolesGuard, AdminPermGuard)
+    @RequirePerm('metiers', 'write')
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({

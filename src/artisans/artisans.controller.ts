@@ -37,6 +37,7 @@ import {
 } from './dto';
 import { GetCurrentUserId, Public, Roles } from 'src/common/decorators';
 import { RolesGuard } from 'src/common/guards';
+import { AdminPermGuard, RequirePerm } from 'src/admin/rbac.guard';
 import { Role } from 'src/generated/prisma';
 
 @ApiTags('Artisans')
@@ -230,7 +231,8 @@ export class ArtisansController {
 
     @Patch(':id/verify')
     @Roles(Role.ADMIN)
-    @UseGuards(RolesGuard)
+    @UseGuards(RolesGuard, AdminPermGuard)
+    @RequirePerm('artisans', 'write')
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -262,7 +264,8 @@ export class ArtisansController {
 
     @Patch(':id/reject')
     @Roles(Role.ADMIN)
-    @UseGuards(RolesGuard)
+    @UseGuards(RolesGuard, AdminPermGuard)
+    @RequirePerm('artisans', 'write')
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -293,7 +296,8 @@ export class ArtisansController {
 
     @Patch(':id/statut')
     @Roles(Role.ADMIN)
-    @UseGuards(RolesGuard)
+    @UseGuards(RolesGuard, AdminPermGuard)
+    @RequirePerm('artisans', 'write')
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -325,7 +329,8 @@ export class ArtisansController {
 
     @Delete(':id')
     @Roles(Role.ADMIN)
-    @UseGuards(RolesGuard)
+    @UseGuards(RolesGuard, AdminPermGuard)
+    @RequirePerm('artisans', 'write')
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({

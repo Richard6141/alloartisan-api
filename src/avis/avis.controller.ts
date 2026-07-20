@@ -23,6 +23,7 @@ import {
 import { AvisService } from './avis.service';
 import { CreateAvisDto, RespondAvisDto, ReportAvisDto } from './dto';
 import { AtGuard, RolesGuard } from 'src/common/guards';
+import { AdminPermGuard, RequirePerm } from 'src/admin/rbac.guard';
 import { Roles, GetCurrentUser } from 'src/common/decorators';
 import { Role } from 'src/generated/prisma';
 
@@ -144,7 +145,8 @@ export class AvisController {
     })
     @ApiResponse({ status: 200, description: 'Avis modéré' })
     @Roles(Role.ADMIN)
-    @UseGuards(RolesGuard)
+    @UseGuards(RolesGuard, AdminPermGuard)
+    @RequirePerm('avis', 'write')
     @Patch(':id/moderate')
     async moderateAvis(
         @Param('id', ParseUUIDPipe) avisId: string,
