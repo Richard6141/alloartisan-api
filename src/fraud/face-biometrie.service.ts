@@ -5,11 +5,11 @@ import { FACE_EMBEDDING_PROVIDER, type EmbeddingProvider } from './face/embeddin
 
 /**
  * Seuils de similarité cosinus (embeddings L2-normalisés). Calibrés pour
- * arcfaceresnet100-8 + recadrage bbox (sans alignement fin) : sur de vraies
- * paires, même personne ≈ 0.47, personnes différentes ≈ 0. Ajustables.
+ * arcfaceresnet100-8 + visage ALIGNÉ 5-points (SCRFD) : sur de vraies paires,
+ * même personne ≈ 0.8, personnes différentes ≈ 0. Ajustables.
  */
-export const FACE_SIM_WEAK = 0.3; // visage ressemblant → alerte
-export const FACE_SIM_STRONG = 0.45; // très probablement la même personne
+export const FACE_SIM_WEAK = 0.45; // visage ressemblant → alerte
+export const FACE_SIM_STRONG = 0.6; // très probablement la même personne
 
 /**
  * Biométrie faciale (Phase 2) — même philosophie que les empreintes Phase 0/1 :

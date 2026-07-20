@@ -61,40 +61,33 @@ export class OnnxEmbeddingProvider implements EmbeddingProvider {
     async embed(imageBuffer: Buffer): Promise<number[] | null> {
         if (!(await this.ensureSession()) || !this.session) return null;
         try {
-            // Recadrage du visage via SCRFD si dispo (ArcFace attend un visage isolé).
-            // Sinon repli : recadrage centré de l'image entière.
-            let pipeline = sharp(imageBuffer).removeAlpha();
+            const n = this.size * this.size;
+            let tensorData: Float32Array | null = null;
+
+            // Voie privilégiée : visage détecté + ALIGNÉ 5-points par SCRFD
+            // (similarité même-personne ~0.8 vs ~0.47 sans alignement).
             if (this.detector.enabled) {
-                const region = await this.detector.detectRegion(imageBuffer);
-                if (region) {
-                    pipeline = sharp(imageBuffer).removeAlpha().extract({
-                        left: region.left,
-                        top: region.top,
-                        width: region.width,
-                        height: region.height,
-                    });
-                }
+                tensorData = await this.detector.alignedFaceTensor(imageBuffer);
             }
 
-            const { data, info } = await pipeline
-                .resize(this.size, this.size, { fit: 'cover' })
-                .raw()
-                .toBuffer({ resolveWithObject: true });
-            if (info.channels < 3) return null;
-
-            const n = this.size * this.size;
-            const tensorData = new Float32Array(3 * n);
-            // NCHW, PIXELS BRUTS [0,255] RGB — préprocessing validé pour
-            // arcfaceresnet100-8 (ONNX zoo) : la normalisation casse la
-            // discrimination (tous les visages ~0.96). RGB par défaut ;
-            // FACE_INPUT_BGR pour un modèle attendant du BGR.
-            for (let i = 0; i < n; i++) {
-                const r = data[i * info.channels];
-                const g = data[i * info.channels + 1];
-                const b = data[i * info.channels + 2];
-                tensorData[i] = this.inputBgr ? b : r;
-                tensorData[n + i] = g;
-                tensorData[2 * n + i] = this.inputBgr ? r : b;
+            // Repli (pas de détecteur / aucun visage) : recadrage centré de
+            // l'image entière, pixels bruts RGB (précision moindre).
+            if (!tensorData) {
+                const { data, info } = await sharp(imageBuffer)
+                    .removeAlpha()
+                    .resize(this.size, this.size, { fit: 'cover' })
+                    .raw()
+                    .toBuffer({ resolveWithObject: true });
+                if (info.channels < 3) return null;
+                tensorData = new Float32Array(3 * n);
+                for (let i = 0; i < n; i++) {
+                    const r = data[i * info.channels];
+                    const g = data[i * info.channels + 1];
+                    const b = data[i * info.channels + 2];
+                    tensorData[i] = this.inputBgr ? b : r;
+                    tensorData[n + i] = g;
+                    tensorData[2 * n + i] = this.inputBgr ? r : b;
+                }
             }
 
             const ort: any = await import(this.runtimePkg);
