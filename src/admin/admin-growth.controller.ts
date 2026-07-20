@@ -33,6 +33,12 @@ export class AdminGrowthController {
         return this.growth.getAmbassadeursLeaderboard();
     }
 
+    @ApiOperation({ summary: "Détail d'un ambassadeur (parrain) + ses filleuls" })
+    @Get('ambassadeurs/:id')
+    getAmbassadeurDetail(@Param('id', ParseUUIDPipe) id: string) {
+        return this.growth.getAmbassadeurDetail(id);
+    }
+
     @ApiOperation({ summary: 'Liste des parrainages (paginée + filtrable)' })
     @Get('parrainages')
     getParrainages(@Query() dto: AdminGrowthFilterDto) {

@@ -130,6 +130,67 @@ export class AdminGrowthService {
         });
     }
 
+    async getAmbassadeurDetail(parrainId: string) {
+        const parrain = await this.prisma.user.findUnique({
+            where: { id: parrainId },
+            select: {
+                id: true,
+                nom: true,
+                prenom: true,
+                email: true,
+                telephone: true,
+                photoUrl: true,
+                codeParrainage: true,
+                createdAt: true,
+                artisan: { select: { ambassadeurNiveau: true, nomEntreprise: true } },
+            },
+        });
+        if (!parrain) throw new NotFoundException('Parrain introuvable');
+
+        const filleuls = await this.prisma.parrainage.findMany({
+            where: { parrainId },
+            orderBy: { createdAt: 'desc' },
+            select: {
+                id: true,
+                codeUtilise: true,
+                statut: true,
+                joursParrain: true,
+                joursFilleul: true,
+                recompenseAt: true,
+                createdAt: true,
+                filleul: { select: { id: true, nom: true, prenom: true, createdAt: true } },
+            },
+        });
+
+        const total = filleuls.length;
+        const convertis = filleuls.filter((f) => f.statut === 'RECOMPENSE').length;
+        const enAttente = filleuls.filter((f) => f.statut === 'EN_ATTENTE').length;
+        const joursOfferts = filleuls.reduce((s, f) => s + (f.joursParrain ?? 0), 0);
+
+        // Paliers Ambassadeur (cf. config/constants AMBASSADEUR_PALIERS)
+        const paliers = [
+            { seuil: 3, niveau: 'BRONZE' },
+            { seuil: 5, niveau: 'ARGENT' },
+            { seuil: 10, niveau: 'OR' },
+        ];
+        const prochain = paliers.find((p) => p.seuil > convertis);
+
+        return {
+            parrain,
+            stats: {
+                total,
+                convertis,
+                enAttente,
+                joursOfferts,
+                tauxConversion: total ? Math.round((convertis / total) * 100) : 0,
+                prochainPalier: prochain
+                    ? { niveau: prochain.niveau, seuil: prochain.seuil, restant: prochain.seuil - convertis }
+                    : null,
+            },
+            filleuls,
+        };
+    }
+
     async getParrainages(dto: AdminGrowthFilterDto) {
         const { page = 1, limit = 20, statut, search } = dto;
         const skip = (page - 1) * limit;
