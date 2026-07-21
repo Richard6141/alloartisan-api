@@ -16,6 +16,9 @@ import { ConfigService } from '@nestjs/config';
 import { MessagingService } from './messaging.service';
 import { buildWsOriginValidator } from 'src/common/utils/cors.util';
 import { SendMessageDto } from './dto';
+import { SessionService } from 'src/common/services/session.service';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { Statut } from 'src/generated/prisma';
 
 /**
  * Gateway WebSocket pour la messagerie temps réel.
@@ -62,7 +65,23 @@ export class MessagingGateway implements OnGatewayInit, OnGatewayConnection, OnG
         private readonly messagingService: MessagingService,
         private readonly jwtService: JwtService,
         private readonly config: ConfigService,
+        private readonly sessionService: SessionService,
+        private readonly prisma: PrismaService,
     ) {}
+
+    /**
+     * Coupe TOUTES les connexions temps réel d'un utilisateur. Appelé quand un
+     * admin suspend/bannit un compte : sans ça, un socket déjà ouvert continuait
+     * de fonctionner (chat) jusqu'à expiration du token. On prévient le client
+     * puis on ferme.
+     */
+    disconnectUser(userId: string): void {
+        // Chaque socket rejoint la room `user:<id>` à la connexion → on prévient
+        // puis on ferme toutes ses connexions d'un coup (API room, sûre en type).
+        const room = `user:${userId}`;
+        this.server.to(room).emit('error', { message: 'Session close (compte suspendu).' });
+        void this.server.in(room).disconnectSockets(true);
+    }
 
     afterInit() {
         this.logger.log('MessagingGateway initialisé — namespace /chat');
@@ -303,15 +322,31 @@ export class MessagingGateway implements OnGatewayInit, OnGatewayConnection, OnG
 
         if (!token) throw new WsException('Token manquant');
 
+        let payload: { sub: string; sid?: string; role: string };
         try {
-            const payload = await this.jwtService.verifyAsync<{ sub: string; role: string }>(
+            payload = await this.jwtService.verifyAsync<{ sub: string; sid?: string; role: string }>(
                 token,
                 { secret: this.config.getOrThrow('JWT_ACCESS_SECRET') },
             );
-            return payload;
         } catch {
             throw new WsException('Token invalide ou expiré');
         }
+
+        // Session révoquée (déconnexion à distance, suspension) → refuser même si
+        // le JWT est encore valide (durée de vie 2 h). Aligne le temps réel sur
+        // la même règle que les requêtes REST (AtStrategy).
+        if (payload.sid && !(await this.sessionService.exists(payload.sub, payload.sid))) {
+            throw new WsException('Session expirée ou révoquée');
+        }
+        // Compte suspendu / banni → aucun accès temps réel.
+        const user = await this.prisma.user.findUnique({
+            where: { id: payload.sub },
+            select: { statut: true },
+        });
+        if (!user || user.statut === Statut.SUSPENDU || user.statut === Statut.BANNI) {
+            throw new WsException('Compte suspendu');
+        }
+        return payload;
     }
 
     private requireUserId(client: Socket): string {

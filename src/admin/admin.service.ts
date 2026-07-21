@@ -10,6 +10,9 @@ import {
     AdminLogsFilterDto,
 } from './dto/admin-stats.dto';
 import { AdminTrendsDto } from './dto/admin-trends.dto';
+import { SessionService } from 'src/common/services/session.service';
+import { MessagingGateway } from 'src/messaging/messaging.gateway';
+import { TrackingGateway } from 'src/tracking/tracking.gateway';
 
 import { Role, Prisma } from 'src/generated/prisma';
 
@@ -17,7 +20,12 @@ import { Role, Prisma } from 'src/generated/prisma';
 export class AdminService {
     private readonly logger = new Logger(AdminService.name);
 
-    constructor(private readonly prisma: PrismaService) {}
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly sessionService: SessionService,
+        private readonly messagingGateway: MessagingGateway,
+        private readonly trackingGateway: TrackingGateway,
+    ) {}
 
     // ─── Stats globales ─────────────────────────────────────────────────────────
 
@@ -263,6 +271,19 @@ export class AdminService {
                 metadata: { adminId, raison: dto.raison ?? null } as never,
             },
         });
+
+        // Suspension / bannissement EN DIRECT : le simple changement de statut
+        // bloque déjà les requêtes REST (AtStrategy relit le statut), mais un
+        // token d'accès reste valide 2 h et les sockets ouverts survivaient. On
+        // coupe donc tout de suite : révocation des sessions (le refresh échoue)
+        // + fermeture des sockets chat/tracking en cours.
+        if (dto.statut === 'SUSPENDU' || dto.statut === 'BANNI') {
+            await this.sessionService.revokeAll(id).catch((e) => {
+                this.logger.error(`revokeAll échoué pour ${id}: ${(e as Error).message}`);
+            });
+            this.messagingGateway.disconnectUser(id);
+            void this.trackingGateway.disconnectUser(id).catch(() => undefined);
+        }
         return updated;
     }
 

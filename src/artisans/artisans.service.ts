@@ -193,7 +193,9 @@ export class ArtisansService {
                         metierId: m.metierId,
                         estPrincipal: m.estPrincipal ?? false,
                         anneesExperience: m.anneesExperience,
-                        certifie: m.certifie ?? false,
+                        // JAMAIS auto-déclaré : le badge « certifié » ne s'obtient
+                        // que par une preuve de métier VALIDÉE par un admin.
+                        certifie: false,
                         tarifHoraire: m.tarifHoraire,
                         description: m.description,
                     })),
@@ -708,6 +710,26 @@ export class ArtisansService {
             throw new BadRequestException('Un ou plusieurs métiers sont invalides ou inactifs');
         }
 
+        // Changer de métiers est une modification SENSIBLE : un artisan déjà
+        // vérifié/actif doit repasser en examen, sinon il pourrait se faire
+        // valider « plomberie » puis basculer en « électricité » en gardant son
+        // badge Vérifié et sa visibilité, sans nouveau contrôle (contournement).
+        // On ne re-examine QUE si l'ensemble des métiers OU le métier principal
+        // change réellement — pas pour un simple ajustement de tarif/description.
+        const anciensMetiers = await this.prisma.artisanMetier.findMany({
+            where: { artisanId: id },
+            select: { metierId: true, estPrincipal: true },
+        });
+        const ancienSet = new Set(anciensMetiers.map((m) => m.metierId));
+        const ancienPrincipal = anciensMetiers.find((m) => m.estPrincipal)?.metierId ?? null;
+        const nouveauPrincipal = dto.metiers.find((m) => m.estPrincipal)?.metierId ?? null;
+        const metiersOntChange =
+            ancienSet.size !== metierIds.length ||
+            metierIds.some((mid) => !ancienSet.has(mid)) ||
+            ancienPrincipal !== nouveauPrincipal;
+        const doitReExaminer =
+            (artisan.verified || artisan.statut === StatutArtisan.ACTIF) && metiersOntChange;
+
         // Supprimer les anciens métiers et créer les nouveaux
         await this.prisma.artisanMetier.deleteMany({
             where: { artisanId: id },
@@ -721,11 +743,23 @@ export class ArtisansService {
                         metierId: m.metierId,
                         estPrincipal: m.estPrincipal ?? false,
                         anneesExperience: m.anneesExperience,
-                        certifie: m.certifie ?? false,
+                        // JAMAIS auto-déclaré : le badge se gagne par une preuve
+                        // de métier VALIDÉE, pas par un champ envoyé par le client.
+                        certifie: false,
                         tarifHoraire: m.tarifHoraire,
                         description: m.description,
                     })),
                 },
+                // Repasse invisible en recherche + badge retiré tant qu'un admin
+                // n'a pas re-validé le nouveau dossier métier.
+                ...(doitReExaminer
+                    ? {
+                          verified: false,
+                          verifiedAt: null,
+                          verifiedBy: null,
+                          statut: StatutArtisan.EN_ATTENTE,
+                      }
+                    : {}),
             },
             include: ARTISAN_INCLUDE,
         });
@@ -735,6 +769,16 @@ export class ArtisansService {
             this.cacheService.invalidateArtisanProfile(id),
             this.cacheService.delByPattern(`${CacheService.PREFIX.SEARCH}*`),
         ]);
+
+        if (doitReExaminer) {
+            void this.notificationService.send({
+                userId: artisan.userId,
+                type: 'SYSTEME',
+                titre: 'Profil à re-vérifier',
+                corps: 'Vos métiers ont changé : votre profil repart en vérification et redeviendra visible après validation par notre équipe.',
+                data: { screen: 'justificatifs', artisanId: id },
+            });
+        }
 
         return this.formatArtisanResponse(updated);
     }

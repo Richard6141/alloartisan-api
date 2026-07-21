@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AdminService } from './admin.service';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { SessionService } from 'src/common/services/session.service';
+import { MessagingGateway } from 'src/messaging/messaging.gateway';
+import { TrackingGateway } from 'src/tracking/tracking.gateway';
 
 // ─── Mock PrismaService ───────────────────────────────────────────────────────
 
@@ -43,6 +46,10 @@ const mockPrisma = {
     $queryRaw: jest.fn(),
 };
 
+const mockSessionService = { revokeAll: jest.fn().mockResolvedValue(undefined) };
+const mockMessagingGateway = { disconnectUser: jest.fn() };
+const mockTrackingGateway = { disconnectUser: jest.fn().mockResolvedValue(undefined) };
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('AdminService', () => {
@@ -52,7 +59,13 @@ describe('AdminService', () => {
         jest.clearAllMocks();
 
         const module: TestingModule = await Test.createTestingModule({
-            providers: [AdminService, { provide: PrismaService, useValue: mockPrisma }],
+            providers: [
+                AdminService,
+                { provide: PrismaService, useValue: mockPrisma },
+                { provide: SessionService, useValue: mockSessionService },
+                { provide: MessagingGateway, useValue: mockMessagingGateway },
+                { provide: TrackingGateway, useValue: mockTrackingGateway },
+            ],
         }).compile();
 
         service = module.get<AdminService>(AdminService);
@@ -260,7 +273,7 @@ describe('AdminService', () => {
 
     describe('getBreakdown', () => {
         it('agrège abonnements + top métiers/villes', async () => {
-            (mockPrisma.artisan.groupBy as jest.Mock).mockResolvedValue([
+            mockPrisma.artisan.groupBy.mockResolvedValue([
                 { abonnementType: 'GRATUIT', _count: { id: 4 } },
                 { abonnementType: 'STANDARD', _count: { id: 2 } },
             ]);
@@ -281,8 +294,11 @@ describe('AdminService', () => {
 
     describe('changeUserStatut', () => {
         it('met à jour le statut + journalise', async () => {
-            (mockPrisma.user.update as jest.Mock).mockResolvedValue({ id: 'u1', statut: 'SUSPENDU' });
-            (mockPrisma.logActivite.create as jest.Mock).mockResolvedValue({});
+            mockPrisma.user.update.mockResolvedValue({
+                id: 'u1',
+                statut: 'SUSPENDU',
+            });
+            mockPrisma.logActivite.create.mockResolvedValue({});
             const res = await service.changeUserStatut(
                 'u1',
                 { statut: 'SUSPENDU', raison: 'abus' },

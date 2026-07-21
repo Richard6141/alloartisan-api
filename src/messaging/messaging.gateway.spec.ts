@@ -3,6 +3,8 @@ import { MessagingGateway } from './messaging.gateway';
 import { MessagingService } from './messaging.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { SessionService } from 'src/common/services/session.service';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -18,6 +20,17 @@ const mockJwtService = {
 
 const mockConfig = {
     getOrThrow: jest.fn().mockReturnValue('test-secret'),
+};
+
+// Session valide + compte ACTIF par défaut → la connexion réussit dans les tests.
+const mockSessionService = {
+    exists: jest.fn().mockResolvedValue(true),
+};
+
+const mockPrisma = {
+    user: {
+        findUnique: jest.fn().mockResolvedValue({ statut: 'ACTIF' }),
+    },
 };
 
 function buildSocket(overrides: Record<string, unknown> = {}) {
@@ -48,6 +61,8 @@ describe('MessagingGateway', () => {
                 { provide: MessagingService, useValue: mockMessagingService },
                 { provide: JwtService, useValue: mockJwtService },
                 { provide: ConfigService, useValue: mockConfig },
+                { provide: SessionService, useValue: mockSessionService },
+                { provide: PrismaService, useValue: mockPrisma },
             ],
         }).compile();
 

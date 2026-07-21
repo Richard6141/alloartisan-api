@@ -5,6 +5,9 @@ import { AdminGrowthService } from './admin-growth.service';
 import { AdminGrowthController } from './admin-growth.controller';
 import { AdminPermGuard } from './rbac.guard';
 import { PrismaModule } from 'src/prisma/prisma.module';
+import { CommonModule } from 'src/common/common.module';
+import { MessagingModule } from 'src/messaging/messaging.module';
+import { TrackingModule } from 'src/tracking/tracking.module';
 
 /**
  * AdminModule — Dashboard d'administration (Sprint 8)
@@ -13,7 +16,9 @@ import { PrismaModule } from 'src/prisma/prisma.module';
  * Ce module ne dépend que de PrismaModule pour les stats et la gestion des données.
  */
 @Module({
-    imports: [PrismaModule],
+    // CommonModule (SessionService) + gateways WS : révoquer sessions ET couper
+    // les sockets en direct quand un compte est suspendu/banni.
+    imports: [PrismaModule, CommonModule, MessagingModule, TrackingModule],
     controllers: [AdminController, AdminGrowthController],
     providers: [AdminService, AdminGrowthService, AdminPermGuard],
     exports: [AdminService],

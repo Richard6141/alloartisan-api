@@ -6,6 +6,7 @@ import { MessagingService } from './messaging.service';
 import { MessagingController } from './messaging.controller';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { PushModule } from 'src/push/push.module';
+import { CommonModule } from 'src/common/common.module';
 
 /**
  * MessagingModule — Messagerie temps réel (Sprint 5)
@@ -21,6 +22,9 @@ import { PushModule } from 'src/push/push.module';
 @Module({
     imports: [
         PrismaModule,
+        // CommonModule : SessionService pour valider la session sur la connexion WS
+        // (couper le temps réel dès qu'un compte est suspendu ou déconnecté).
+        CommonModule,
         // PushModule : envoi FCM pour faire sonner un message app fermée
         // (partagé avec NotificationModule, sans dépendance circulaire).
         PushModule,

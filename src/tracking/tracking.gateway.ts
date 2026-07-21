@@ -16,6 +16,9 @@ import { ConfigService } from '@nestjs/config';
 import { TrackingService } from './tracking.service';
 import { buildWsOriginValidator } from 'src/common/utils/cors.util';
 import type { PhaseUpdatePayload, PositionUpdatePayload } from './tracking.types';
+import { SessionService } from 'src/common/services/session.service';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { Statut } from 'src/generated/prisma';
 
 /**
  * Gateway WebSocket pour le suivi temps réel des artisans.
@@ -57,10 +60,25 @@ export class TrackingGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         private readonly trackingService: TrackingService,
         private readonly jwtService: JwtService,
         private readonly config: ConfigService,
+        private readonly sessionService: SessionService,
+        private readonly prisma: PrismaService,
     ) {}
 
     afterInit() {
         this.logger.log('TrackingGateway initialisé — namespace /tracking');
+    }
+
+    /**
+     * Coupe les sockets de suivi d'un utilisateur (suspension/bannissement admin).
+     */
+    async disconnectUser(userId: string): Promise<void> {
+        const sockets = await this.server.fetchSockets();
+        for (const s of sockets) {
+            if ((s.data as { userId?: string }).userId === userId) {
+                s.emit('error', { message: 'Session close (compte suspendu).' });
+                s.disconnect(true);
+            }
+        }
     }
 
     // ─── Connexion / Déconnexion ──────────────────────────────────────────────
@@ -170,13 +188,29 @@ export class TrackingGateway implements OnGatewayInit, OnGatewayConnection, OnGa
 
         if (!token) throw new WsException('Token manquant');
 
+        let payload: { sub: string; sid?: string; role: string };
         try {
-            return await this.jwtService.verifyAsync<{ sub: string; role: string }>(token, {
-                secret: this.config.getOrThrow('JWT_ACCESS_SECRET'),
-            });
+            payload = await this.jwtService.verifyAsync<{ sub: string; sid?: string; role: string }>(
+                token,
+                { secret: this.config.getOrThrow('JWT_ACCESS_SECRET') },
+            );
         } catch {
             throw new WsException('Token invalide ou expiré');
         }
+
+        // Session révoquée (déconnexion, suspension) → refuser malgré un JWT encore valide.
+        if (payload.sid && !(await this.sessionService.exists(payload.sub, payload.sid))) {
+            throw new WsException('Session expirée ou révoquée');
+        }
+        // Compte suspendu / banni → pas de suivi temps réel.
+        const user = await this.prisma.user.findUnique({
+            where: { id: payload.sub },
+            select: { statut: true },
+        });
+        if (!user || user.statut === Statut.SUSPENDU || user.statut === Statut.BANNI) {
+            throw new WsException('Compte suspendu');
+        }
+        return payload;
     }
 
     private requireUserId(client: Socket): string {
