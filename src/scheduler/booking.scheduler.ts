@@ -112,6 +112,10 @@ export class BookingScheduler {
                     titre: '📊 Votre rapport hebdomadaire',
                     corps: `Bonjour ! Cette semaine, vous avez reçu ${bookingsCount} nouvelle(s) demande(s). Connectez-vous pour les gérer.`,
                     data: {
+                        // Cible de navigation au tap : sans clé routable, l'app
+                        // rendait la notif NON cliquable (destinationFromData → null).
+                        // 'activite' → écran Activité artisan (« gérer mes demandes »).
+                        screen: 'activite',
                         artisanId: artisan.id,
                         bookingsCount,
                         weekOf: oneWeekAgo.toISOString(),
