@@ -68,14 +68,6 @@ export class AvisService {
             }
         }
 
-        // 4bis. Noter vaut confirmation : clôture le booking si en attente.
-        if (booking.statut === StatutBooking.ATTENTE_CONFIRMATION) {
-            await this.prisma.booking.update({
-                where: { id: booking.id },
-                data: { statut: StatutBooking.TERMINEE, finAt: booking.finAt ?? new Date() },
-            });
-        }
-
         // 5. Calculer note globale pondérée si plusieurs sous-notes
         let noteFinale = dto.note;
         const sousNotes = [dto.notePonctualite, dto.noteQualite, dto.noteCommunication].filter(
@@ -87,23 +79,35 @@ export class AvisService {
             noteFinale = Math.round((dto.note * 0.5 + moyenneSousNotes * 0.5) * 10) / 10;
         }
 
-        // 6. Créer l'avis
-        const avis = await this.prisma.avis.create({
-            data: {
-                bookingId: dto.bookingId,
-                clientId,
-                artisanId: booking.artisan.id,
-                note: noteFinale, // Note pondérée (sous-notes prises en compte)
-                notePonctualite: dto.notePonctualite,
-                noteQualite: dto.noteQualite,
-                noteCommunication: dto.noteCommunication,
-                commentaire: dto.commentaire,
-                visible: true,
-            },
-            include: {
-                client: { select: { nom: true, prenom: true, photoUrl: true } },
-                booking: { select: { titre: true } },
-            },
+        // 6. Créer l'avis ET clôturer le booking DE FAÇON ATOMIQUE : noter vaut
+        // confirmation. Sans transaction, un échec entre les deux laissait un
+        // avis créé alors que le booking restait « à confirmer » → mission
+        // bloquée ET impossible de re-noter (contrainte 1 avis/booking).
+        const avis = await this.prisma.$transaction(async (tx) => {
+            const created = await tx.avis.create({
+                data: {
+                    bookingId: dto.bookingId,
+                    clientId,
+                    artisanId: booking.artisan.id,
+                    note: noteFinale, // Note pondérée (sous-notes prises en compte)
+                    notePonctualite: dto.notePonctualite,
+                    noteQualite: dto.noteQualite,
+                    noteCommunication: dto.noteCommunication,
+                    commentaire: dto.commentaire,
+                    visible: true,
+                },
+                include: {
+                    client: { select: { nom: true, prenom: true, photoUrl: true } },
+                    booking: { select: { titre: true } },
+                },
+            });
+            if (booking.statut === StatutBooking.ATTENTE_CONFIRMATION) {
+                await tx.booking.update({
+                    where: { id: booking.id },
+                    data: { statut: StatutBooking.TERMINEE, finAt: booking.finAt ?? new Date() },
+                });
+            }
+            return created;
         });
 
         // 7. Mettre à jour le taux de complétion de l'artisan

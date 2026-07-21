@@ -4,6 +4,7 @@ import {
     NotFoundException,
     ForbiddenException,
     BadRequestException,
+    ConflictException,
     Logger,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -11,7 +12,7 @@ import { SessionService } from 'src/common/services/session.service';
 import { CryptoService } from 'src/common/services/crypto.service';
 import { CacheService } from 'src/common/services/cache.service';
 import { GetProfileResponseDto, UpdateProfileDto, DeleteAccountDto } from './dto';
-import { Statut } from 'src/generated/prisma';
+import { Statut, Prisma } from 'src/generated/prisma';
 import * as argon from 'argon2';
 import { authenticator } from 'otplib';
 import { UploadService, ImageVariants } from 'src/upload';
@@ -77,21 +78,40 @@ export class UserService {
     ): Promise<GetProfileResponseDto> {
         await this.validateSession(userId, sessionId);
 
-        const user = await this.prisma.user.update({
-            where: { id: userId },
-            data: {
-                nom: dto.nom,
-                prenom: dto.prenom,
-                telephone: dto.telephone,
-                dateNaissance: dto.dateNaissance ? new Date(dto.dateNaissance) : undefined,
-                sexe: dto.sexe,
-                ville: dto.ville,
-                quartier: dto.quartier,
-                adressePrincipale: dto.adressePrincipale,
-                photoUrl: dto.photoUrl,
-            },
-            select: USER_PROFILE_SELECT,
-        });
+        let user: GetProfileResponseDto;
+        try {
+            user = await this.prisma.user.update({
+                where: { id: userId },
+                data: {
+                    nom: dto.nom,
+                    prenom: dto.prenom,
+                    telephone: dto.telephone,
+                    dateNaissance: dto.dateNaissance ? new Date(dto.dateNaissance) : undefined,
+                    sexe: dto.sexe,
+                    ville: dto.ville,
+                    quartier: dto.quartier,
+                    adressePrincipale: dto.adressePrincipale,
+                    photoUrl: dto.photoUrl,
+                },
+                select: USER_PROFILE_SELECT,
+            });
+        } catch (e) {
+            // Numéro déjà pris par un autre compte : le téléphone est @unique.
+            // Sans ce garde, Prisma levait P2002 non géré → 500 « Erreur du
+            // serveur » à l'enregistrement du profil / de l'adresse.
+            if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+                const target = Array.isArray(e.meta?.target)
+                    ? (e.meta?.target as string[]).join(',')
+                    : String(e.meta?.target ?? '');
+                if (target.includes('telephone')) {
+                    throw new ConflictException(
+                        'Ce numéro de téléphone est déjà utilisé par un autre compte.',
+                    );
+                }
+                throw new ConflictException('Cette information est déjà utilisée par un autre compte.');
+            }
+            throw e;
+        }
 
         // Un ARTISAN qui change sa photo doit la voir changer PARTOUT :
         // les cartes et fiches affichent artisan.photoProfilUrl en priorité,
