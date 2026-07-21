@@ -35,6 +35,8 @@ import { NotificationModule } from 'src/notification/notification.module';
     ],
     providers: [TrackingGateway, TrackingService],
     controllers: [TrackingController],
-    exports: [TrackingService],
+    // TrackingGateway exporté : AdminService s'en sert pour couper les sockets
+    // de suivi d'un compte suspendu/banni.
+    exports: [TrackingService, TrackingGateway],
 })
 export class TrackingModule {}
