@@ -2,7 +2,7 @@
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
 import { BullModule } from '@nestjs/bull';
-import { redisStore } from 'cache-manager-redis-yet';
+import { createKeyv } from '@keyv/redis';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { UserThrottlerGuard } from './common/guards/user-throttler.guard';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
@@ -53,31 +53,30 @@ import { join } from 'path';
             isGlobal: true,
             imports: [ConfigModule],
             inject: [ConfigService],
-            useFactory: async (config: ConfigService) => {
-                const store = await redisStore({
+            useFactory: (config: ConfigService) => {
+                // cache-manager v7 : store Redis via Keyv (`stores: [...]`).
+                // ⚠️ L'ancienne API `{ store: redisStore(...) }` (v5) était IGNORÉE
+                // par cache-manager v7 → tout le cache (dont les SESSIONS) tombait
+                // en MÉMOIRE → sessions perdues au recyclage du process Passenger
+                // → refresh 403 → déconnexion après quelques heures d'inactivité.
+                const host = config.get<string>('REDIS_HOST', 'localhost');
+                const port = config.get<number>('REDIS_PORT', 6379);
+                const password = config.get<string>('REDIS_PASSWORD') || undefined;
+                const keyv = createKeyv({
+                    url: `redis://${host}:${port}`,
+                    password,
+                    pingInterval: 60000, // PING périodique : la connexion ne devient jamais inactive
                     socket: {
-                        host: config.get('REDIS_HOST', 'localhost'),
-                        port: config.get('REDIS_PORT', 6379),
-                        // Windows/Docker coupe les connexions inactives :
-                        // keepAlive TCP + reconnexion progressive
-                        // (client v1.5 du cache : délai en ms, pas un booléen)
                         keepAlive: 30000,
                         reconnectStrategy: (retries: number) => Math.min(retries * 200, 5000),
                     },
-                    password: config.get('REDIS_PASSWORD'),
-                    // PING périodique : la connexion ne devient jamais inactive
-                    pingInterval: 60000,
                 });
-                // CRITIQUE : sans gestionnaire, un simple ECONNRESET sur CE
-                // client (le cache) faisait crasher tout le serveur —
-                // "Unhandled 'error' event". Le client se reconnecte seul.
-                (store as unknown as { client?: NodeJS.EventEmitter }).client?.on(
-                    'error',
-                    (err: Error) => {
-                        console.error(`[CacheRedis] ${err.message} (reconnexion automatique)`);
-                    },
-                );
-                return { store };
+                // Sans gestionnaire, un ECONNRESET sur ce client crasherait le
+                // serveur ("Unhandled 'error' event"). Il se reconnecte seul.
+                keyv.on('error', (err: Error) => {
+                    console.error(`[CacheRedis] ${err?.message ?? err} (reconnexion automatique)`);
+                });
+                return { stores: [keyv] };
             },
         }),
         ThrottlerModule.forRootAsync({

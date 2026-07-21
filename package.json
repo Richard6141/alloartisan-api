@@ -38,6 +38,7 @@
         "docker:logs": "docker compose logs -f"
     },
     "dependencies": {
+        "@keyv/redis": "^4.6.0",
         "@nestjs/bull": "^11.0.4",
         "@nestjs/cache-manager": "^3.0.1",
         "@nestjs/common": "^11.1.9",
