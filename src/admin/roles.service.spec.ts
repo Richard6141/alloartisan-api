@@ -103,4 +103,58 @@ describe('RolesService', () => {
             service.setOverrides('u1', { granted: [], revoked: ['admins.manage'] }, 'actor'),
         ).rejects.toBeInstanceOf(ForbiddenException);
     });
+
+    it('assignRole bloque si le nouveau rôle priverait le dernier gestionnaire (anti-lockout)', async () => {
+        // cible = ADMIN avec overrides vides ; nouveau rôle n'a que users.view
+        mockPrisma.user.findUnique.mockResolvedValue({
+            role: 'ADMIN',
+            adminRole: null,
+            permGranted: [],
+            permRevoked: [],
+        });
+        mockPrisma.adminRoleDef.findUnique.mockResolvedValue({ permissions: ['users.view'] });
+        mockPrisma.user.findMany.mockResolvedValue([]); // aucun autre admin avec manage
+        await expect(
+            service.assignRole('u1', 'role-no-manage', 'actor'),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('assignRole réussit quand un autre admin conserve admins.manage', async () => {
+        // cible : nouveau rôle sans manage
+        mockPrisma.user.findUnique.mockResolvedValue({
+            role: 'ADMIN',
+            adminRole: null,
+            permGranted: [],
+            permRevoked: [],
+        });
+        mockPrisma.adminRoleDef.findUnique.mockResolvedValue({ permissions: ['users.view'] });
+        // un autre admin a le wildcard → possède admins.manage
+        mockPrisma.user.findMany.mockResolvedValue([
+            adminRow({ adminRoleRef: { permissions: ['*'] } }),
+        ]);
+        mockPrisma.logActivite.create.mockResolvedValue(undefined);
+        await expect(service.assignRole('u1', 'role-no-manage', 'actor')).resolves.toBeUndefined();
+        expect(mockPrisma.user.update).toHaveBeenCalledWith({
+            where: { id: 'u1' },
+            data: { adminRoleId: 'role-no-manage' },
+        });
+    });
+
+    it('createRole clone depuis une source wildcard produit un rôle sans wildcard', async () => {
+        // source = SUPER_ADMIN (wildcard) ; permissions explicites vides → clone
+        mockPrisma.adminRoleDef.findUnique.mockResolvedValue({
+            id: 'src',
+            permissions: ['*'],
+        });
+        mockPrisma.adminRoleDef.create.mockResolvedValue({
+            id: 'new-role',
+            name: 'Clone',
+            permissions: [],
+            isBuiltin: false,
+        });
+        mockPrisma.logActivite.create.mockResolvedValue(undefined);
+        await service.createRole({ name: 'Clone', permissions: [], fromRoleId: 'src' }, 'actor');
+        const createCall = mockPrisma.adminRoleDef.create.mock.calls[0][0];
+        expect(createCall.data.permissions).not.toContain('*');
+    });
 });
