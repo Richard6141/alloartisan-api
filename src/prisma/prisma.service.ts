@@ -179,4 +179,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     get identiteEmpreinte() {
         return this.client.identiteEmpreinte;
     }
+
+    // ===== RBAC fin — rôles d'administration =====
+
+    get adminRoleDef() {
+        return this.client.adminRoleDef;
+    }
 }
