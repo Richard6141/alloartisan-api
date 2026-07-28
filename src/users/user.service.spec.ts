@@ -117,6 +117,67 @@ describe('UserService', () => {
 
             await expect(service.getProfile('bad-id')).rejects.toThrow(NotFoundException);
         });
+
+        it('getProfile expose les permissions effectives pour un admin (wildcard développé)', async () => {
+            mockPrisma.user.findUnique.mockResolvedValue({
+                id: 'a1',
+                email: 'admin@x.io',
+                nom: 'A',
+                prenom: 'B',
+                telephone: null,
+                dateNaissance: null,
+                sexe: null,
+                ville: null,
+                quartier: null,
+                adressePrincipale: null,
+                photoUrl: null,
+                role: 'ADMIN',
+                adminRole: null,
+                statut: 'ACTIF',
+                emailVerified: true,
+                mfaEnabled: false,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                adminRoleId: 'r1',
+                permGranted: [],
+                permRevoked: [],
+                adminRoleRef: { name: 'SUPER_ADMIN', permissions: ['*'] },
+            });
+            const res = await service.getProfile('a1');
+            expect(res.adminRoleName).toBe('SUPER_ADMIN');
+            expect(res.adminPermissions).toContain('admins.manage');
+            expect(res.adminPermissions).toContain('finances.refund');
+        });
+
+        it('getProfile : un client a adminPermissions vide', async () => {
+            mockPrisma.user.findUnique.mockResolvedValue({
+                id: 'c1',
+                email: 'c@x.io',
+                nom: null,
+                prenom: null,
+                telephone: null,
+                dateNaissance: null,
+                sexe: null,
+                ville: null,
+                quartier: null,
+                adressePrincipale: null,
+                photoUrl: null,
+                role: 'CLIENT',
+                adminRole: null,
+                statut: 'ACTIF',
+                emailVerified: true,
+                mfaEnabled: false,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                adminRoleId: null,
+                permGranted: [],
+                permRevoked: [],
+                adminRoleRef: null,
+            });
+            const res = await service.getProfile('c1');
+            expect(res.adminPermissions).toEqual([]);
+            expect(res.adminRoleName).toBeNull();
+        });
     });
 
     // ─── updateProfile ────────────────────────────────────────────────────────

@@ -16,6 +16,7 @@ import { Statut, Prisma } from 'src/generated/prisma';
 import * as argon from 'argon2';
 import { authenticator } from 'otplib';
 import { UploadService, ImageVariants } from 'src/upload';
+import { resolveEffectivePermissions, toPermissionList } from 'src/admin/permissions.resolve';
 
 const USER_PROFILE_SELECT = {
     id: true,
@@ -36,7 +37,13 @@ const USER_PROFILE_SELECT = {
     mfaEnabled: true,
     createdAt: true,
     updatedAt: true,
+    adminRoleId: true,
+    permGranted: true,
+    permRevoked: true,
+    adminRoleRef: { select: { name: true, permissions: true } },
 } as const;
+
+type UserProfilePayload = Prisma.UserGetPayload<{ select: typeof USER_PROFILE_SELECT }>;
 
 @Injectable()
 export class UserService {
@@ -68,7 +75,17 @@ export class UserService {
             throw new NotFoundException('Profil utilisateur non trouvé');
         }
 
-        return user;
+        const { adminRoleRef, permGranted, permRevoked, adminRoleId: _rid, ...rest } = user;
+        const adminPermissions = toPermissionList(
+            resolveEffectivePermissions({
+                role: rest.role,
+                adminRole: rest.adminRole,
+                roleDefPermissions: adminRoleRef?.permissions ?? null,
+                granted: permGranted ?? [],
+                revoked: permRevoked ?? [],
+            }),
+        );
+        return { ...rest, adminRoleName: adminRoleRef?.name ?? null, adminPermissions };
     }
 
     async updateProfile(
@@ -78,9 +95,9 @@ export class UserService {
     ): Promise<GetProfileResponseDto> {
         await this.validateSession(userId, sessionId);
 
-        let user: GetProfileResponseDto;
+        let rawUpdated: UserProfilePayload | null = null;
         try {
-            user = await this.prisma.user.update({
+            rawUpdated = (await this.prisma.user.update({
                 where: { id: userId },
                 data: {
                     nom: dto.nom,
@@ -94,7 +111,7 @@ export class UserService {
                     photoUrl: dto.photoUrl,
                 },
                 select: USER_PROFILE_SELECT,
-            });
+            })) as unknown as UserProfilePayload;
         } catch (e) {
             // Numéro déjà pris par un autre compte : le téléphone est @unique.
             // Sans ce garde, Prisma levait P2002 non géré → 500 « Erreur du
@@ -108,7 +125,9 @@ export class UserService {
                         'Ce numéro de téléphone est déjà utilisé par un autre compte.',
                     );
                 }
-                throw new ConflictException('Cette information est déjà utilisée par un autre compte.');
+                throw new ConflictException(
+                    'Cette information est déjà utilisée par un autre compte.',
+                );
             }
             throw e;
         }
@@ -133,7 +152,17 @@ export class UserService {
             }
         }
 
-        return user;
+        const { adminRoleRef: uRef, permGranted: uGr, permRevoked: uRev, adminRoleId: _uRid, ...uRest } = rawUpdated!;
+        const updatedPermissions = toPermissionList(
+            resolveEffectivePermissions({
+                role: uRest.role,
+                adminRole: uRest.adminRole,
+                roleDefPermissions: uRef?.permissions ?? null,
+                granted: uGr ?? [],
+                revoked: uRev ?? [],
+            }),
+        );
+        return { ...uRest, adminRoleName: uRef?.name ?? null, adminPermissions: updatedPermissions };
     }
 
     async deleteAccount(

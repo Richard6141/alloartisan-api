@@ -92,6 +92,12 @@ export class GetProfileResponseDto {
     })
     adminRole?: RoleAdmin | null;
 
+    @ApiPropertyOptional({ description: 'Nom du rôle admin assigné (null hors ADMIN)', nullable: true })
+    adminRoleName?: string | null;
+
+    @ApiProperty({ description: "Permissions effectives de l'admin (vide hors ADMIN)", type: [String] })
+    adminPermissions: string[];
+
     @ApiProperty({
         description: 'Statut du compte',
         enum: ['EN_ATTENTE', 'ACTIF', 'SUSPENDU', 'BANNI'],
