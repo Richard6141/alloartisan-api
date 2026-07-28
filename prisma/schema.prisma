@@ -156,6 +156,12 @@ model User {
   statut    Statut @default(EN_ATTENTE)
   /// RBAC : rôle fin d'admin (null hors ADMIN). Cf. RoleAdmin.
   adminRole RoleAdmin? @map("admin_role")
+  /// RBAC fin : rôle assigné (source d'autorité si défini). Cf. AdminRoleDef.
+  adminRoleId  String?       @map("admin_role_id") @db.VarChar(36)
+  adminRoleRef AdminRoleDef? @relation(fields: [adminRoleId], references: [id], onDelete: SetNull)
+  /// Surcharges par admin : permissions accordées en plus / retirées du rôle.
+  permGranted  String[]      @map("perm_granted")
+  permRevoked  String[]      @map("perm_revoked")
   langue     String  @default("fr") @db.VarChar(5)
   timezone   String  @default("Africa/Porto-Novo") @db.VarChar(50)
   notificationEmail Boolean @default(true)  @map("notification_email")
@@ -202,6 +208,24 @@ model User {
   nombreAvisPatron   Int     @default(0) @map("nombre_avis_patron")
 
   @@map("users")
+}
+
+// ==================== ADMIN ROLE DEFS (RBAC fin) ====================
+
+/// Définition d'un rôle admin (RBAC fin). isBuiltin = rôle verrouillé, non éditable.
+model AdminRoleDef {
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  name        String   @unique @db.VarChar(60)
+  description String?  @db.VarChar(255)
+  isBuiltin   Boolean  @default(false) @map("is_builtin")
+  /// Clés du catalogue de permissions (ou "*" pour tout).
+  permissions String[]
+  createdAt   DateTime @default(now()) @db.Timestamptz @map("created_at")
+  updatedAt   DateTime @updatedAt @db.Timestamptz @map("updated_at")
+
+  admins User[]
+
+  @@map("admin_role_defs")
 }
 
 // ==================== CATEGORIES METIERS ====================
