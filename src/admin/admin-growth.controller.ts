@@ -34,28 +34,28 @@ export class AdminGrowthController {
     // ─── Ambassadeurs ────────────────────────────────────────────────────────────
 
     @ApiOperation({ summary: 'Stats programme ambassadeur (parrainage)' })
-    @RequirePerm('ambassadeurs', 'read')
+    @RequirePerm('ambassadeurs.view')
     @Get('ambassadeurs/stats')
     getAmbassadeursStats() {
         return this.growth.getAmbassadeursStats();
     }
 
     @ApiOperation({ summary: 'Classement des meilleurs parrains' })
-    @RequirePerm('ambassadeurs', 'read')
+    @RequirePerm('ambassadeurs.view')
     @Get('ambassadeurs/leaderboard')
     getAmbassadeursLeaderboard() {
         return this.growth.getAmbassadeursLeaderboard();
     }
 
     @ApiOperation({ summary: "Détail d'un ambassadeur (parrain) + ses filleuls" })
-    @RequirePerm('ambassadeurs', 'read')
+    @RequirePerm('ambassadeurs.view')
     @Get('ambassadeurs/:id')
     getAmbassadeurDetail(@Param('id', ParseUUIDPipe) id: string) {
         return this.growth.getAmbassadeurDetail(id);
     }
 
     @ApiOperation({ summary: 'Liste des parrainages (paginée + filtrable)' })
-    @RequirePerm('ambassadeurs', 'read')
+    @RequirePerm('ambassadeurs.view')
     @Get('parrainages')
     getParrainages(@Query() dto: AdminGrowthFilterDto) {
         return this.growth.getParrainages(dto);
@@ -64,35 +64,35 @@ export class AdminGrowthController {
     // ─── Main-d'œuvre ────────────────────────────────────────────────────────────
 
     @ApiOperation({ summary: 'Stats main-d’œuvre (travailleurs, annonces, engagements)' })
-    @RequirePerm('maindoeuvre', 'read')
+    @RequirePerm('maindoeuvre.view')
     @Get('main-doeuvre/stats')
     getMainDoeuvreStats() {
         return this.growth.getMainDoeuvreStats();
     }
 
     @ApiOperation({ summary: 'Annonces de chantier (paginées + filtrables)' })
-    @RequirePerm('maindoeuvre', 'read')
+    @RequirePerm('maindoeuvre.view')
     @Get('annonces')
     getAnnonces(@Query() dto: AdminGrowthFilterDto) {
         return this.growth.getAnnonces(dto);
     }
 
     @ApiOperation({ summary: "Détail d'une annonce de chantier + candidats" })
-    @RequirePerm('maindoeuvre', 'read')
+    @RequirePerm('maindoeuvre.view')
     @Get('annonces/:id')
     getAnnonceDetail(@Param('id', ParseUUIDPipe) id: string) {
         return this.growth.getAnnonceDetail(id);
     }
 
     @ApiOperation({ summary: 'Profils travailleurs (paginés + filtrables)' })
-    @RequirePerm('maindoeuvre', 'read')
+    @RequirePerm('maindoeuvre.view')
     @Get('travailleurs')
     getTravailleurs(@Query() dto: AdminGrowthFilterDto) {
         return this.growth.getTravailleurs(dto);
     }
 
     @ApiOperation({ summary: "Détail d'un travailleur (métiers, engagements, avis)" })
-    @RequirePerm('maindoeuvre', 'read')
+    @RequirePerm('maindoeuvre.view')
     @Get('travailleurs/:id')
     getTravailleurDetail(@Param('id', ParseUUIDPipe) id: string) {
         return this.growth.getTravailleurDetail(id);
@@ -101,21 +101,21 @@ export class AdminGrowthController {
     // ─── Comptes admin (RBAC) ────────────────────────────────────────────────────
 
     @ApiOperation({ summary: 'Comptes administrateurs + rôle et activité' })
-    @RequirePerm('admins', 'read')
+    @RequirePerm('admins.view')
     @Get('admins')
     getAdmins() {
         return this.growth.getAdmins();
     }
 
     @ApiOperation({ summary: 'Promouvoir un utilisateur en administrateur' })
-    @RequirePerm('admins', 'write')
+    @RequirePerm('admins.manage')
     @Post('admins/grant')
     grantAdmin(@Body() dto: GrantAdminDto, @GetCurrentUser('sub') actorId: string) {
         return this.growth.grantAdmin(dto.userId, dto.adminRole, actorId);
     }
 
     @ApiOperation({ summary: "Changer le rôle fin d'un administrateur" })
-    @RequirePerm('admins', 'write')
+    @RequirePerm('admins.manage')
     @Patch('admins/:id/role')
     changeAdminRole(
         @Param('id', ParseUUIDPipe) id: string,
@@ -126,7 +126,7 @@ export class AdminGrowthController {
     }
 
     @ApiOperation({ summary: "Révoquer l'accès administrateur d'un compte" })
-    @RequirePerm('admins', 'write')
+    @RequirePerm('admins.manage')
     @Post('admins/:id/revoke')
     revokeAdmin(@Param('id', ParseUUIDPipe) id: string, @GetCurrentUser('sub') actorId: string) {
         return this.growth.revokeAdmin(id, actorId);
@@ -135,21 +135,21 @@ export class AdminGrowthController {
     // ─── Demandes Express ────────────────────────────────────────────────────────
 
     @ApiOperation({ summary: 'Stats demandes express (dispatch urgent)' })
-    @RequirePerm('express', 'read')
+    @RequirePerm('express.view')
     @Get('demandes-express/stats')
     getExpressStats() {
         return this.growth.getExpressStats();
     }
 
     @ApiOperation({ summary: 'Liste des demandes express (paginée + filtrable)' })
-    @RequirePerm('express', 'read')
+    @RequirePerm('express.view')
     @Get('demandes-express')
     getDemandesExpress(@Query() dto: AdminGrowthFilterDto) {
         return this.growth.getDemandesExpress(dto);
     }
 
     @ApiOperation({ summary: "Détail d'une demande express + candidats notifiés" })
-    @RequirePerm('express', 'read')
+    @RequirePerm('express.view')
     @Get('demandes-express/:id')
     getDemandeExpressDetail(@Param('id', ParseUUIDPipe) id: string) {
         return this.growth.getDemandeExpressDetail(id);

@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { RolesService } from './roles.service';
 import { ChangeUserStatutDto } from './dto/change-user-statut.dto';
 import { AdminBookingsFilterDto } from './dto/admin-bookings.dto';
 import { UpdateUserAdminDto, UpdateArtisanAdminDto } from './dto/admin-update.dto';
@@ -25,6 +26,7 @@ export class AdminService {
         private readonly sessionService: SessionService,
         private readonly messagingGateway: MessagingGateway,
         private readonly trackingGateway: TrackingGateway,
+        private readonly roles: RolesService,
     ) {}
 
     // ─── Stats globales ─────────────────────────────────────────────────────────
@@ -258,6 +260,9 @@ export class AdminService {
      * l'action admin (audit).
      */
     async changeUserStatut(id: string, dto: ChangeUserStatutDto, adminId: string) {
+        if (dto.statut === 'BANNI') {
+            await this.roles.assertPermission(adminId, 'users.ban');
+        }
         const updated = await this.prisma.user.update({
             where: { id },
             data: { statut: dto.statut },

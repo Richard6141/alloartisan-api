@@ -232,7 +232,7 @@ export class ArtisansController {
     @Patch(':id/verify')
     @Roles(Role.ADMIN)
     @UseGuards(RolesGuard, AdminPermGuard)
-    @RequirePerm('artisans', 'write')
+    @RequirePerm('artisans.validate')
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -265,7 +265,7 @@ export class ArtisansController {
     @Patch(':id/reject')
     @Roles(Role.ADMIN)
     @UseGuards(RolesGuard, AdminPermGuard)
-    @RequirePerm('artisans', 'write')
+    @RequirePerm('artisans.reject')
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -297,7 +297,7 @@ export class ArtisansController {
     @Patch(':id/statut')
     @Roles(Role.ADMIN)
     @UseGuards(RolesGuard, AdminPermGuard)
-    @RequirePerm('artisans', 'write')
+    @RequirePerm('artisans.edit')
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -330,7 +330,7 @@ export class ArtisansController {
     @Delete(':id')
     @Roles(Role.ADMIN)
     @UseGuards(RolesGuard, AdminPermGuard)
-    @RequirePerm('artisans', 'write')
+    @RequirePerm('artisans.edit')
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({

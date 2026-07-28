@@ -4,6 +4,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { SessionService } from 'src/common/services/session.service';
 import { MessagingGateway } from 'src/messaging/messaging.gateway';
 import { TrackingGateway } from 'src/tracking/tracking.gateway';
+import { RolesService } from './roles.service';
 
 // ─── Mock PrismaService ───────────────────────────────────────────────────────
 
@@ -49,6 +50,7 @@ const mockPrisma = {
 const mockSessionService = { revokeAll: jest.fn().mockResolvedValue(undefined) };
 const mockMessagingGateway = { disconnectUser: jest.fn() };
 const mockTrackingGateway = { disconnectUser: jest.fn().mockResolvedValue(undefined) };
+const mockRolesService = { assertPermission: jest.fn().mockResolvedValue(undefined) };
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
@@ -65,6 +67,7 @@ describe('AdminService', () => {
                 { provide: SessionService, useValue: mockSessionService },
                 { provide: MessagingGateway, useValue: mockMessagingGateway },
                 { provide: TrackingGateway, useValue: mockTrackingGateway },
+                { provide: RolesService, useValue: mockRolesService },
             ],
         }).compile();
 

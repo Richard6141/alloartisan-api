@@ -45,7 +45,7 @@ export class MetiersController {
     @Post()
     @Roles(Role.ADMIN)
     @UseGuards(RolesGuard, AdminPermGuard)
-    @RequirePerm('metiers', 'write')
+    @RequirePerm('metiers.manage')
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.CREATED)
     @ApiOperation({
@@ -135,7 +135,7 @@ export class MetiersController {
     @Get('admin/all')
     @Roles(Role.ADMIN)
     @UseGuards(RolesGuard, AdminPermGuard)
-    @RequirePerm('metiers', 'read')
+    @RequirePerm('metiers.view')
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -157,7 +157,7 @@ export class MetiersController {
     @Get('admin/pending')
     @Roles(Role.ADMIN)
     @UseGuards(RolesGuard, AdminPermGuard)
-    @RequirePerm('metiers', 'read')
+    @RequirePerm('metiers.view')
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -176,7 +176,7 @@ export class MetiersController {
     @Patch(':id/valider')
     @Roles(Role.ADMIN)
     @UseGuards(RolesGuard, AdminPermGuard)
-    @RequirePerm('metiers', 'write')
+    @RequirePerm('metiers.manage')
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -292,7 +292,7 @@ export class MetiersController {
     @Patch(':id')
     @Roles(Role.ADMIN)
     @UseGuards(RolesGuard, AdminPermGuard)
-    @RequirePerm('metiers', 'write')
+    @RequirePerm('metiers.manage')
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -324,7 +324,7 @@ export class MetiersController {
     @Delete(':id')
     @Roles(Role.ADMIN)
     @UseGuards(RolesGuard, AdminPermGuard)
-    @RequirePerm('metiers', 'write')
+    @RequirePerm('metiers.manage')
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({

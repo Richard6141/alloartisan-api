@@ -7,21 +7,21 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { can, Section } from './rbac';
+import { Permission } from './permissions.catalog';
+import { hasPermission, resolveEffectivePermissions } from './permissions.resolve';
 
 export const PERM_KEY = 'adminPerm';
 
 /**
- * Décorateur de route : exige un niveau d'accès sur une section.
- * @example @RequirePerm('finances', 'read')
+ * Décorateur de route : exige une permission fine.
+ * @example @RequirePerm('artisans.validate')
  */
-export const RequirePerm = (section: Section, need: 'read' | 'write') =>
-    SetMetadata(PERM_KEY, { section, need });
+export const RequirePerm = (key: Permission) => SetMetadata(PERM_KEY, key);
 
 /**
- * Garde RBAC : à placer APRÈS AtGuard/RolesGuard dans @UseGuards (l'utilisateur
- * doit déjà être authentifié). Sans @RequirePerm sur la route → laisse passer.
- * Le rôle fin est relu en base pour prise en compte immédiate des changements.
+ * Garde RBAC : à placer APRÈS AtGuard/RolesGuard. Sans @RequirePerm → laisse passer.
+ * Les permissions effectives sont relues en base à chaque requête (prise en compte
+ * immédiate des changements de rôle/surcharges).
  */
 @Injectable()
 export class AdminPermGuard implements CanActivate {
@@ -31,11 +31,11 @@ export class AdminPermGuard implements CanActivate {
     ) {}
 
     async canActivate(ctx: ExecutionContext): Promise<boolean> {
-        const meta = this.reflector.getAllAndOverride<{ section: Section; need: 'read' | 'write' }>(
-            PERM_KEY,
-            [ctx.getHandler(), ctx.getClass()],
-        );
-        if (!meta) return true;
+        const key = this.reflector.getAllAndOverride<Permission | undefined>(PERM_KEY, [
+            ctx.getHandler(),
+            ctx.getClass(),
+        ]);
+        if (!key) return true;
 
         const req = ctx.switchToHttp().getRequest();
         const userId: string | undefined = req.user?.sub;
@@ -43,11 +43,24 @@ export class AdminPermGuard implements CanActivate {
 
         const u = await this.prisma.user.findUnique({
             where: { id: userId },
-            select: { role: true, adminRole: true },
+            select: {
+                role: true,
+                adminRole: true,
+                permGranted: true,
+                permRevoked: true,
+                adminRoleRef: { select: { permissions: true } },
+            },
         });
         if (u?.role !== 'ADMIN') throw new ForbiddenException();
 
-        if (!can(u.adminRole, meta.section, meta.need)) {
+        const perms = resolveEffectivePermissions({
+            role: u.role,
+            adminRole: u.adminRole,
+            roleDefPermissions: u.adminRoleRef?.permissions ?? null,
+            granted: u.permGranted,
+            revoked: u.permRevoked,
+        });
+        if (!hasPermission(perms, key)) {
             throw new ForbiddenException("Votre rôle admin n'autorise pas cette action.");
         }
         return true;

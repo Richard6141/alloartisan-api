@@ -146,7 +146,7 @@ export class AvisController {
     @ApiResponse({ status: 200, description: 'Avis modéré' })
     @Roles(Role.ADMIN)
     @UseGuards(RolesGuard, AdminPermGuard)
-    @RequirePerm('avis', 'write')
+    @RequirePerm('avis.moderate')
     @Patch(':id/moderate')
     async moderateAvis(
         @Param('id', ParseUUIDPipe) avisId: string,
