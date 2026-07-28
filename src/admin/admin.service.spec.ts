@@ -261,14 +261,22 @@ describe('AdminService', () => {
 
     describe('getTrends', () => {
         it('getTrends renvoie une série continue par jour', async () => {
+            // Date dynamique DANS la fenêtre 7 jours (même calcul UTC que le service),
+            // pour éviter la dérive quand le temps passe.
+            const since = new Date();
+            since.setUTCHours(0, 0, 0, 0);
+            since.setUTCDate(since.getUTCDate() - 6);
+            const target = new Date(since);
+            target.setUTCDate(since.getUTCDate() + 3);
+            const jour = target.toISOString().slice(0, 10);
             mockPrisma.$queryRaw
-                .mockResolvedValueOnce([{ jour: '2026-07-12', n: 3 }])
-                .mockResolvedValueOnce([{ jour: '2026-07-12', n: 5 }])
-                .mockResolvedValueOnce([{ jour: '2026-07-12', montant: 12000 }]);
+                .mockResolvedValueOnce([{ jour, n: 3 }])
+                .mockResolvedValueOnce([{ jour, n: 5 }])
+                .mockResolvedValueOnce([{ jour, montant: 12000 }]);
             const res = await service.getTrends({ range: '7d' });
             expect(res.points).toHaveLength(7);
-            const j12 = res.points.find((p) => p.date === '2026-07-12');
-            expect(j12).toMatchObject({ inscriptions: 3, demandes: 5, revenus: 12000 });
+            const point = res.points.find((p) => p.date === jour);
+            expect(point).toMatchObject({ inscriptions: 3, demandes: 5, revenus: 12000 });
         });
     });
 

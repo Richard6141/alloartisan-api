@@ -90,6 +90,14 @@ describe('AvisService', () => {
         mockPrisma.booking.count.mockResolvedValue(1);
         mockPrisma.artisan.update.mockResolvedValue({});
         mockNotificationService.send.mockResolvedValue(undefined);
+        // create() encapsule la création de l'avis dans prisma.$transaction(cb) :
+        // exécuter le callback avec le mock comme `tx` (les tests batch/tableau
+        // surchargent $transaction dans leur propre corps).
+        mockPrisma.$transaction.mockImplementation(async (arg: unknown) =>
+            typeof arg === 'function'
+                ? (arg as (tx: typeof mockPrisma) => unknown)(mockPrisma)
+                : Promise.all(arg as Promise<unknown>[]),
+        );
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [
