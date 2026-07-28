@@ -67,8 +67,11 @@ function buildUser(overrides = {}) {
         dateNaissance: null,
         sexe: null,
         ville: 'Cotonou',
+        quartier: null,
+        adressePrincipale: null,
         photoUrl: null,
         role: 'CLIENT',
+        adminRole: null,
         statut: 'ACTIF',
         emailVerified: true,
         mfaEnabled: false,
@@ -76,6 +79,10 @@ function buildUser(overrides = {}) {
         passwordHash: 'hashed-password',
         createdAt: new Date(),
         updatedAt: new Date(),
+        adminRoleId: null,
+        permGranted: [],
+        permRevoked: [],
+        adminRoleRef: null,
         ...overrides,
     };
 }
@@ -201,6 +208,24 @@ describe('UserService', () => {
             await expect(
                 service.updateProfile('user-1', 'bad-session', { nom: 'Martin' } as any),
             ).rejects.toThrow(UnauthorizedException);
+        });
+
+        it('updateProfile retourne adminPermissions et adminRoleName pour un admin SUPER_ADMIN', async () => {
+            const adminUser = buildUser({
+                id: 'a2',
+                role: 'ADMIN',
+                adminRoleId: 'r2',
+                permGranted: [],
+                permRevoked: [],
+                adminRoleRef: { name: 'SUPER_ADMIN', permissions: ['*'] },
+            });
+            mockSession.exists.mockResolvedValue(true);
+            mockPrisma.user.update.mockResolvedValue(adminUser);
+
+            const result = await service.updateProfile('a2', 'session-1', { nom: 'Admin' } as any);
+
+            expect(result.adminRoleName).toBe('SUPER_ADMIN');
+            expect(result.adminPermissions).toContain('admins.manage');
         });
     });
 

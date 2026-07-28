@@ -65,17 +65,8 @@ export class UserService {
 
     getAllUsers() {}
 
-    async getProfile(userId: string): Promise<GetProfileResponseDto> {
-        const user = await this.prisma.user.findUnique({
-            where: { id: userId },
-            select: USER_PROFILE_SELECT,
-        });
-
-        if (!user) {
-            throw new NotFoundException('Profil utilisateur non trouvé');
-        }
-
-        const { adminRoleRef, permGranted, permRevoked, adminRoleId: _rid, ...rest } = user;
+    private toProfileResponse(raw: UserProfilePayload): GetProfileResponseDto {
+        const { adminRoleRef, permGranted, permRevoked, adminRoleId: _rid, ...rest } = raw;
         const adminPermissions = toPermissionList(
             resolveEffectivePermissions({
                 role: rest.role,
@@ -86,6 +77,19 @@ export class UserService {
             }),
         );
         return { ...rest, adminRoleName: adminRoleRef?.name ?? null, adminPermissions };
+    }
+
+    async getProfile(userId: string): Promise<GetProfileResponseDto> {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: USER_PROFILE_SELECT,
+        });
+
+        if (!user) {
+            throw new NotFoundException('Profil utilisateur non trouvé');
+        }
+
+        return this.toProfileResponse(user);
     }
 
     async updateProfile(
@@ -152,17 +156,7 @@ export class UserService {
             }
         }
 
-        const { adminRoleRef: uRef, permGranted: uGr, permRevoked: uRev, adminRoleId: _uRid, ...uRest } = rawUpdated!;
-        const updatedPermissions = toPermissionList(
-            resolveEffectivePermissions({
-                role: uRest.role,
-                adminRole: uRest.adminRole,
-                roleDefPermissions: uRef?.permissions ?? null,
-                granted: uGr ?? [],
-                revoked: uRev ?? [],
-            }),
-        );
-        return { ...uRest, adminRoleName: uRef?.name ?? null, adminPermissions: updatedPermissions };
+        return this.toProfileResponse(rawUpdated!);
     }
 
     async deleteAccount(
