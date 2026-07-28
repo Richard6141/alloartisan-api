@@ -1,12 +1,12 @@
 import {
     BadRequestException,
-    ForbiddenException,
     Injectable,
     NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Prisma, RoleAdmin } from 'src/generated/prisma';
+import { Prisma } from 'src/generated/prisma';
 import { AdminGrowthFilterDto } from './dto/admin-growth.dto';
+import { RolesService } from './roles.service';
 
 /**
  * AdminGrowthService — modules « croissance & terrain » du back-office :
@@ -19,7 +19,10 @@ import { AdminGrowthFilterDto } from './dto/admin-growth.dto';
  */
 @Injectable()
 export class AdminGrowthService {
-    constructor(private readonly prisma: PrismaService) {}
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly roles: RolesService,
+    ) {}
 
     private meta(total: number, page: number, limit: number) {
         return { total, page, limit, totalPages: Math.ceil(total / limit) };
@@ -419,6 +422,10 @@ export class AdminGrowthService {
                 telephone: true,
                 statut: true,
                 adminRole: true,
+                adminRoleId: true,
+                adminRoleRef: { select: { id: true, name: true } },
+                permGranted: true,
+                permRevoked: true,
                 createdAt: true,
             },
             orderBy: { createdAt: 'asc' },
@@ -461,28 +468,26 @@ export class AdminGrowthService {
         }));
     }
 
-    /** Nombre de super-admins actifs — garde anti-verrouillage. */
-    private async countSuperAdmins() {
-        return this.prisma.user.count({
-            where: { role: 'ADMIN', adminRole: 'SUPER_ADMIN' },
-        });
-    }
-
-    /** Promouvoir un utilisateur existant en administrateur. Super-admin uniquement. */
-    async grantAdmin(userId: string, adminRole: RoleAdmin, actorId: string) {
+    /** Promouvoir un utilisateur existant en administrateur. */
+    async grantAdmin(userId: string, roleId: string, actorId: string) {
         const target = await this.prisma.user.findUnique({
             where: { id: userId },
-            select: { id: true, role: true, prenom: true, nom: true },
+            select: { id: true, role: true },
         });
         if (!target) throw new NotFoundException('Utilisateur introuvable');
         if (target.role === 'ADMIN') {
             throw new BadRequestException('Cet utilisateur est déjà administrateur.');
         }
+        const role = await this.prisma.adminRoleDef.findUnique({
+            where: { id: roleId },
+            select: { id: true },
+        });
+        if (!role) throw new NotFoundException('Rôle introuvable');
 
         const updated = await this.prisma.user.update({
             where: { id: userId },
-            data: { role: 'ADMIN', adminRole },
-            select: { id: true, prenom: true, nom: true, email: true, adminRole: true },
+            data: { role: 'ADMIN', adminRoleId: roleId, adminRole: null, permGranted: [], permRevoked: [] },
+            select: { id: true, prenom: true, nom: true, email: true, adminRoleId: true },
         });
         await this.prisma.logActivite.create({
             data: {
@@ -490,63 +495,26 @@ export class AdminGrowthService {
                 action: 'ADMIN_GRANT',
                 entite: 'user',
                 entiteId: userId,
-                metadata: { adminRole },
+                metadata: { roleId },
             },
         });
         return updated;
     }
 
-    /** Changer le rôle fin d'un administrateur existant. Super-admin uniquement. */
-    async changeAdminRole(targetId: string, adminRole: RoleAdmin, actorId: string) {
-        const target = await this.prisma.user.findUnique({
-            where: { id: targetId },
-            select: { id: true, role: true, adminRole: true },
-        });
-        if (!target || target.role !== 'ADMIN') {
-            throw new NotFoundException('Administrateur introuvable');
-        }
-        // Anti-verrouillage : ne pas rétrograder le dernier super-admin.
-        if (
-            target.adminRole === 'SUPER_ADMIN' &&
-            adminRole !== 'SUPER_ADMIN' &&
-            (await this.countSuperAdmins()) <= 1
-        ) {
-            throw new ForbiddenException('Impossible : au moins un super-admin doit subsister.');
-        }
-
-        const updated = await this.prisma.user.update({
-            where: { id: targetId },
-            data: { adminRole },
-            select: { id: true, prenom: true, nom: true, email: true, adminRole: true },
-        });
-        await this.prisma.logActivite.create({
-            data: {
-                userId: actorId,
-                action: 'ADMIN_ROLE_CHANGE',
-                entite: 'user',
-                entiteId: targetId,
-                metadata: { adminRole },
-            },
-        });
-        return updated;
-    }
-
-    /** Révoquer l'accès admin d'un compte (repasse en CLIENT). Super-admin uniquement. */
+    /** Révoquer l'accès admin d'un compte (repasse en CLIENT). */
     async revokeAdmin(targetId: string, actorId: string) {
         const target = await this.prisma.user.findUnique({
             where: { id: targetId },
-            select: { id: true, role: true, adminRole: true },
+            select: { id: true, role: true },
         });
         if (!target || target.role !== 'ADMIN') {
             throw new NotFoundException('Administrateur introuvable');
         }
-        if (target.adminRole === 'SUPER_ADMIN' && (await this.countSuperAdmins()) <= 1) {
-            throw new ForbiddenException('Impossible : au moins un super-admin doit subsister.');
-        }
+        await this.roles.assertNotLastManager(targetId);
 
         const updated = await this.prisma.user.update({
             where: { id: targetId },
-            data: { role: 'CLIENT', adminRole: null },
+            data: { role: 'CLIENT', adminRole: null, adminRoleId: null, permGranted: [], permRevoked: [] },
             select: { id: true },
         });
         await this.prisma.logActivite.create({

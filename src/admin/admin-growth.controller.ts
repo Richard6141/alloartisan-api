@@ -4,7 +4,6 @@ import {
     Get,
     Param,
     ParseUUIDPipe,
-    Patch,
     Post,
     Query,
     UseGuards,
@@ -12,7 +11,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AdminGrowthService } from './admin-growth.service';
 import { AdminGrowthFilterDto } from './dto/admin-growth.dto';
-import { GrantAdminDto, ChangeAdminRoleDto } from './dto/admin-role.dto';
+import { GrantAdminDto } from './dto/admin-role.dto';
 import { AdminPermGuard, RequirePerm } from './rbac.guard';
 
 import { AtGuard, RolesGuard } from 'src/common/guards';
@@ -111,18 +110,7 @@ export class AdminGrowthController {
     @RequirePerm('admins.manage')
     @Post('admins/grant')
     grantAdmin(@Body() dto: GrantAdminDto, @GetCurrentUser('sub') actorId: string) {
-        return this.growth.grantAdmin(dto.userId, dto.adminRole, actorId);
-    }
-
-    @ApiOperation({ summary: "Changer le rôle fin d'un administrateur" })
-    @RequirePerm('admins.manage')
-    @Patch('admins/:id/role')
-    changeAdminRole(
-        @Param('id', ParseUUIDPipe) id: string,
-        @Body() dto: ChangeAdminRoleDto,
-        @GetCurrentUser('sub') actorId: string,
-    ) {
-        return this.growth.changeAdminRole(id, dto.adminRole, actorId);
+        return this.growth.grantAdmin(dto.userId, dto.roleId, actorId);
     }
 
     @ApiOperation({ summary: "Révoquer l'accès administrateur d'un compte" })

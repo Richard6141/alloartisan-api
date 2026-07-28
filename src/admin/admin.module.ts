@@ -5,6 +5,7 @@ import { AdminGrowthService } from './admin-growth.service';
 import { AdminGrowthController } from './admin-growth.controller';
 import { AdminPermGuard } from './rbac.guard';
 import { RolesService } from './roles.service';
+import { RolesController } from './roles.controller';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { CommonModule } from 'src/common/common.module';
 import { MessagingModule } from 'src/messaging/messaging.module';
@@ -20,7 +21,7 @@ import { TrackingModule } from 'src/tracking/tracking.module';
     // CommonModule (SessionService) + gateways WS : révoquer sessions ET couper
     // les sockets en direct quand un compte est suspendu/banni.
     imports: [PrismaModule, CommonModule, MessagingModule, TrackingModule],
-    controllers: [AdminController, AdminGrowthController],
+    controllers: [AdminController, AdminGrowthController, RolesController],
     providers: [AdminService, AdminGrowthService, AdminPermGuard, RolesService],
     exports: [AdminService, RolesService],
 })

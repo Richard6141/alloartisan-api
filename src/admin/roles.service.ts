@@ -253,6 +253,11 @@ export class RolesService implements OnModuleInit {
         if (!perms.includes(key)) throw new ForbiddenException(`Permission requise : ${key}`);
     }
 
+    /** Anti-lockout : refuse si retirer cet admin laisserait 0 gestionnaire. */
+    async assertNotLastManager(userId: string): Promise<void> {
+        await this.assertKeepsAManager(userId, false);
+    }
+
     /** Invariant anti-lockout : au moins un admin conserve `admins.manage`. */
     private async assertKeepsAManager(targetId: string, targetKeepsManage: boolean): Promise<void> {
         if (targetKeepsManage) return;
