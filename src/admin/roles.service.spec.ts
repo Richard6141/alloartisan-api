@@ -114,9 +114,9 @@ describe('RolesService', () => {
         });
         mockPrisma.adminRoleDef.findUnique.mockResolvedValue({ permissions: ['users.view'] });
         mockPrisma.user.findMany.mockResolvedValue([]); // aucun autre admin avec manage
-        await expect(
-            service.assignRole('u1', 'role-no-manage', 'actor'),
-        ).rejects.toBeInstanceOf(ForbiddenException);
+        await expect(service.assignRole('u1', 'role-no-manage', 'actor')).rejects.toBeInstanceOf(
+            ForbiddenException,
+        );
     });
 
     it('assignRole réussit quand un autre admin conserve admins.manage', async () => {
@@ -138,6 +138,58 @@ describe('RolesService', () => {
             where: { id: 'u1' },
             data: { adminRoleId: 'role-no-manage' },
         });
+    });
+
+    it('updateRole bloque le retrait du dernier gestionnaire via édition de rôle (anti-lockout)', async () => {
+        // r-custom est le seul rôle qui accorde admins.manage ; un seul admin en est titulaire
+        mockPrisma.adminRoleDef.findUnique.mockResolvedValue({
+            id: 'r-custom',
+            isBuiltin: false,
+            name: 'Custom',
+        });
+        mockPrisma.user.findMany.mockResolvedValue([
+            {
+                role: 'ADMIN',
+                adminRoleId: 'r-custom',
+                adminRole: null,
+                permGranted: [],
+                permRevoked: [],
+                adminRoleRef: { permissions: ['admins.manage'] },
+            },
+        ]);
+        await expect(
+            service.updateRole('r-custom', { permissions: ['users.view'] }, 'actor'),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it("updateRole autorise l'édition quand un autre admin conserve admins.manage (anti-lockout)", async () => {
+        // r-custom perd admins.manage, mais un autre admin possède le wildcard → OK
+        mockPrisma.adminRoleDef.findUnique.mockResolvedValue({
+            id: 'r-custom',
+            isBuiltin: false,
+            name: 'Custom',
+        });
+        mockPrisma.user.findMany.mockResolvedValue([
+            {
+                role: 'ADMIN',
+                adminRoleId: 'r-custom',
+                adminRole: null,
+                permGranted: [],
+                permRevoked: [],
+                adminRoleRef: { permissions: ['admins.manage'] },
+            },
+            adminRow({ adminRoleId: 'r-super', adminRoleRef: { permissions: ['*'] } }),
+        ]);
+        mockPrisma.adminRoleDef.update.mockResolvedValue({
+            id: 'r-custom',
+            name: 'Custom',
+            permissions: ['users.view'],
+        });
+        mockPrisma.logActivite.create.mockResolvedValue(undefined);
+        await expect(
+            service.updateRole('r-custom', { permissions: ['users.view'] }, 'actor'),
+        ).resolves.toBeDefined();
+        expect(mockPrisma.adminRoleDef.update).toHaveBeenCalled();
     });
 
     it('createRole clone depuis une source wildcard produit un rôle sans wildcard', async () => {

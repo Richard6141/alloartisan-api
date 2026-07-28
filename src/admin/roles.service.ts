@@ -146,6 +146,7 @@ export class RolesService implements OnModuleInit {
         if (role.isBuiltin)
             throw new ForbiddenException('Un rôle système ne peut pas être modifié (clonez-le).');
         if (dto.permissions) this.assertValidPermissions(dto.permissions);
+        if (dto.permissions) await this.assertRoleEditKeepsAManager(id, dto.permissions);
         try {
             const updated = await this.prisma.adminRoleDef.update({
                 where: { id },
@@ -278,6 +279,42 @@ export class RolesService implements OnModuleInit {
             ),
         );
         if (!someoneElseManages)
+            throw new ForbiddenException(
+                'Au moins un administrateur doit conserver la gestion des comptes.',
+            );
+    }
+
+    /** Anti-lockout pour updateRole : refuse si le nouvel ensemble de permissions priverait
+     *  tous les admins de `admins.manage`. */
+    private async assertRoleEditKeepsAManager(roleId: string, newPermissions: string[]): Promise<void> {
+        // Si le rôle modifié accorde toujours manage (ou wildcard), pas de risque.
+        if (newPermissions.includes(WILDCARD) || newPermissions.includes('admins.manage')) return;
+        // Sinon, simuler la plateforme après l'édition.
+        const ADMIN_SELECT_WITH_ROLE_ID = {
+            ...ADMIN_SELECT,
+            adminRoleId: true,
+        } as const;
+        const admins = await this.prisma.user.findMany({
+            where: { role: 'ADMIN' },
+            select: ADMIN_SELECT_WITH_ROLE_ID,
+        });
+        const someoneManages = admins.some((a) => {
+            const roleDefPermissions =
+                a.adminRoleId === roleId
+                    ? newPermissions
+                    : (a.adminRoleRef?.permissions ?? null);
+            return hasPermission(
+                resolveEffectivePermissions({
+                    role: a.role,
+                    adminRole: a.adminRole,
+                    roleDefPermissions,
+                    granted: a.permGranted,
+                    revoked: a.permRevoked,
+                }),
+                'admins.manage',
+            );
+        });
+        if (!someoneManages)
             throw new ForbiddenException(
                 'Au moins un administrateur doit conserver la gestion des comptes.',
             );
