@@ -185,4 +185,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     get adminRoleDef() {
         return this.client.adminRoleDef;
     }
+
+    // ===== 2FA admin — appareils de confiance =====
+
+    get trustedDevice() {
+        return this.client.trustedDevice;
+    }
 }

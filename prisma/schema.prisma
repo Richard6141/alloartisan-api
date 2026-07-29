@@ -196,6 +196,7 @@ model User {
   avisClient       Avis[]         @relation("ClientAvis")
   favoris          Favori[]       @relation("ClientFavoris")
   fcmTokens        FcmToken[]
+  trustedDevices   TrustedDevice[]
   logsActivite     LogActivite[]
   parrainagesEnvoyes Parrainage[] @relation("Parrain")
   parrainageRecu     Parrainage?  @relation("Filleul")
@@ -725,6 +726,27 @@ model FcmToken {
   @@index([userId, actif], name: "idx_fcm_user")
 
   @@map("fcm_tokens")
+}
+
+// ==================== TRUSTED DEVICES (2FA email admin) ====================
+
+/// Appareil de confiance pour la 2FA admin (email OTP par nouvel appareil/IP).
+model TrustedDevice {
+  id           String   @id @default(uuid()) @db.VarChar(36)
+  userId       String   @map("user_id") @db.VarChar(36)
+  deviceId     String   @map("device_id") @db.VarChar(100)
+  ipAddress    String?  @map("ip_address") @db.VarChar(45)
+  userAgent    String?  @map("user_agent") @db.Text
+  deviceLabel  String?  @map("device_label") @db.VarChar(120)
+  trustedUntil DateTime @map("trusted_until") @db.Timestamptz
+  lastSeenAt   DateTime @default(now()) @map("last_seen_at") @db.Timestamptz
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceId])
+  @@index([userId], name: "idx_trusted_device_user")
+  @@map("trusted_devices")
 }
 
 // ==================== FAVORIS ====================
