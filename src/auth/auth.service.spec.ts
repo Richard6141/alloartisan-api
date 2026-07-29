@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthDto } from './dto';
 import * as argon from 'argon2';
@@ -152,13 +152,13 @@ describe('login — 2FA email admin', () => {
         };
 
         service = new AuthService(
-            mockPrisma as any,
-            mockJwt as any,
+            mockPrisma,
+            mockJwt,
             mockConfig as any,
-            mockOtp as any,
-            mockEmail as any,
-            mockSession as any,
-            mockLoginAttempt as any,
+            mockOtp,
+            mockEmail,
+            mockSession,
+            mockLoginAttempt,
             mockMfaAttempt as any,
             mockCrypto as any,
             mockCacheManager as any,
@@ -174,10 +174,10 @@ describe('login — 2FA email admin', () => {
         mockOtp.create.mockResolvedValue('123456');
         mockJwt.signAsync.mockResolvedValue('vtok');
 
-        const res = await service.login(
-            { email: adminBase.email, password: 'p' } as any,
-            { deviceId: 'd1', ipAddress: '1.2.3.4' },
-        );
+        const res = await service.login({ email: adminBase.email, password: 'p' } as any, {
+            deviceId: 'd1',
+            ipAddress: '1.2.3.4',
+        });
 
         expect((res as any).verification_required).toBe(true);
         expect((res as any).email_masked).toContain('@');
@@ -197,10 +197,10 @@ describe('login — 2FA email admin', () => {
         // createSession calls signAsync twice (at + rt) and session.create
         mockJwt.signAsync.mockResolvedValue('access-tok');
 
-        const res = await service.login(
-            { email: adminBase.email, password: 'p' } as any,
-            { deviceId: 'd1', ipAddress: '1.2.3.4' },
-        );
+        const res = await service.login({ email: adminBase.email, password: 'p' } as any, {
+            deviceId: 'd1',
+            ipAddress: '1.2.3.4',
+        });
 
         expect((res as any).access_token).toBeDefined();
         expect(mockEmail.sendLoginCodeEmail).not.toHaveBeenCalled();
@@ -215,11 +215,155 @@ describe('login — 2FA email admin', () => {
         mockOtp.create.mockResolvedValue('123456');
         mockJwt.signAsync.mockResolvedValue('vtok');
 
-        const res = await service.login(
-            { email: adminBase.email, password: 'p' } as any,
-            { deviceId: 'd1', ipAddress: '1.2.3.4' },
-        );
+        const res = await service.login({ email: adminBase.email, password: 'p' } as any, {
+            deviceId: 'd1',
+            ipAddress: '1.2.3.4',
+        });
 
         expect((res as any).verification_required).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// verifyLoginCode — security rejection paths
+// ---------------------------------------------------------------------------
+describe('verifyLoginCode', () => {
+    let mockPrisma: any;
+    let mockOtp: any;
+    let mockEmail: any;
+    let mockJwt: any;
+    let mockSession: any;
+    let service: AuthService;
+
+    beforeEach(() => {
+        mockPrisma = {
+            user: {
+                findUnique: jest.fn(),
+                update: jest.fn().mockResolvedValue({}),
+            },
+            trustedDevice: {
+                findUnique: jest.fn().mockResolvedValue(null),
+                upsert: jest.fn().mockResolvedValue({}),
+            },
+            logActivite: {
+                create: jest.fn().mockResolvedValue({}),
+            },
+        };
+
+        mockOtp = {
+            create: jest.fn(),
+            verify: jest.fn(),
+            exists: jest.fn(),
+        };
+
+        mockEmail = {
+            sendLoginCodeEmail: jest.fn().mockResolvedValue(true),
+            sendNewLoginAlertEmail: jest.fn().mockResolvedValue(true),
+            sendVerificationEmail: jest.fn().mockResolvedValue(true),
+            sendPasswordResetEmail: jest.fn().mockResolvedValue(true),
+            sendAccountStatusEmail: jest.fn().mockResolvedValue(true),
+        };
+
+        mockJwt = {
+            signAsync: jest.fn().mockResolvedValue('signed-token'),
+            verifyAsync: jest.fn(),
+        };
+
+        mockSession = {
+            create: jest.fn().mockResolvedValue('sess-123'),
+            updateToken: jest.fn().mockResolvedValue(undefined),
+            revoke: jest.fn(),
+            revokeAll: jest.fn(),
+            revokeAllExcept: jest.fn(),
+            getUserSessions: jest.fn(),
+            validate: jest.fn(),
+        };
+
+        const mockConfig = {
+            get: jest.fn((key: string, fallback?: unknown) => fallback),
+            getOrThrow: jest.fn().mockReturnValue('test-secret'),
+        };
+
+        const mockLoginAttempt = {
+            isLocked: jest.fn().mockResolvedValue(false),
+            getRemainingLockTime: jest.fn().mockResolvedValue(0),
+            recordFailedAttempt: jest.fn().mockResolvedValue(3),
+            resetAttempts: jest.fn().mockResolvedValue(undefined),
+        };
+
+        const mockMfaAttempt = {
+            isLocked: jest.fn().mockResolvedValue(false),
+            getRemainingLockTime: jest.fn().mockResolvedValue(0),
+            recordFailedAttempt: jest.fn().mockResolvedValue(3),
+            resetAttempts: jest.fn().mockResolvedValue(undefined),
+        };
+
+        const mockCrypto = {
+            encrypt: jest.fn(),
+            decrypt: jest.fn().mockReturnValue(null),
+        };
+
+        const mockCacheManager = {
+            get: jest.fn().mockResolvedValue(0),
+            set: jest.fn().mockResolvedValue(undefined),
+            del: jest.fn().mockResolvedValue(undefined),
+        };
+
+        service = new AuthService(
+            mockPrisma,
+            mockJwt,
+            mockConfig as any,
+            mockOtp,
+            mockEmail,
+            mockSession,
+            mockLoginAttempt,
+            mockMfaAttempt as any,
+            mockCrypto as any,
+            mockCacheManager as any,
+        );
+    });
+
+    it('device mismatch -> ForbiddenException, otpService.verify jamais appelé', async () => {
+        // JWT token embeds deviceId 'dX'; request arrives from device 'dY'
+        mockJwt.verifyAsync.mockResolvedValueOnce({
+            sub: 'a1',
+            deviceId: 'dX',
+            type: 'login_verify',
+        });
+
+        await expect(
+            service.verifyLoginCode('vtok', '123456', { deviceId: 'dY', ipAddress: '1.2.3.4' }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+
+        expect(mockOtp.verify).not.toHaveBeenCalled();
+    });
+
+    it('code invalide -> ForbiddenException', async () => {
+        // JWT resolves with matching deviceId
+        mockJwt.verifyAsync.mockResolvedValueOnce({
+            sub: 'a1',
+            deviceId: 'dX',
+            type: 'login_verify',
+        });
+        // OTP check returns false (wrong code)
+        mockOtp.verify.mockResolvedValueOnce(false);
+
+        await expect(
+            service.verifyLoginCode('vtok', '000000', { deviceId: 'dX', ipAddress: '1.2.3.4' }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('type de jeton incorrect (mfa_pending) -> ForbiddenException', async () => {
+        mockJwt.verifyAsync.mockResolvedValueOnce({
+            sub: 'a1',
+            deviceId: 'dX',
+            type: 'mfa_pending', // wrong type
+        });
+
+        await expect(
+            service.verifyLoginCode('vtok', '123456', { deviceId: 'dX', ipAddress: '1.2.3.4' }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+
+        expect(mockOtp.verify).not.toHaveBeenCalled();
     });
 });
