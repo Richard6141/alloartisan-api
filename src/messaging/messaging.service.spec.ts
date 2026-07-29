@@ -12,7 +12,12 @@ import {
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
 const mockPrisma = {
-    artisan: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn() },
+    artisan: {
+        findUnique: jest.fn(),
+        findMany: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+    },
     user: { findMany: jest.fn(), update: jest.fn(), findUnique: jest.fn() },
     conversation: {
         findFirst: jest.fn(),
@@ -414,15 +419,21 @@ describe('MessagingService', () => {
             mockPrisma.artisan.findUnique.mockResolvedValue(
                 buildArtisanGate({ essaisGratuitsUtilises: 1 }),
             );
-            mockPrisma.$transaction.mockResolvedValue([{}, {}]);
+            // Déblocage atomique : $transaction reçoit un callback, updateMany
+            // conditionnel renvoie count:1 (essai réellement consommé).
+            mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
+            mockPrisma.artisan.updateMany.mockResolvedValue({ count: 1 });
 
             const result = await service.debloquerConversation('conv-1', 'user-artisan');
 
             expect(result.verrouille).toBe(false);
             expect(result.source).toBe('essai');
             expect(result.gate.essaisRestants).toBe(1); // 3 - (1+1)
-            expect(mockPrisma.artisan.update).toHaveBeenCalledWith(
+            expect(mockPrisma.artisan.updateMany).toHaveBeenCalledWith(
                 expect.objectContaining({
+                    where: expect.objectContaining({
+                        essaisGratuitsUtilises: { lt: 3 },
+                    }),
                     data: { essaisGratuitsUtilises: { increment: 1 } },
                 }),
             );
@@ -440,16 +451,45 @@ describe('MessagingService', () => {
                     compteurDemandesMoisCourant: 2,
                 }),
             );
-            mockPrisma.$transaction.mockResolvedValue([{}, {}]);
+            mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
+            mockPrisma.artisan.updateMany.mockResolvedValue({ count: 1 });
 
             const result = await service.debloquerConversation('conv-1', 'user-artisan');
 
             expect(result.source).toBe('abonnement');
-            expect(mockPrisma.artisan.update).toHaveBeenCalledWith(
+            expect(mockPrisma.artisan.updateMany).toHaveBeenCalledWith(
                 expect.objectContaining({
+                    where: expect.objectContaining({
+                        compteurDemandesMoisCourant: { lt: expect.any(Number) },
+                    }),
                     data: { compteurDemandesMoisCourant: { increment: 1 } },
                 }),
             );
+        });
+
+        // Anti-race (TOCTOU) : si l'incrément conditionnel ne matche aucune ligne
+        // (quota atteint par une requête concurrente), le déblocage échoue en 402
+        // au lieu de dépasser le quota.
+        it('should throw QUOTA_EPUISE when the atomic increment loses the race', async () => {
+            mockPrisma.conversation.findUnique.mockResolvedValue(
+                buildConversation({ debloque: false, debloqueAt: null }),
+            );
+            mockPrisma.artisan.findUnique.mockResolvedValue(
+                buildArtisanGate({
+                    essaisGratuitsUtilises: 3,
+                    abonnementType: 'STANDARD',
+                    abonnementExpireAt: new Date(Date.now() + 86400000),
+                    compteurDemandesMoisCourant: 4, // au bord du quota
+                }),
+            );
+            mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockPrisma));
+            mockPrisma.artisan.updateMany.mockResolvedValue({ count: 0 }); // quota déjà consommé
+
+            await expect(service.debloquerConversation('conv-1', 'user-artisan')).rejects.toThrow(
+                HttpException,
+            );
+            // La conversation ne doit PAS être débloquée si l'incrément a échoué
+            expect(mockPrisma.conversation.update).not.toHaveBeenCalled();
         });
 
         it('should throw 402 when no trial and no active subscription', async () => {

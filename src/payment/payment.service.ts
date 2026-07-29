@@ -361,7 +361,6 @@ export class PaymentService {
         providerTransactionId: string,
         provider: string,
         providerResponse: Record<string, unknown>,
-        paidAmount?: number,
     ): Promise<void> {
         // Idempotence : chercher la transaction par l'ID provider
         const transaction = await this.prisma.transaction.findFirst({
@@ -380,11 +379,35 @@ export class PaymentService {
             return;
         }
 
-        // Anti-fraude : le montant payé doit correspondre au montant attendu.
-        // Un paiement partiel validé par webhook débloquerait l'intervention à prix réduit.
-        if (paidAmount !== undefined && Math.abs(paidAmount - Number(transaction.montant)) > 1) {
+        // SÉCURITÉ CRITIQUE : ne PAS se fier au corps du webhook (statut/montant
+        // falsifiables — le webhook est public). On re-vérifie le vrai statut ET
+        // montant auprès du provider (source de vérité), comme le font déjà
+        // confirmerPaiement()/getStatutPaiement(). Sans cela, un webhook forgé
+        // validerait un paiement de mission jamais réellement effectué.
+        const estKkiapay = provider === 'kkiapay';
+        const remote = estKkiapay
+            ? await this.kkiaPay.getTransactionStatus(providerTransactionId).catch(() => null)
+            : await this.fedaPay.getTransaction(providerTransactionId).catch(() => null);
+        const reussi = estKkiapay
+            ? remote?.status === 'SUCCESS'
+            : remote?.status === 'approved' || remote?.status === 'transferred';
+        if (!remote || !reussi) {
+            this.logger.warn(
+                `Webhook mission NON validé [${transaction.id}] : statut provider non confirmé ` +
+                    `(${remote?.status ?? 'introuvable'}) pour ${providerTransactionId}`,
+            );
+            return;
+        }
+
+        // Anti-fraude : le montant VÉRIFIÉ (provider) doit correspondre au montant
+        // attendu. Un paiement partiel débloquerait l'intervention à prix réduit.
+        const verifiedAmount = Number(remote.amount);
+        if (
+            !Number.isFinite(verifiedAmount) ||
+            Math.abs(verifiedAmount - Number(transaction.montant)) > 1
+        ) {
             this.logger.error(
-                `⚠️ FRAUDE POSSIBLE — montant webhook (${paidAmount} FCFA) ≠ montant attendu ` +
+                `⚠️ FRAUDE POSSIBLE — montant vérifié (${verifiedAmount} FCFA) ≠ montant attendu ` +
                     `(${transaction.montant} FCFA) pour transaction ${providerTransactionId}. Paiement NON validé.`,
             );
             await this.prisma.logActivite.create({
@@ -395,7 +418,7 @@ export class PaymentService {
                     entiteId: transaction.id,
                     metadata: {
                         montantAttendu: Number(transaction.montant),
-                        montantRecu: paidAmount,
+                        montantRecu: verifiedAmount,
                         provider,
                         providerTransactionId,
                     },
@@ -494,6 +517,25 @@ export class PaymentService {
         });
 
         if (!transaction || transaction.statut === StatutTransaction.ECHOUEE) {
+            return;
+        }
+
+        // SÉCURITÉ : ne pas se fier au corps du webhook (falsifiable) pour marquer
+        // un paiement échoué — sinon un webhook forgé « declined » ferait échouer
+        // une transaction légitime en attente (griefing). On re-vérifie l'échec
+        // réel auprès du provider avant d'agir.
+        const estKkiapay = provider === 'kkiapay';
+        const remote = estKkiapay
+            ? await this.kkiaPay.getTransactionStatus(providerTransactionId).catch(() => null)
+            : await this.fedaPay.getTransaction(providerTransactionId).catch(() => null);
+        const echecConfirme = estKkiapay
+            ? ['FAILED', 'CANCELLED'].includes(remote?.status ?? '')
+            : ['declined', 'cancelled'].includes(remote?.status ?? '');
+        if (!remote || !echecConfirme) {
+            this.logger.warn(
+                `Webhook échec ignoré [${transaction.id}] : le provider ne confirme pas ` +
+                    `l'échec (${remote?.status ?? 'introuvable'}) pour ${providerTransactionId}`,
+            );
             return;
         }
 

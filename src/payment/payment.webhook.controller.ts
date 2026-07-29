@@ -72,13 +72,12 @@ export class PaymentWebhookController {
                     body,
                 );
                 if (!estAbonnement) {
-                    const paidAmount =
-                        transaction?.amount !== undefined ? Number(transaction.amount) : undefined;
+                    // Le montant/statut sont re-vérifiés auprès du provider dans
+                    // processSuccessfulPayment (le corps du webhook n'est pas fiable).
                     await this.paymentService.processSuccessfulPayment(
                         transactionId,
                         'fedapay',
                         body,
-                        Number.isFinite(paidAmount) ? paidAmount : undefined,
                     );
                 }
             } else if (['declined', 'cancelled'].includes(status)) {
@@ -137,12 +136,11 @@ export class PaymentWebhookController {
                     body,
                 );
                 if (!estAbonnement) {
-                    const paidAmount = body?.amount !== undefined ? Number(body.amount) : undefined;
+                    // Montant/statut re-vérifiés côté provider dans processSuccessfulPayment.
                     await this.paymentService.processSuccessfulPayment(
                         transactionId,
                         'kkiapay',
                         body,
-                        Number.isFinite(paidAmount) ? paidAmount : undefined,
                     );
                 }
             } else if (['FAILED', 'CANCELLED'].includes(status)) {

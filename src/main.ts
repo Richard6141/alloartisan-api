@@ -174,38 +174,41 @@ Cette API utilise JWT Bearer Token pour l'authentification.
     const customCss = swaggerCustomCss;
     const customJs = swaggerCustomJs;
 
-    SwaggerModule.setup('docs', app, document, {
-        customSiteTitle: 'Allo Artisan API Docs',
-        customfavIcon: '/favicon.svg',
-        customCss,
-        customJs,
-        swaggerOptions: {
-            persistAuthorization: true,
-            docExpansion: 'list',
-            filter: true,
-            showRequestDuration: true,
-            syntaxHighlight: {
-                activate: true,
-                theme: 'monokai',
+    // Documentation API (Swagger `/docs` + Scalar `/reference`) : exposée HORS
+    // production uniquement — en prod elle publierait toute la surface de l'API.
+    if (process.env.NODE_ENV !== 'production') {
+        SwaggerModule.setup('docs', app, document, {
+            customSiteTitle: 'Allo Artisan API Docs',
+            customfavIcon: '/favicon.svg',
+            customCss,
+            customJs,
+            swaggerOptions: {
+                persistAuthorization: true,
+                docExpansion: 'list',
+                filter: true,
+                showRequestDuration: true,
+                syntaxHighlight: {
+                    activate: true,
+                    theme: 'monokai',
+                },
             },
-        },
-    });
+        });
 
-    // Configuration Scalar - Documentation moderne avec sidebar et Try it
-    app.use(
-        '/reference',
-        apiReference({
-            content: document,
-            theme: 'kepler',
-            darkMode: true,
-            hideDarkModeToggle: false,
-            hideModels: false,
-            hideDownloadButton: true,
-            hideClientButton: true,
-            hideTestRequestButton: false,
-            hiddenClients: true,
-            showSidebar: true,
-            customCss: `
+        // Configuration Scalar - Documentation moderne avec sidebar et Try it
+        app.use(
+            '/reference',
+            apiReference({
+                content: document,
+                theme: 'kepler',
+                darkMode: true,
+                hideDarkModeToggle: false,
+                hideModels: false,
+                hideDownloadButton: true,
+                hideClientButton: true,
+                hideTestRequestButton: false,
+                hiddenClients: true,
+                showSidebar: true,
+                customCss: `
                 :root {
                     --scalar-color-1: #FF6B35;
                     --scalar-color-2: #2D3436;
@@ -305,14 +308,15 @@ Cette API utilise JWT Bearer Token pour l'authentification.
                     z-index: 1000;
                 }
             `,
-            metaData: {
-                title: 'Allo Artisan API',
-                description: "Documentation interactive de l'API Allo Artisan",
-                ogImage: '/logo.svg',
-            },
-            favicon: '/favicon.svg',
-        }),
-    );
+                metaData: {
+                    title: 'Allo Artisan API',
+                    description: "Documentation interactive de l'API Allo Artisan",
+                    ogImage: '/logo.svg',
+                },
+                favicon: '/favicon.svg',
+            }),
+        );
+    }
 
     await app.listen(port);
 }

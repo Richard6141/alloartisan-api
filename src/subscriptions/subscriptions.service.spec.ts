@@ -295,4 +295,74 @@ describe('SubscriptionsService', () => {
             expect(count).toBe(0);
         });
     });
+
+    // ─── confirmerViaWebhook (sécurité anti webhook forgé) ────────────────────
+    describe('confirmerViaWebhook', () => {
+        const PAIEMENT = { id: 'pay-1', provider: 'fedapay', montant: 5000 };
+
+        it('returns false when the transaction is not a subscription payment', async () => {
+            mockPrisma.abonnementPaiement.findFirst.mockResolvedValue(null);
+
+            const result = await service.confirmerViaWebhook('tx-x', { status: 'approved' });
+
+            expect(result).toBe(false);
+            expect(mockPrisma.abonnementPaiement.updateMany).not.toHaveBeenCalled();
+        });
+
+        it('does NOT activate when the provider does not confirm the payment (forged webhook)', async () => {
+            mockPrisma.abonnementPaiement.findFirst.mockResolvedValue({ ...PAIEMENT });
+            // Le corps prétend « approved » mais le provider dit « pending ».
+            mockFedaPay.getTransaction.mockResolvedValue({ status: 'pending', amount: 5000 });
+
+            const result = await service.confirmerViaWebhook('tx-1', { status: 'approved' });
+
+            expect(result).toBe(true); // c'est bien un paiement d'abonnement…
+            expect(mockPrisma.abonnementPaiement.updateMany).not.toHaveBeenCalled(); // …mais non activé
+        });
+
+        it('does NOT activate when the verified amount is below the plan price', async () => {
+            mockPrisma.abonnementPaiement.findFirst.mockResolvedValue({ ...PAIEMENT });
+            mockFedaPay.getTransaction.mockResolvedValue({ status: 'approved', amount: 100 });
+
+            const result = await service.confirmerViaWebhook('tx-1', {
+                status: 'approved',
+                amount: 999999,
+            });
+
+            expect(result).toBe(true);
+            expect(mockPrisma.abonnementPaiement.updateMany).not.toHaveBeenCalled();
+        });
+
+        it('activates when the provider confirms status AND sufficient amount', async () => {
+            mockPrisma.abonnementPaiement.findFirst.mockResolvedValue({ ...PAIEMENT });
+            mockFedaPay.getTransaction.mockResolvedValue({ status: 'approved', amount: 5000 });
+            // finaliserPaiement : updateMany count:0 court-circuite l'activation lourde.
+            mockPrisma.abonnementPaiement.updateMany.mockResolvedValue({ count: 0 });
+
+            const result = await service.confirmerViaWebhook('tx-1', { status: 'approved' });
+
+            expect(result).toBe(true);
+            expect(mockFedaPay.getTransaction).toHaveBeenCalledWith('tx-1');
+            expect(mockPrisma.abonnementPaiement.updateMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: expect.objectContaining({ id: 'pay-1', statut: { not: 'COMPLETEE' } }),
+                }),
+            );
+        });
+
+        it('verifies KkiaPay subscriptions via getTransactionStatus', async () => {
+            mockPrisma.abonnementPaiement.findFirst.mockResolvedValue({
+                id: 'pay-2',
+                provider: 'kkiapay',
+                montant: 5000,
+            });
+            mockKkiaPay.getTransactionStatus.mockResolvedValue({ status: 'SUCCESS', amount: 5000 });
+            mockPrisma.abonnementPaiement.updateMany.mockResolvedValue({ count: 0 });
+
+            const result = await service.confirmerViaWebhook('tx-2', { status: 'SUCCESS' });
+
+            expect(result).toBe(true);
+            expect(mockKkiaPay.getTransactionStatus).toHaveBeenCalledWith('tx-2');
+        });
+    });
 });

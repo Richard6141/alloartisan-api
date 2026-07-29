@@ -501,11 +501,47 @@ export class SubscriptionsService {
     ): Promise<boolean> {
         const paiement = await this.prisma.abonnementPaiement.findFirst({
             where: { providerTransactionId },
-            select: { id: true },
+            select: { id: true, provider: true, montant: true },
         });
         if (!paiement) return false;
 
-        await this.finaliserPaiement(paiement.id, providerResponse);
+        // SÉCURITÉ CRITIQUE : ne JAMAIS faire confiance au corps du webhook
+        // (falsifiable — le webhook est public). On re-vérifie le vrai statut ET
+        // le montant auprès du provider (source de vérité), exactement comme le
+        // font déjà confirmerPaiement() et getStatutPaiement(). Sans cela, un
+        // webhook forgé activerait un abonnement sans paiement réel.
+        const estKkiapay = paiement.provider === 'kkiapay';
+        const remote = estKkiapay
+            ? await this.kkiaPay.getTransactionStatus(providerTransactionId).catch(() => null)
+            : await this.fedaPay.getTransaction(providerTransactionId).catch(() => null);
+
+        const reussi = estKkiapay
+            ? remote?.status === 'SUCCESS'
+            : remote?.status === 'approved' || remote?.status === 'transferred';
+
+        if (!remote || !reussi) {
+            this.logger.warn(
+                `Webhook abonnement NON activé [${paiement.id}] : statut provider non confirmé ` +
+                    `(${remote?.status ?? 'introuvable'}) pour ${providerTransactionId}`,
+            );
+            return true; // c'est bien un paiement d'abonnement, mais on ne l'active pas
+        }
+
+        // Anti-fraude : le montant réellement payé doit couvrir le palier
+        // (fail-closed : un montant absent / 0 / NaN est rejeté).
+        const paid = Number(remote.amount);
+        if (!Number.isFinite(paid) || paid <= 0 || paid < Number(paiement.montant)) {
+            this.logger.warn(
+                `Webhook abonnement montant suspect [${paiement.id}] : attendu ${paiement.montant}, reçu ${remote.amount}`,
+            );
+            return true; // abonnement, mais montant insuffisant → non activé
+        }
+
+        // On stocke la réponse VÉRIFIÉE (provider), pas le corps brut du webhook.
+        await this.finaliserPaiement(paiement.id, {
+            ...providerResponse,
+            verifie: remote as unknown as Record<string, unknown>,
+        });
         return true;
     }
 

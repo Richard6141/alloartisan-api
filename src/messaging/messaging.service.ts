@@ -792,49 +792,70 @@ export class MessagingService {
             plan !== PlanAbonnement.GRATUIT &&
             (!artisan.abonnementExpireAt || artisan.abonnementExpireAt > now);
 
-        // 1. Essais découverte gratuits en priorité (offre de bienvenue)
+        // 1. Essais découverte gratuits en priorité (offre de bienvenue).
+        // Incrément CONDITIONNEL atomique (where essaisGratuitsUtilises < N) :
+        // deux déblocages simultanés ne peuvent pas consommer le même essai deux
+        // fois (le perdant voit count === 0 et retombe sur l'abonnement).
         if (artisan.essaisGratuitsUtilises < ESSAIS_GRATUITS) {
-            await this.prisma.$transaction([
-                this.prisma.conversation.update({
+            const claimed = await this.prisma.$transaction(async (tx) => {
+                const res = await tx.artisan.updateMany({
+                    where: { id: artisan.id, essaisGratuitsUtilises: { lt: ESSAIS_GRATUITS } },
+                    data: { essaisGratuitsUtilises: { increment: 1 } },
+                });
+                if (res.count === 0) return false;
+                await tx.conversation.update({
                     where: { id: conversationId },
                     data: { debloque: true, debloqueAt: now },
-                }),
-                this.prisma.artisan.update({
-                    where: { id: artisan.id },
-                    data: { essaisGratuitsUtilises: { increment: 1 } },
-                }),
-            ]);
-            const gate = this.gateStatus({
-                ...artisan,
-                essaisGratuitsUtilises: artisan.essaisGratuitsUtilises + 1,
+                });
+                return true;
             });
-            this.logger.log(
-                `Conversation débloquée [conv:${conversationId}] via ESSAI ` +
-                    `(${gate.essaisRestants} restants) [artisan:${artisan.id}]`,
-            );
-            return { verrouille: false, source: 'essai' as const, gate };
+            if (claimed) {
+                const gate = this.gateStatus({
+                    ...artisan,
+                    essaisGratuitsUtilises: artisan.essaisGratuitsUtilises + 1,
+                });
+                this.logger.log(
+                    `Conversation débloquée [conv:${conversationId}] via ESSAI ` +
+                        `(${gate.essaisRestants} restants) [artisan:${artisan.id}]`,
+                );
+                return { verrouille: false, source: 'essai' as const, gate };
+            }
+            // Essais épuisés à l'instant par une requête concurrente → on continue
+            // vers le quota d'abonnement ci-dessous.
         }
 
-        // 2. Sinon, quota de l'abonnement payant en cours
+        // 2. Sinon, quota de l'abonnement payant en cours.
         if (paidActive) {
             const quota = PLAN_QUOTAS[plan];
-            const illimite = quota === null;
-            if (!illimite && artisan.compteurDemandesMoisCourant >= quota) {
+            // Incrément CONDITIONNEL atomique : le check quota et la consommation
+            // se font en une seule écriture (where compteur < quota) → plus de
+            // dépassement par course entre deux déblocages concurrents (TOCTOU).
+            const claimed = await this.prisma.$transaction(async (tx) => {
+                if (quota !== null) {
+                    const res = await tx.artisan.updateMany({
+                        where: { id: artisan.id, compteurDemandesMoisCourant: { lt: quota } },
+                        data: { compteurDemandesMoisCourant: { increment: 1 } },
+                    });
+                    if (res.count === 0) return false;
+                } else {
+                    // Illimité : on incrémente pour les statistiques, sans plafond.
+                    await tx.artisan.update({
+                        where: { id: artisan.id },
+                        data: { compteurDemandesMoisCourant: { increment: 1 } },
+                    });
+                }
+                await tx.conversation.update({
+                    where: { id: conversationId },
+                    data: { debloque: true, debloqueAt: now },
+                });
+                return true;
+            });
+            if (!claimed) {
                 throw this.paiementRequis(
                     'QUOTA_EPUISE',
                     'Vous avez atteint votre quota de mises en relation ce mois-ci. Passez à un palier supérieur pour continuer.',
                 );
             }
-            await this.prisma.$transaction([
-                this.prisma.conversation.update({
-                    where: { id: conversationId },
-                    data: { debloque: true, debloqueAt: now },
-                }),
-                this.prisma.artisan.update({
-                    where: { id: artisan.id },
-                    data: { compteurDemandesMoisCourant: { increment: 1 } },
-                }),
-            ]);
             const gate = this.gateStatus({
                 ...artisan,
                 compteurDemandesMoisCourant: artisan.compteurDemandesMoisCourant + 1,
