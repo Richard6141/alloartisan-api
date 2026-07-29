@@ -132,6 +132,22 @@ describe('AvisService', () => {
             expect(result.id).toBe(AVIS_ID);
         });
 
+        // Anti-désintermédiation : un numéro/email glissé dans le commentaire d'un
+        // avis public doit être masqué (contournait le verrou de la messagerie).
+        it('should mask contact info in the comment', async () => {
+            mockPrisma.booking.findUnique.mockResolvedValue(completedBooking);
+
+            await service.create(CLIENT_ID, {
+                ...createAvisDto,
+                commentaire: 'Super, appelez-moi au 97 12 34 56 ou sur whatsapp',
+            });
+
+            const stored = mockPrisma.avis.create.mock.calls[0][0].data.commentaire as string;
+            expect(stored).not.toMatch(/97 12 34 56/);
+            expect(stored.toLowerCase()).not.toContain('whatsapp');
+            expect(stored).toContain('•••');
+        });
+
         it('should throw NotFoundException when booking not found', async () => {
             mockPrisma.booking.findUnique.mockResolvedValue(null);
 

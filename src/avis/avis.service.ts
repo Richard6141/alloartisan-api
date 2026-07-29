@@ -11,6 +11,7 @@ import { NotificationService } from 'src/notification/notification.service';
 import { CreateAvisDto, RespondAvisDto, ReportAvisDto } from './dto';
 import { StatutBooking } from 'src/generated/prisma';
 import { nomLisible } from 'src/common/utils/nom.util';
+import { masquerContacts } from 'src/common/utils/anti-contact.util';
 
 // Fenêtre de 14 jours pour laisser un avis après fin d'intervention
 const REVIEW_DELAY_DAYS = 14;
@@ -93,7 +94,11 @@ export class AvisService {
                     notePonctualite: dto.notePonctualite,
                     noteQualite: dto.noteQualite,
                     noteCommunication: dto.noteCommunication,
-                    commentaire: dto.commentaire,
+                    // Anti-désintermédiation : masquer tout numéro/email/réseau glissé
+                    // dans un avis public (contournait le verrou de la messagerie).
+                    commentaire: dto.commentaire
+                        ? masquerContacts(dto.commentaire).texte
+                        : dto.commentaire,
                     visible: true,
                 },
                 include: {
@@ -118,7 +123,7 @@ export class AvisService {
         );
 
         // 8. Notifier l'artisan du nouvel avis (fire-and-forget)
-        const clientData = (avis as any).client;
+        const clientData = avis.client;
         const nomClient = nomLisible(clientData, 'Un client');
         void this.notificationService.send({
             userId: booking.artisan.userId,
