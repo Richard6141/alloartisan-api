@@ -25,6 +25,8 @@ async function bootstrap() {
     });
 
     const app = await NestFactory.create<NestExpressApplication>(AppModule);
+    // derrière reverse proxy (Plesk/Passenger) : req.ip = vraie IP client
+    app.set('trust proxy', 1);
     app.enableShutdownHooks();
 
     // WebSockets scalables multi-instances (chat + tracking) via Redis pub/sub
