@@ -367,3 +367,91 @@ describe('verifyLoginCode', () => {
         expect(mockOtp.verify).not.toHaveBeenCalled();
     });
 });
+
+// ---------------------------------------------------------------------------
+// resetPassword — activation d'un compte EN_ATTENTE (Bug: reset OK mais login bloqué)
+// ---------------------------------------------------------------------------
+describe('resetPassword — activation compte EN_ATTENTE', () => {
+    let mockPrisma: any;
+    let mockOtp: any;
+    let mockSession: any;
+    let service: AuthService;
+
+    const buildService = () => {
+        mockPrisma = {
+            user: {
+                findUnique: jest.fn(),
+                update: jest.fn().mockResolvedValue({}),
+            },
+        };
+        mockOtp = { verify: jest.fn().mockResolvedValue(true) };
+        mockSession = { revokeAll: jest.fn().mockResolvedValue(undefined) };
+        service = new AuthService(
+            mockPrisma,
+            {} as any,
+            { get: jest.fn(), getOrThrow: jest.fn() } as any,
+            mockOtp,
+            {} as any,
+            mockSession,
+            {} as any,
+            {} as any,
+            {} as any,
+            {} as any,
+        );
+    };
+
+    const dto = { email: 'u@x.io', code: '123456', newPassword: 'NewPass@123' } as any;
+
+    beforeEach(() => buildService());
+
+    it('compte EN_ATTENTE -> maj passwordHash + emailVerified=true + statut=ACTIF', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue({
+            id: 'u1',
+            email: 'u@x.io',
+            statut: 'EN_ATTENTE',
+            emailVerified: false,
+        });
+
+        await service.resetPassword(dto);
+
+        expect(mockPrisma.user.update).toHaveBeenCalledWith({
+            where: { id: 'u1' },
+            data: expect.objectContaining({
+                passwordHash: 'hashed',
+                emailVerified: true,
+                statut: 'ACTIF',
+            }),
+        });
+        expect(mockSession.revokeAll).toHaveBeenCalledWith('u1');
+    });
+
+    it('compte ACTIF -> ne touche PAS statut/emailVerified (juste le mot de passe)', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue({
+            id: 'u2',
+            email: 'u@x.io',
+            statut: 'ACTIF',
+            emailVerified: true,
+        });
+
+        await service.resetPassword(dto);
+
+        const dataArg = mockPrisma.user.update.mock.calls[0][0].data;
+        expect(dataArg.passwordHash).toBe('hashed');
+        expect(dataArg).not.toHaveProperty('statut');
+        expect(dataArg).not.toHaveProperty('emailVerified');
+    });
+
+    it('compte SUSPENDU -> reste SUSPENDU (jamais réactivé par un reset)', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue({
+            id: 'u3',
+            email: 'u@x.io',
+            statut: 'SUSPENDU',
+            emailVerified: true,
+        });
+
+        await service.resetPassword(dto);
+
+        const dataArg = mockPrisma.user.update.mock.calls[0][0].data;
+        expect(dataArg).not.toHaveProperty('statut');
+    });
+});

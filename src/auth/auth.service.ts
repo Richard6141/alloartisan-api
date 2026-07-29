@@ -258,12 +258,22 @@ export class AuthService {
             picture?: string;
         };
 
-        // Vérifier que le jeton a bien été émis pour NOS clients Google
+        // Vérifier que le jeton a bien été émis pour NOS clients Google.
+        // FAIL-CLOSED : sans liste de client IDs autorisés, on REFUSE. Sinon
+        // n'importe quel jeton Google valide (émis pour une AUTRE application,
+        // que l'attaquant contrôle) serait accepté → usurpation de compte par
+        // email (googleAuth fait confiance à claims.email pour créer/lier).
         const allowed = (this.config.get<string>('GOOGLE_CLIENT_IDS') ?? '')
             .split(',')
             .map((s) => s.trim())
             .filter(Boolean);
-        if (allowed.length > 0 && (!claims.aud || !allowed.includes(claims.aud))) {
+        if (allowed.length === 0) {
+            this.logger.error(
+                'GOOGLE_CLIENT_IDS non configuré — connexion Google refusée (fail-closed).',
+            );
+            throw new UnauthorizedException('Connexion Google indisponible.');
+        }
+        if (!claims.aud || !allowed.includes(claims.aud)) {
             throw new UnauthorizedException('Jeton Google non destiné à cette application');
         }
         if (claims.email_verified !== true && claims.email_verified !== 'true') {
@@ -536,9 +546,20 @@ export class AuthService {
         }
 
         const hash = await argon.hash(dto.newPassword);
+
+        // Recevoir puis saisir le code envoyé par email PROUVE la possession de
+        // l'adresse — exactement la preuve qu'exige la vérification d'email. On
+        // active donc un compte encore EN_ATTENTE (jamais SUSPENDU/BANNI), sinon
+        // l'utilisateur réinitialise son mot de passe avec succès mais reste
+        // bloqué au login (gate emailVerified + statut === ACTIF).
+        const activation =
+            user.statut === Statut.EN_ATTENTE
+                ? { emailVerified: true, statut: Statut.ACTIF }
+                : {};
+
         await this.prisma.user.update({
             where: { id: user.id },
-            data: { passwordHash: hash },
+            data: { passwordHash: hash, ...activation },
         });
 
         // Révoquer toutes les sessions existantes
