@@ -88,4 +88,46 @@ export class EmailService {
     private getPasswordResetEmailHtml(otpCode: string): string {
         return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Réinitialisation du mot de passe</title></head><body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f4f4f4;"><table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto;"><tr><td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;"><h1 style="color: white; margin: 0; font-size: 28px;">AlloArtisan</h1></td></tr><tr><td style="background: #ffffff; padding: 40px 30px; border-radius: 0 0 10px 10px;"><h2 style="color: #333; margin: 0 0 20px 0; font-size: 22px;">Réinitialisation du mot de passe</h2><p style="margin: 0 0 20px 0; color: #555;">Vous avez demandé la réinitialisation de votre mot de passe. Utilisez le code ci-dessous pour continuer :</p><table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center"><div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-size: 32px; font-weight: bold; text-align: center; padding: 20px 40px; border-radius: 8px; letter-spacing: 8px; display: inline-block;">${otpCode}</div></td></tr></table><p style="color: #666; font-size: 14px; margin: 25px 0 10px 0;">Ce code expire dans <strong>10 minutes</strong>.</p><p style="color: #888; font-size: 13px; margin: 0;">Si vous n'avez pas demandé cette réinitialisation, veuillez ignorer cet email. Votre mot de passe restera inchangé.</p><hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;"><p style="color: #999; font-size: 12px; text-align: center; margin: 0;">© ${new Date().getFullYear()} AlloArtisan. Tous droits réservés.</p></td></tr></table></body></html>`;
     }
+
+    async sendLoginCodeEmail(to: string, otpCode: string): Promise<boolean> {
+        const subject = 'Votre code de connexion AlloArtisan Admin';
+        const html = `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f4f6fb;padding:24px">
+    <div style="max-width:480px;margin:auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
+      <div style="background:#14294d;color:#fff;padding:20px 24px;font-size:18px;font-weight:bold">AlloArtisan · Console d'administration</div>
+      <div style="padding:24px">
+        <p style="color:#111827">Une connexion à votre compte administrateur a été demandée depuis un nouvel appareil.</p>
+        <p style="color:#374151">Votre code de vérification (valable 10 minutes) :</p>
+        <div style="text-align:center;margin:20px 0">
+          <span style="display:inline-block;background:#14294d;color:#fff;font-size:30px;font-weight:bold;letter-spacing:8px;padding:16px 28px;border-radius:8px">${otpCode}</span>
+        </div>
+        <p style="color:#6b7280;font-size:13px">Si vous n'êtes pas à l'origine de cette connexion, ignorez cet email et changez votre mot de passe.</p>
+      </div>
+    </div></body></html>`;
+        const sent = await this.sendEmail(to, subject, html);
+        if (!sent && process.env.NODE_ENV !== 'production') {
+            this.logger.warn(`[DEV] Code de connexion pour ${to} : ${otpCode}`);
+        }
+        return sent;
+    }
+
+    async sendNewLoginAlertEmail(
+        to: string,
+        info: { deviceLabel: string; ip: string; date: string },
+    ): Promise<boolean> {
+        const subject = 'Nouvelle connexion à votre compte AlloArtisan Admin';
+        const html = `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f4f6fb;padding:24px">
+    <div style="max-width:480px;margin:auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
+      <div style="background:#14294d;color:#fff;padding:20px 24px;font-size:18px;font-weight:bold">AlloArtisan · Sécurité</div>
+      <div style="padding:24px;color:#374151">
+        <p>Une nouvelle connexion à votre compte administrateur vient d'être validée :</p>
+        <ul style="line-height:1.8">
+          <li>Appareil : <b>${info.deviceLabel}</b></li>
+          <li>Adresse IP : <b>${info.ip}</b></li>
+          <li>Date : <b>${info.date}</b></li>
+        </ul>
+        <p style="color:#6b7280;font-size:13px">Si ce n'était pas vous, changez votre mot de passe immédiatement.</p>
+      </div>
+    </div></body></html>`;
+        return this.sendEmail(to, subject, html);
+    }
 }
