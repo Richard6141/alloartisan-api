@@ -36,4 +36,10 @@ export class MfaRequiredResponse {
     mfa_token: string;
 }
 
-export type LoginResponse = Tokens | MfaRequiredResponse;
+export class LoginVerifyRequiredResponse {
+    @ApiProperty({ example: true }) verification_required: true;
+    @ApiProperty({ description: 'JWT court pour /login/verify' }) verify_token: string;
+    @ApiProperty({ example: 'j***@gmail.com' }) email_masked: string;
+}
+
+export type LoginResponse = Tokens | MfaRequiredResponse | LoginVerifyRequiredResponse;

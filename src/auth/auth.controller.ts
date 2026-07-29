@@ -29,6 +29,8 @@ import {
     EnableMfaDto,
     VerifyMfaDto,
     VerifyMfaLoginDto,
+    VerifyLoginCodeDto,
+    ResendLoginCodeDto,
 } from './dto';
 import { RtGuard } from 'src/common/guards';
 import { GetCurrentUser, GetCurrentUserId, Public } from 'src/common/decorators';
@@ -120,6 +122,28 @@ export class AuthController {
             dto.code,
             this.extractDeviceInfo(req),
         );
+    }
+
+    @Public()
+    @Throttle({ short: { limit: 5, ttl: 900000 } })
+    @Post('login/verify')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Vérification code email (nouvel appareil admin)' })
+    @ApiResponse({ status: 200, description: 'Code vérifié, tokens retournés', type: Tokens })
+    @ApiForbiddenResponse({ description: 'Code invalide, expiré ou appareil non concordant' })
+    verifyLoginCode(@Body() dto: VerifyLoginCodeDto, @Req() req: Request): Promise<Tokens> {
+        return this.authService.verifyLoginCode(dto.verify_token, dto.code, this.extractDeviceInfo(req));
+    }
+
+    @Public()
+    @Throttle({ short: { limit: 3, ttl: 600000 } })
+    @Post('login/verify/resend')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Renvoyer le code email de connexion' })
+    @ApiResponse({ status: 200, description: 'Code renvoyé' })
+    @ApiForbiddenResponse({ description: 'Session de vérification expirée' })
+    resendLoginCode(@Body() dto: ResendLoginCodeDto): Promise<{ ok: true }> {
+        return this.authService.resendLoginCode(dto.verify_token);
     }
 
     @SkipThrottle()

@@ -18,7 +18,7 @@ import {
     VerifyMfaDto,
 } from './dto';
 import * as argon from 'argon2';
-import { Tokens, LoginResponse } from './types';
+import { Tokens, LoginResponse, LoginVerifyRequiredResponse } from './types';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { OtpService, EmailService, SessionService, CryptoService } from 'src/common/services';
@@ -334,6 +334,34 @@ export class AuthService {
                 },
             );
             return { mfa_required: true, mfa_token: mfaToken };
+        }
+
+        // 2FA email « appareil de confiance » pour les admins SANS TOTP
+        if (user.role === 'ADMIN' && !(await this.isTrustedDevice(user.id, deviceInfo))) {
+            const code = await this.otpService.create(user.id, OtpType.TWO_FACTOR_AUTH);
+            setImmediate(() => {
+                void this.emailService.sendLoginCodeEmail(user.email, code);
+            });
+            const verifyToken = await this.signLoginVerifyToken(user.id, deviceInfo?.deviceId);
+            this.prisma.logActivite
+                .create({
+                    data: {
+                        userId: user.id,
+                        action: 'LOGIN_VERIFY_SENT',
+                        entite: 'auth',
+                        entiteId: user.id,
+                        metadata: { ip: deviceInfo?.ipAddress },
+                    },
+                })
+                .catch(() => undefined);
+            return {
+                verification_required: true,
+                verify_token: verifyToken,
+                email_masked: this.maskEmail(user.email),
+            } as LoginVerifyRequiredResponse;
+        }
+        if (user.role === 'ADMIN') {
+            await this.trustDevice(user.id, deviceInfo); // rafraîchit lastSeen sur appareil de confiance
         }
 
         // Mettre à jour dernière connexion
@@ -760,5 +788,150 @@ export class AuthService {
         } else if (user.statut === Statut.EN_ATTENTE) {
             await this.emailService.sendAccountStatusEmail(user.email, 'not_verified');
         }
+    }
+
+    // ==================== 2FA EMAIL (ADMIN TRUSTED DEVICE) ====================
+
+    private maskEmail(email: string): string {
+        const [name, domain] = email.split('@');
+        const head = name.slice(0, 1);
+        return `${head}${'*'.repeat(Math.max(name.length - 1, 1))}@${domain}`;
+    }
+
+    /** Appareil de confiance = ligne (userId, deviceId) non expirée ET même IP. */
+    private async isTrustedDevice(userId: string, deviceInfo?: DeviceInfo): Promise<boolean> {
+        const deviceId = deviceInfo?.deviceId;
+        if (!deviceId) return false;
+        const td = await this.prisma.trustedDevice.findUnique({
+            where: { userId_deviceId: { userId, deviceId } },
+        });
+        if (!td || td.trustedUntil.getTime() <= Date.now()) return false;
+        // "nouvelle IP" : si on a une IP mémorisée et qu'elle diffère → non de confiance
+        if (td.ipAddress && deviceInfo?.ipAddress && td.ipAddress !== deviceInfo.ipAddress)
+            return false;
+        return true;
+    }
+
+    /** Crée/rafraîchit l'appareil de confiance (30 jours). */
+    private async trustDevice(userId: string, deviceInfo?: DeviceInfo): Promise<void> {
+        const deviceId = deviceInfo?.deviceId;
+        if (!deviceId) return;
+        const trustedUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        const label =
+            [deviceInfo?.deviceName, deviceInfo?.deviceType].filter(Boolean).join(' · ') || null;
+        await this.prisma.trustedDevice.upsert({
+            where: { userId_deviceId: { userId, deviceId } },
+            update: {
+                ipAddress: deviceInfo?.ipAddress,
+                userAgent: deviceInfo?.userAgent,
+                deviceLabel: label,
+                trustedUntil,
+                lastSeenAt: new Date(),
+            },
+            create: {
+                userId,
+                deviceId,
+                ipAddress: deviceInfo?.ipAddress,
+                userAgent: deviceInfo?.userAgent,
+                deviceLabel: label,
+                trustedUntil,
+                lastSeenAt: new Date(),
+            },
+        });
+    }
+
+    private async signLoginVerifyToken(userId: string, deviceId?: string): Promise<string> {
+        return this.jwtService.signAsync(
+            { sub: userId, deviceId: deviceId ?? null, type: 'login_verify' },
+            { secret: this.config.getOrThrow('JWT_ACCESS_SECRET'), expiresIn: 60 * 10 },
+        );
+    }
+
+    async verifyLoginCode(
+        verifyToken: string,
+        code: string,
+        deviceInfo?: DeviceInfo,
+    ): Promise<Tokens> {
+        let payload: { sub: string; deviceId: string | null; type: string };
+        try {
+            payload = await this.jwtService.verifyAsync(verifyToken, {
+                secret: this.config.getOrThrow('JWT_ACCESS_SECRET'),
+            });
+        } catch {
+            throw new ForbiddenException('Session de vérification expirée. Reconnectez-vous.');
+        }
+        if (payload.type !== 'login_verify')
+            throw new ForbiddenException('Jeton de vérification invalide');
+        // liaison appareil : le x-device-id doit correspondre à celui du token
+        if (
+            payload.deviceId &&
+            deviceInfo?.deviceId &&
+            payload.deviceId !== deviceInfo.deviceId
+        ) {
+            throw new ForbiddenException('Appareil non concordant');
+        }
+        const ok = await this.otpService.verify(payload.sub, OtpType.TWO_FACTOR_AUTH, code); // lève si expiré/max tentatives
+        if (!ok) throw new ForbiddenException('Code de vérification invalide');
+
+        await this.trustDevice(payload.sub, {
+            ...deviceInfo,
+            deviceId: deviceInfo?.deviceId ?? payload.deviceId ?? undefined,
+        });
+        const user = await this.prisma.user.findUnique({
+            where: { id: payload.sub },
+            select: { email: true },
+        });
+        if (user?.email) {
+            setImmediate(() => {
+                void this.emailService.sendNewLoginAlertEmail(user.email, {
+                    deviceLabel:
+                        [deviceInfo?.deviceName, deviceInfo?.deviceType]
+                            .filter(Boolean)
+                            .join(' · ') || 'Appareil inconnu',
+                    ip: deviceInfo?.ipAddress ?? '—',
+                    date: new Date().toLocaleString('fr-FR'),
+                });
+            });
+        }
+        this.prisma.logActivite
+            .create({
+                data: {
+                    userId: payload.sub,
+                    action: 'LOGIN_VERIFY_OK',
+                    entite: 'auth',
+                    entiteId: payload.sub,
+                    metadata: { ip: deviceInfo?.ipAddress },
+                },
+            })
+            .catch(() => undefined);
+        await this.prisma.user.update({
+            where: { id: payload.sub },
+            data: { derniereConnexion: new Date() },
+        });
+        return this.createSession(payload.sub, deviceInfo);
+    }
+
+    async resendLoginCode(verifyToken: string): Promise<{ ok: true }> {
+        let payload: { sub: string; type: string };
+        try {
+            payload = await this.jwtService.verifyAsync(verifyToken, {
+                secret: this.config.getOrThrow('JWT_ACCESS_SECRET'),
+            });
+        } catch {
+            throw new ForbiddenException('Session de vérification expirée. Reconnectez-vous.');
+        }
+        if (payload.type !== 'login_verify')
+            throw new ForbiddenException('Jeton de vérification invalide');
+        const user = await this.prisma.user.findUnique({
+            where: { id: payload.sub },
+            select: { email: true },
+        });
+        if (user?.email) {
+            const code = await this.otpService.create(payload.sub, OtpType.TWO_FACTOR_AUTH);
+            setImmediate(() => {
+                void this.emailService.sendLoginCodeEmail(user.email, code);
+            });
+        }
+        return { ok: true }; // réponse neutre (ne pas révéler l'existence du compte)
     }
 }
